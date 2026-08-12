@@ -28,23 +28,33 @@ const provider = new GoogleAuthProvider();
 
 /**
  * Sign in with Google.
- * On Native Mobile App (Android/iOS): STRICTLY uses native Google Sign-In bottom sheet inside the app.
- * NEVER redirects to Chrome browser on mobile.
+ * On Native Mobile App (Android/iOS): Uses native Google Sign-In bottom sheet with scopes and idToken/accessToken mapping.
  * On Web Browser: Uses standard Firebase popup window.
  */
 export async function signInWithGoogle() {
   if (Capacitor.isNativePlatform()) {
     try {
       const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
-      const res = await FirebaseAuthentication.signInWithGoogle();
-      if (res.credential?.idToken) {
-        const credential = GoogleAuthProvider.credential(res.credential.idToken);
+      const res = await FirebaseAuthentication.signInWithGoogle({
+        scopes: ['profile', 'email']
+      });
+
+      const idToken = res.credential?.idToken;
+      const accessToken = res.credential?.accessToken;
+
+      if (idToken || accessToken) {
+        const credential = GoogleAuthProvider.credential(idToken, accessToken);
         const userCredential = await signInWithCredential(auth, credential);
         return userCredential.user;
       }
     } catch (err) {
       console.error('Native Google Auth Error:', err);
-      // Ensure we NEVER fall back to opening Chrome on Android
+      const errMsg = err?.message || err?.code || 'Sign in failed';
+      alert(
+        navigator.language === 'bn'
+          ? `⚠️ গুগল সাইন-ইন ত্রুটি: ${errMsg}`
+          : `⚠️ Google Sign-in error: ${errMsg}`
+      );
       throw err;
     }
     return;
