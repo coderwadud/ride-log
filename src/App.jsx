@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import LoginScreen from './components/LoginScreen';
+import { onAuthChange, signOutUser } from './utils/firebase';
+import { loadUserData, saveUserData, resetUserDataInFirestore } from './utils/firestoreDB';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import FuelLogsTab from './components/FuelLogsTab';
@@ -10,142 +13,116 @@ import BikeModal from './components/BikeModal';
 import PWAInstallModal from './components/PWAInstallModal';
 import BikeSelector from './components/BikeSelector';
 
-import { 
-  loadBikes,
-  saveBikes,
-  loadActiveBikeId,
-  saveActiveBikeId,
-  loadBikeProfile, 
-  saveBikeProfile, 
-  loadFuelLogs, 
-  saveFuelLogs, 
-  loadServiceLogs, 
-  saveServiceLogs, 
-  loadSettings, 
-  saveSettings,
-  loadGDriveUser,
-  exportBackupData,
-  mergeImportBackupData,
-  loadFuelLogs as reloadFuelLogs,
-  loadServiceLogs as reloadServiceLogs,
-  clearAllData
-} from './utils/storage';
-
-import { 
-  syncWithGDrive, 
-  requestGoogleDriveLogin, 
-  clearGDriveToken, 
-  isGDriveTokenValid 
-} from './utils/gdrive';
-
-import { 
-  calculateFuelLogStats, 
-  calculateServiceStats 
-} from './utils/calculations';
-
+import { exportBackupData, mergeImportBackupData } from './utils/storage';
+import { calculateFuelLogStats, calculateServiceStats } from './utils/calculations';
 import { translations } from './utils/translations';
 import { LayoutDashboard, Fuel, Wrench, BarChart3 } from 'lucide-react';
 
+const DEFAULT_BIKE = {
+  id: 'bike_1',
+  name: 'My Bike',
+  regNumber: '',
+  initialOdometer: 0,
+  currentOdometer: 0,
+  targetOilKm: 1000
+};
+
 export default function App() {
-  const initialSettings = loadSettings();
-  const [lang, setLang] = useState(initialSettings?.lang || 'bn');
-  const [theme, setTheme] = useState(initialSettings?.theme || 'dark');
+  const [lang, setLang] = useState('bn');
+  const [theme, setTheme] = useState('dark');
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  // Firebase Auth State
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(false);
+
+  // Core App Data States (User-isolated via Firestore)
+  const [bikes, setBikes] = useState([DEFAULT_BIKE]);
+  const [activeBikeId, setActiveBikeId] = useState('bike_1');
+  const [fuelLogs, setFuelLogs] = useState([]);
+  const [serviceLogs, setServiceLogs] = useState([]);
+
+  // Flag to avoid saving initial empty state over Firestore before loading finishes
+  const isLoadedRef = useRef(false);
+  const saveTimerRef = useRef(null);
 
   // Apply theme to document root
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // Multi-Bike Core States
-  const [bikes, setBikes] = useState(loadBikes());
-  const [activeBikeId, setActiveBikeId] = useState(loadActiveBikeId());
-
-  // Core Data States
-  const [fuelLogs, setFuelLogs] = useState(loadFuelLogs());
-  const [serviceLogs, setServiceLogs] = useState(loadServiceLogs());
-
-  // Google Drive Cloud Sync State
-  const [gdriveUser, setGDriveUser] = useState(loadGDriveUser());
-  const [gdriveSyncing, setGDriveSyncing] = useState(false);
-
-  // Active Bike Profile
-  const activeBike = bikes.find(b => b.id === activeBikeId) || bikes[0] || {
-    id: 'bike_1',
-    name: 'My Bike',
-    regNumber: '',
-    initialOdometer: 0,
-    currentOdometer: 0,
-    targetOilKm: 1000
-  };
-
   // Modal States
   const [isFuelModalOpen, setIsFuelModalOpen] = useState(false);
   const [editingFuelData, setEditingFuelData] = useState(null);
-
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
   const [editingServiceData, setEditingServiceData] = useState(null);
-
   const [isBikeModalOpen, setIsBikeModalOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
 
   // PWA Install Event
   const [deferredPrompt, setDeferredPrompt] = useState(null);
-
   useEffect(() => {
-    const handleBeforeInstall = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
+    const handleBeforeInstall = (e) => { e.preventDefault(); setDeferredPrompt(e); };
     window.addEventListener('beforeinstallprompt', handleBeforeInstall);
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
   }, []);
 
-  // Save to LocalStorage whenever data changes
+  // ── FIREBASE AUTH & FIRESTORE DATA SYNC ──
   useEffect(() => {
-    saveBikes(bikes);
-  }, [bikes]);
+    const unsubscribe = onAuthChange(async (firebaseUser) => {
+      setUser(firebaseUser);
+      if (firebaseUser) {
+        setDataLoading(true);
+        isLoadedRef.current = false;
 
-  useEffect(() => {
-    saveActiveBikeId(activeBikeId);
-  }, [activeBikeId]);
+        // Fetch user data from Firestore document users/{uid}
+        const data = await loadUserData(firebaseUser.uid);
 
-  useEffect(() => {
-    saveFuelLogs(fuelLogs);
-  }, [fuelLogs]);
+        setBikes(data.bikes);
+        setActiveBikeId(data.activeBikeId);
+        setFuelLogs(data.fuelLogs);
+        setServiceLogs(data.serviceLogs);
+        if (data.settings?.lang) setLang(data.settings.lang);
+        if (data.settings?.theme) setTheme(data.settings.theme);
 
-  useEffect(() => {
-    saveServiceLogs(serviceLogs);
-  }, [serviceLogs]);
-
-  // Background Google Drive Auto-Sync Trigger
-  const triggerAutoGDriveSync = async () => {
-    if (isGDriveTokenValid() && navigator.onLine) {
-      setGDriveSyncing(true);
-      try {
-        const res = await syncWithGDrive();
-        if (res.success) {
-          // Reload merged data from localStorage
-          setBikes(loadBikes());
-          setActiveBikeId(loadActiveBikeId());
-          setFuelLogs(reloadFuelLogs());
-          setServiceLogs(reloadServiceLogs());
-        }
-      } catch (e) {
-        console.error('Auto sync error:', e);
-      } finally {
-        setGDriveSyncing(false);
+        setDataLoading(false);
+        isLoadedRef.current = true;
+      } else {
+        // Logged out — clear user data from memory
+        setBikes([DEFAULT_BIKE]);
+        setActiveBikeId('bike_1');
+        setFuelLogs([]);
+        setServiceLogs([]);
+        isLoadedRef.current = false;
       }
-    }
-  };
-
-  // Auto-sync on boot and when internet restores
-  useEffect(() => {
-    triggerAutoGDriveSync();
-    const handleOnline = () => triggerAutoGDriveSync();
-    window.addEventListener('online', handleOnline);
-    return () => window.removeEventListener('online', handleOnline);
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
   }, []);
+
+  // ── AUTO-SAVE TO FIRESTORE (Debounced) ──
+  const scheduleSave = useCallback(() => {
+    if (!user || !isLoadedRef.current) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+
+    saveTimerRef.current = setTimeout(() => {
+      saveUserData(user.uid, {
+        settings: { lang, theme },
+        activeBikeId,
+        bikes,
+        fuelLogs,
+        serviceLogs
+      });
+    }, 600);
+  }, [user, lang, theme, activeBikeId, bikes, fuelLogs, serviceLogs]);
+
+  useEffect(() => {
+    scheduleSave();
+  }, [bikes, fuelLogs, serviceLogs, activeBikeId, lang, theme, scheduleSave]);
+
+  // Active Bike Profile
+  const activeBike = bikes.find(b => b.id === activeBikeId) || bikes[0] || DEFAULT_BIKE;
 
   // Filter fuel and service logs for active bike
   const activeFuelLogs = fuelLogs.filter(l => (l.bikeId || 'bike_1') === activeBikeId);
@@ -159,12 +136,12 @@ export default function App() {
     ...(activeServiceLogs.map(s => s.odometer || 0))
   );
 
-  // Auto-sync current odometer to activeBike if higher
+  // Auto-update current odometer to activeBike if higher
   useEffect(() => {
     if (currentOdometer > (activeBike.currentOdometer || 0)) {
       setBikes(prev => prev.map(b => b.id === activeBikeId ? { ...b, currentOdometer } : b));
     }
-  }, [currentOdometer, activeBikeId]);
+  }, [currentOdometer, activeBikeId, activeBike.currentOdometer]);
 
   const serviceStats = calculateServiceStats(activeServiceLogs, currentOdometer, activeBike.targetOilKm || 1000);
 
@@ -174,54 +151,40 @@ export default function App() {
     ...activeServiceLogs.map(s => ({ ...s, isFuel: false }))
   ].sort((a, b) => new Date(b.date) - new Date(a.date) || (b.odometer || 0) - (a.odometer || 0));
 
-  const t = translations[lang];
+  const t = translations[lang] || translations.bn;
 
-  // Multi-Bike Handlers
+  // Handlers
   const handleSelectBike = (bikeId) => {
     setActiveBikeId(bikeId);
-    saveActiveBikeId(bikeId);
   };
 
   const handleAddBike = (newBikeData) => {
-    const newBike = {
-      ...newBikeData,
-      id: `bike_${Date.now()}`
-    };
-    const updated = [...bikes, newBike];
-    setBikes(updated);
+    const newBike = { ...newBikeData, id: `bike_${Date.now()}` };
+    setBikes(prev => [...prev, newBike]);
     setActiveBikeId(newBike.id);
-    triggerAutoGDriveSync();
   };
 
   const handleDeleteBike = (bikeId) => {
     if (bikes.length <= 1) return;
-    const updated = bikes.filter(b => b.id !== bikeId);
-    setBikes(updated);
-    if (activeBikeId === bikeId) {
-      setActiveBikeId(updated[0].id);
-    }
-    triggerAutoGDriveSync();
+    setBikes(prev => {
+      const updated = prev.filter(b => b.id !== bikeId);
+      if (activeBikeId === bikeId) setActiveBikeId(updated[0].id);
+      return updated;
+    });
   };
 
   const handleSaveBikeProfile = (updatedProfile) => {
     setBikes(prev => prev.map(b => b.id === activeBikeId ? { ...b, ...updatedProfile } : b));
-    triggerAutoGDriveSync();
   };
 
-  // Language & Theme Handlers
   const handleToggleLang = () => {
-    const nextLang = lang === 'bn' ? 'en' : 'bn';
-    setLang(nextLang);
-    saveSettings({ lang: nextLang, theme });
+    setLang(prev => prev === 'bn' ? 'en' : 'bn');
   };
 
   const handleToggleTheme = () => {
-    const nextTheme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(nextTheme);
-    saveSettings({ lang, theme: nextTheme });
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
-  // Fuel & Service Handlers
   const handleSaveFuel = (entry) => {
     const entryWithBike = { ...entry, bikeId: activeBikeId };
     if (editingFuelData) {
@@ -230,13 +193,11 @@ export default function App() {
       setFuelLogs(prev => [...prev, entryWithBike]);
     }
     setEditingFuelData(null);
-    triggerAutoGDriveSync();
   };
 
   const handleDeleteFuel = (id) => {
     if (window.confirm(t.confirmDeleteFuel)) {
       setFuelLogs(prev => prev.filter(item => item.id !== id));
-      triggerAutoGDriveSync();
     }
   };
 
@@ -248,57 +209,58 @@ export default function App() {
       setServiceLogs(prev => [...prev, entryWithBike]);
     }
     setEditingServiceData(null);
-    triggerAutoGDriveSync();
   };
 
   const handleDeleteService = (id) => {
     if (window.confirm(t.confirmDeleteService)) {
       setServiceLogs(prev => prev.filter(item => item.id !== id));
-      triggerAutoGDriveSync();
     }
   };
 
-  // Google Drive Handlers
-  const handleGoogleLogin = () => {
-    requestGoogleDriveLogin(
-      async ({ token, user }) => {
-        setGDriveUser(user);
-        alert(lang === 'bn' ? '✅ গুগল অ্যাকাউন্ট সফলভাবে কানেক্ট হয়েছে!' : '✅ Google account connected successfully!');
-        triggerAutoGDriveSync();
-      },
-      (err) => {
-        console.error('Google login failed:', err);
-        alert(lang === 'bn' ? '⚠️ গুগল ক্লাউড সাইন-ইন ব্যাহত হয়েছে।' : '⚠️ Google login interrupted.');
-      }
+  const handleLogout = async () => {
+    const confirmed = window.confirm(
+      lang === 'bn' ? 'আপনি কি সত্যিই লগআউট করতে চান?' : 'Are you sure you want to logout?'
     );
-  };
-
-  const handleGoogleLogout = () => {
-    clearGDriveToken();
-    setGDriveUser(null);
-    alert(lang === 'bn' ? '🚪 গুগল ক্লাউড থেকে সাইন-আউট করা হয়েছে।' : '🚪 Signed out from Google Drive.');
+    if (!confirmed) return;
+    await signOutUser();
   };
 
   const handleTriggerInstall = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
       const choiceResult = await deferredPrompt.userChoice;
-      if (choiceResult.outcome === 'accepted') {
-        setDeferredPrompt(null);
-      }
+      if (choiceResult.outcome === 'accepted') setDeferredPrompt(null);
     }
   };
+
+  // ── Auth & Loading Guard ──
+  if (authLoading || dataLoading) {
+    return (
+      <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-main)', gap: '16px' }}>
+        <div style={{ width: 44, height: 44, border: '3px solid rgba(56,189,248,0.2)', borderTopColor: '#38bdf8', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+        <span style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>
+          {lang === 'bn' ? 'ডাটা লোড হচ্ছে...' : 'Loading user data...'}
+        </span>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginScreen lang={lang} />;
+  }
 
   return (
     <div className="app-container">
       {/* Header Bar */}
-      <Header 
+      <Header
         lang={lang}
         onToggleLang={handleToggleLang}
         bikeProfile={activeBike}
         onEditBike={() => setIsBikeModalOpen(true)}
         theme={theme}
         onToggleTheme={handleToggleTheme}
+        user={user}
+        onLogout={handleLogout}
       />
 
       {/* Mobile-Only Custom Bike Selector Bar below Header */}
@@ -318,34 +280,19 @@ export default function App() {
 
       {/* Main Tab Navigation for Desktop */}
       <nav className="nav-tabs">
-        <button 
-          className={`nav-tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
-          onClick={() => setActiveTab('dashboard')}
-        >
+        <button className={`nav-tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
           <LayoutDashboard size={18} />
           <span>{t.dashboard}</span>
         </button>
-
-        <button 
-          className={`nav-tab-btn ${activeTab === 'fuel' ? 'active' : ''}`}
-          onClick={() => setActiveTab('fuel')}
-        >
+        <button className={`nav-tab-btn ${activeTab === 'fuel' ? 'active' : ''}`} onClick={() => setActiveTab('fuel')}>
           <Fuel size={18} />
           <span>{t.fuelLogs}</span>
         </button>
-
-        <button 
-          className={`nav-tab-btn ${activeTab === 'service' ? 'active' : ''}`}
-          onClick={() => setActiveTab('service')}
-        >
+        <button className={`nav-tab-btn ${activeTab === 'service' ? 'active' : ''}`} onClick={() => setActiveTab('service')}>
           <Wrench size={18} />
           <span>{t.serviceLogs}</span>
         </button>
-
-        <button 
-          className={`nav-tab-btn ${activeTab === 'analytics' ? 'active' : ''}`}
-          onClick={() => setActiveTab('analytics')}
-        >
+        <button className={`nav-tab-btn ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => setActiveTab('analytics')}>
           <BarChart3 size={18} />
           <span>{t.analytics}</span>
         </button>
@@ -354,7 +301,7 @@ export default function App() {
       {/* Tab View Contents */}
       <main>
         {activeTab === 'dashboard' && (
-          <Dashboard 
+          <Dashboard
             lang={lang}
             fuelStats={fuelStats}
             serviceStats={serviceStats}
@@ -364,9 +311,8 @@ export default function App() {
             recentLogs={recentLogs}
           />
         )}
-
         {activeTab === 'fuel' && (
-          <FuelLogsTab 
+          <FuelLogsTab
             lang={lang}
             fuelLogsStats={fuelStats}
             onOpenAddFuel={() => { setEditingFuelData(null); setIsFuelModalOpen(true); }}
@@ -374,9 +320,8 @@ export default function App() {
             onDeleteFuel={handleDeleteFuel}
           />
         )}
-
         {activeTab === 'service' && (
-          <ServiceLogsTab 
+          <ServiceLogsTab
             lang={lang}
             serviceLogs={activeServiceLogs}
             serviceStats={serviceStats}
@@ -385,9 +330,8 @@ export default function App() {
             onDeleteService={handleDeleteService}
           />
         )}
-
         {activeTab === 'analytics' && (
-          <AnalyticsTab 
+          <AnalyticsTab
             lang={lang}
             fuelLogs={activeFuelLogs}
             serviceLogs={activeServiceLogs}
@@ -396,54 +340,35 @@ export default function App() {
         )}
       </main>
 
-      {/* Native Mobile Floating Action Buttons (FAB) */}
+      {/* Native Mobile Floating Action Button */}
       <div className="fab-container">
-        <button 
-          className="fab-btn fab-fuel" 
-          onClick={() => { setEditingFuelData(null); setIsFuelModalOpen(true); }}
-          title={t.addFuel}
-        >
+        <button className="fab-btn fab-fuel" onClick={() => { setEditingFuelData(null); setIsFuelModalOpen(true); }} title={t.addFuel}>
           <Fuel size={22} />
         </button>
       </div>
 
-      {/* Mobile Bottom Navigation (Native Android App Navigation Bar) */}
+      {/* Mobile Bottom Navigation */}
       <nav className="mobile-nav-bar">
-        <button 
-          className={`mobile-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-          onClick={() => setActiveTab('dashboard')}
-        >
+        <button className={`mobile-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
           <LayoutDashboard size={20} />
           <span>{t.dashboard}</span>
         </button>
-
-        <button 
-          className={`mobile-nav-item ${activeTab === 'fuel' ? 'active' : ''}`}
-          onClick={() => setActiveTab('fuel')}
-        >
+        <button className={`mobile-nav-item ${activeTab === 'fuel' ? 'active' : ''}`} onClick={() => setActiveTab('fuel')}>
           <Fuel size={20} />
           <span>{t.fuelLogs}</span>
         </button>
-
-        <button 
-          className={`mobile-nav-item ${activeTab === 'service' ? 'active' : ''}`}
-          onClick={() => setActiveTab('service')}
-        >
+        <button className={`mobile-nav-item ${activeTab === 'service' ? 'active' : ''}`} onClick={() => setActiveTab('service')}>
           <Wrench size={20} />
           <span>{t.serviceLogs}</span>
         </button>
-
-        <button 
-          className={`mobile-nav-item ${activeTab === 'analytics' ? 'active' : ''}`}
-          onClick={() => setActiveTab('analytics')}
-        >
+        <button className={`mobile-nav-item ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => setActiveTab('analytics')}>
           <BarChart3 size={20} />
           <span>{t.analytics}</span>
         </button>
       </nav>
 
       {/* Modals */}
-      <FuelModal 
+      <FuelModal
         lang={lang}
         isOpen={isFuelModalOpen}
         onClose={() => { setIsFuelModalOpen(false); setEditingFuelData(null); }}
@@ -451,8 +376,7 @@ export default function App() {
         initialData={editingFuelData}
         currentOdometer={currentOdometer}
       />
-
-      <ServiceModal 
+      <ServiceModal
         lang={lang}
         isOpen={isServiceModalOpen}
         onClose={() => { setIsServiceModalOpen(false); setEditingServiceData(null); }}
@@ -460,8 +384,7 @@ export default function App() {
         initialData={editingServiceData}
         currentOdometer={currentOdometer}
       />
-
-      <BikeModal 
+      <BikeModal
         lang={lang}
         isOpen={isBikeModalOpen}
         onClose={() => setIsBikeModalOpen(false)}
@@ -472,36 +395,34 @@ export default function App() {
         onDeleteBike={handleDeleteBike}
         bikeProfile={activeBike}
         onSave={handleSaveBikeProfile}
-        onExportData={exportBackupData}
+        onExportData={() => exportBackupData({ bikes, activeBikeId, fuelLogs, serviceLogs, settings: { lang, theme } })}
         onImportData={(jsonStr) => {
           const result = mergeImportBackupData(jsonStr);
           if (result.success) {
-            setBikes(loadBikes());
-            setActiveBikeId(loadActiveBikeId());
-            setFuelLogs(reloadFuelLogs());
-            setServiceLogs(reloadServiceLogs());
+            // Import updates state directly
+            if (result.data?.bikes) setBikes(result.data.bikes);
+            if (result.data?.activeBikeId) setActiveBikeId(result.data.activeBikeId);
+            if (result.data?.fuelLogs) setFuelLogs(result.data.fuelLogs);
+            if (result.data?.serviceLogs) setServiceLogs(result.data.serviceLogs);
           }
           return result;
         }}
-        gdriveUser={gdriveUser}
-        gdriveSyncing={gdriveSyncing}
-        onGoogleLogin={handleGoogleLogin}
-        onGoogleLogout={handleGoogleLogout}
-        onTriggerSync={triggerAutoGDriveSync}
-        onClearAllData={() => {
-          clearAllData();
-          const defaultBike = { id: 'bike_1', name: 'My Bike', regNumber: '', initialOdometer: 0, currentOdometer: 0, targetOilKm: 1000 };
-          setBikes([defaultBike]);
+        onClearAllData={async () => {
+          if (!user) return;
+          // 1. Reset user data in Firestore for THIS USER only
+          await resetUserDataInFirestore(user.uid);
+
+          // 2. Reset React local state
+          setBikes([DEFAULT_BIKE]);
           setActiveBikeId('bike_1');
           setFuelLogs([]);
           setServiceLogs([]);
-          setGDriveUser(null);
           setIsBikeModalOpen(false);
-          alert(lang === 'bn' ? '✅ সমস্ত ডাটা সফলভাবে মুছে ফেলা হয়েছে!' : '✅ All data reset successfully!');
+
+          alert(lang === 'bn' ? '✅ শুধু আপনার ডাটা সফলভাবে মুছে ফেলা হয়েছে!' : '✅ Your data has been reset successfully!');
         }}
       />
-
-      <PWAInstallModal 
+      <PWAInstallModal
         lang={lang}
         isOpen={isInstallModalOpen}
         onClose={() => setIsInstallModalOpen(false)}
@@ -511,4 +432,3 @@ export default function App() {
     </div>
   );
 }
-

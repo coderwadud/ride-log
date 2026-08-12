@@ -261,82 +261,33 @@ export default function BikeModal({
           </div>
         </form>
 
-        {/* ===== Google Drive Cloud Sync Section ===== */}
+        {/* ===== Firebase Cloud Database Status Section ===== */}
         <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
           <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            ☁️ {lang === 'bn' ? 'গুগল ড্রাইভ ক্লাউড ডাটাবেজ' : 'Google Drive Cloud Database'}
+            🔥 {lang === 'bn' ? 'ফায়ারবেস ক্লাউড ডাটাবেজ' : 'Firebase Cloud Database'}
           </p>
 
-          {gdriveUser ? (
-            <div style={{
-              background: 'rgba(16, 185, 129, 0.08)',
-              border: '1px solid rgba(16, 185, 129, 0.25)',
-              borderRadius: '12px',
-              padding: '12px'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-                {gdriveUser.picture ? (
-                  <img src={gdriveUser.picture} alt="Google Avatar" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
-                ) : (
-                  <CloudCheck size={28} color="#10b981" />
-                )}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#10b981', margin: 0 }}>
-                    {gdriveUser.name || 'Google Drive Connected'}
-                  </p>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }} className="truncate">
-                    {gdriveUser.email}
-                  </p>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  disabled={gdriveSyncing}
-                  onClick={onTriggerSync}
-                  style={{ flex: 1, fontSize: '0.78rem', padding: '7px 10px', gap: '6px' }}
-                >
-                  <RefreshCw size={14} className={gdriveSyncing ? 'animate-spin' : ''} />
-                  <span>{gdriveSyncing ? (lang === 'bn' ? 'সিঙ্ক হচ্ছে...' : 'Syncing...') : (lang === 'bn' ? '🔄 ক্লাউড সিঙ্ক করুন' : 'Sync Now')}</span>
-                </button>
-
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={onGoogleLogout}
-                  style={{ fontSize: '0.78rem', padding: '7px 10px', gap: '4px', color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)' }}
-                >
-                  <LogOut size={14} />
-                  <span>{lang === 'bn' ? 'সাইন আউট' : 'Sign Out'}</span>
-                </button>
-              </div>
+          <div style={{
+            background: 'rgba(16, 185, 129, 0.08)',
+            border: '1px solid rgba(16, 185, 129, 0.25)',
+            borderRadius: '12px',
+            padding: '12px 14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}>
+            <div style={{ width: 36, height: 36, borderRadius: '10px', background: 'rgba(16, 185, 129, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981', flexShrink: 0 }}>
+              <CloudCheck size={20} />
             </div>
-          ) : (
-            <button
-              type="button"
-              className="btn"
-              onClick={onGoogleLogin}
-              style={{
-                width: '100%',
-                background: 'rgba(56, 189, 248, 0.1)',
-                border: '1px solid rgba(56, 189, 248, 0.3)',
-                color: 'var(--accent-mileage)',
-                fontWeight: 700,
-                fontSize: '0.82rem',
-                padding: '10px',
-                borderRadius: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
-              }}
-            >
-              <CloudCheck size={18} />
-              <span>{lang === 'bn' ? '☁️ Google দিয়ে কানেক্ট করুন (অটো ড্রাইভ সিঙ্ক)' : '☁️ Connect Google Drive (Auto Sync)'}</span>
-            </button>
-          )}
+            <div>
+              <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#10b981', margin: 0 }}>
+                {lang === 'bn' ? 'সরাসরি ক্লাউড সিঙ্ক চালু আছে' : 'Live Cloud Sync Active'}
+              </p>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                {lang === 'bn' ? 'আপনার সমস্ত ডাটা নিরাপদে ফায়ারবেস ক্লাউডে সংরক্ষিত হচ্ছে।' : 'Your data is securely saved in your Firebase account.'}
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* ===== Local Data Backup & Restore Section ===== */}
