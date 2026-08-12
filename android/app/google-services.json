@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "4274608297-ogqni0dflq30d2r7ao92ic1eqrnoease.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ridelog.app",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
           "client_id": "4274608297-eu3aq3b2vgurf8a9vvu685ikjdns1gbd.apps.googleusercontent.com",
           "client_type": 3
         }
