@@ -20,6 +20,8 @@ const firebaseConfig = {
   measurementId: "G-7Z8T060VYV"
 };
 
+const WEB_CLIENT_ID = "4274608297-eu3aq3b2vgurf8a9vvu685ikjdns1gbd.apps.googleusercontent.com";
+
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
@@ -28,7 +30,7 @@ const provider = new GoogleAuthProvider();
 
 /**
  * Sign in with Google.
- * On Native Mobile App (Android/iOS): Uses native Google Sign-In bottom sheet with scopes and idToken/accessToken mapping.
+ * On Native Mobile App (Android/iOS): Uses native Google Sign-In bottom sheet with explicit serverClientId and scopes.
  * On Web Browser: Uses standard Firebase popup window.
  */
 export async function signInWithGoogle() {
@@ -36,7 +38,8 @@ export async function signInWithGoogle() {
     try {
       const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
       const res = await FirebaseAuthentication.signInWithGoogle({
-        scopes: ['profile', 'email']
+        scopes: ['profile', 'email'],
+        serverClientId: WEB_CLIENT_ID
       });
 
       const idToken = res.credential?.idToken;
@@ -49,7 +52,7 @@ export async function signInWithGoogle() {
       }
     } catch (err) {
       console.error('Native Google Auth Error:', err);
-      const errMsg = err?.message || err?.code || 'Sign in failed';
+      const errMsg = err?.message || err?.code || JSON.stringify(err);
       alert(
         navigator.language === 'bn'
           ? `⚠️ গুগল সাইন-ইন ত্রুটি: ${errMsg}`
