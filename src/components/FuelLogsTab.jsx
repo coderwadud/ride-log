@@ -78,7 +78,7 @@ export default function FuelLogsTab({ lang, fuelLogsStats, onOpenAddFuel, onEdit
                     </div>
                     {log.calculatedMileage ? (
                       <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent-mileage)' }}>
-                        {formatNum(log.calculatedMileage, lang)} {t.kmPerLiter}
+                        {formatNum(Number(log.tripDistance) / Number(log.liters), lang)} {t.km}/{t.liter}
                       </div>
                     ) : (
                       <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>--</div>

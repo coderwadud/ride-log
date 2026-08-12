@@ -6,7 +6,7 @@
 export function formatCurrency(amount, lang = 'bn') {
   if (isNaN(amount) || amount === null || amount === undefined) return lang === 'bn' ? '৳০' : '৳0';
   const num = Number(amount);
-  
+
   if (lang === 'en') {
     return '৳' + num.toLocaleString('en-US', { maximumFractionDigits: 1 });
   }
@@ -18,7 +18,7 @@ export function formatCurrency(amount, lang = 'bn') {
 // Format numbers in Bengali or English based on lang
 export function formatNum(num, lang = 'bn') {
   if (num === null || num === undefined || isNaN(num)) return lang === 'bn' ? '০' : '0';
-  
+
   if (lang === 'en') {
     return typeof num === 'number' ? Number(num.toFixed(1)).toString() : String(num);
   }
@@ -111,8 +111,11 @@ export function calculateFuelLogStats(fuelLogs = []) {
   const lastFuelLiters = latestLog ? Number(latestLog.liters || 0) : 0;
   const lastFuelCost = latestLog ? Number(latestLog.totalAmount || 0) : 0;
 
-  const lastMileageLog = processedLogs.find(l => l.calculatedMileage !== null && l.calculatedMileage > 0);
-  const lastMileage = lastMileageLog ? Number(lastMileageLog.calculatedMileage) : 0;
+  // Use same formula as FuelLogsTab: tripDistance / liters of the latest log that has both values
+  const lastMileageLog = processedLogs.find(l => Number(l.tripDistance) > 0 && Number(l.liters) > 0);
+  const lastMileage = lastMileageLog
+    ? Number((Number(lastMileageLog.tripDistance) / Number(lastMileageLog.liters)).toFixed(2))
+    : 0;
 
   return {
     processedLogs,
