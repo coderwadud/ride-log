@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "4274608297",
+    "project_id": "ridelogbd1",
+    "storage_bucket": "ridelogbd1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:4274608297:android:6eff7fd5886eb238f1f1b8",
+        "android_client_info": {
+          "package_name": "com.ridelog.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDw1fKp9qDmicU_--gY-ohPvg3QHvfXPmg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

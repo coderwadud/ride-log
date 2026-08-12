@@ -45,3 +45,9 @@ dependencies {
 }
 
 apply from: 'capacitor.build.gradle'
+
+try {
+    apply plugin: 'com.google.gms.google-services'
+} catch (Exception e) {
+    logger.warn("Google Services plugin initialization: " + e.getMessage())
+}
