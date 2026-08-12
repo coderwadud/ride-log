@@ -20,6 +20,8 @@ const firebaseConfig = {
   measurementId: "G-7Z8T060VYV"
 };
 
+const WEB_CLIENT_ID = "4274608297-eu3aq3b2vgurf8a9vvu685ikjdns1gbd.apps.googleusercontent.com";
+
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
@@ -35,7 +37,8 @@ export async function signInWithGoogle() {
     try {
       const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
       const res = await FirebaseAuthentication.signInWithGoogle({
-        scopes: ['profile', 'email']
+        scopes: ['profile', 'email'],
+        serverClientId: WEB_CLIENT_ID
       });
 
       const idToken = res.credential?.idToken;
