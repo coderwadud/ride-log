@@ -20,8 +20,6 @@ const firebaseConfig = {
   measurementId: "G-7Z8T060VYV"
 };
 
-const WEB_CLIENT_ID = "4274608297-eu3aq3b2vgurf8a9vvu685ikjdns1gbd.apps.googleusercontent.com";
-
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
@@ -30,16 +28,14 @@ const provider = new GoogleAuthProvider();
 
 /**
  * Sign in with Google.
- * On Native Mobile App (Android/iOS): Uses native Google Sign-In bottom sheet with explicit serverClientId and scopes.
- * On Web Browser: Uses standard Firebase popup window.
+ * Handles both Native One-Tap Credential Manager and standard Google Account Chooser.
  */
 export async function signInWithGoogle() {
   if (Capacitor.isNativePlatform()) {
     try {
       const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
       const res = await FirebaseAuthentication.signInWithGoogle({
-        scopes: ['profile', 'email'],
-        serverClientId: WEB_CLIENT_ID
+        scopes: ['profile', 'email']
       });
 
       const idToken = res.credential?.idToken;
@@ -51,14 +47,21 @@ export async function signInWithGoogle() {
         return userCredential.user;
       }
     } catch (err) {
-      console.error('Native Google Auth Error:', err);
-      const errMsg = err?.message || err?.code || JSON.stringify(err);
-      alert(
-        navigator.language === 'bn'
-          ? `⚠️ গুগল সাইন-ইন ত্রুটি: ${errMsg}`
-          : `⚠️ Google Sign-in error: ${errMsg}`
-      );
-      throw err;
+      console.warn('Native One-Tap returned error, falling back to Account Selector:', err);
+      // Fallback: If "No credentials available" or One-Tap is not cached, open standard Google Account chooser
+      try {
+        const result = await signInWithPopup(auth, provider);
+        return result.user;
+      } catch (fallbackErr) {
+        console.error('Google Auth Fallback Error:', fallbackErr);
+        const errMsg = fallbackErr?.message || err?.message || 'Login failed';
+        alert(
+          navigator.language === 'bn'
+            ? `⚠️ গুগল সাইন-ইন সমস্যা: ${errMsg}`
+            : `⚠️ Google Sign-in error: ${errMsg}`
+        );
+        throw fallbackErr;
+      }
     }
     return;
   }
