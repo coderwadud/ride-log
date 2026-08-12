@@ -3,7 +3,7 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
-  signInWithCredential,
+  signInWithRedirect,
   signOut,
   onAuthStateChanged
 } from 'firebase/auth';
@@ -28,40 +28,18 @@ const provider = new GoogleAuthProvider();
 
 /**
  * Sign in with Google.
- * On Native Mobile App (Android/iOS): Uses native Google Sign-In sheet/popup inside the app.
- * On Web Browser: Uses standard Firebase popup window.
+ * On Native Mobile App (Android/iOS): Uses signInWithRedirect to handle WebView auth cleanly without popup blocking.
+ * On Web Browser: Uses standard signInWithPopup.
  */
 export async function signInWithGoogle() {
   if (Capacitor.isNativePlatform()) {
-    try {
-      // Dynamic import to prevent web bundlers from breaking if native plugin is unneeded on web
-      const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
-      const res = await FirebaseAuthentication.signInWithGoogle();
-      if (res.credential?.idToken) {
-        const credential = GoogleAuthProvider.credential(res.credential.idToken);
-        const userCredential = await signInWithCredential(auth, credential);
-        return userCredential.user;
-      }
-    } catch (err) {
-      console.warn('Native Google Auth failed, falling back to Web Auth:', err);
-    }
+    return signInWithRedirect(auth, provider);
   }
-
-  // Web Browser / Fallback Popup
-  const result = await signInWithPopup(auth, provider);
-  return result.user;
+  return signInWithPopup(auth, provider);
 }
 
 // Sign out
 export async function signOutUser() {
-  if (Capacitor.isNativePlatform()) {
-    try {
-      const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
-      await FirebaseAuthentication.signOut();
-    } catch (e) {
-      console.warn('Native sign out error:', e);
-    }
-  }
   await signOut(auth);
 }
 
