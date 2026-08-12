@@ -43,6 +43,12 @@ jobs:
       - name: Make Gradle executable
         run: chmod +x android/gradlew
 
+      - name: Generate fixed debug.keystore & Log SHA-1
+        run: |
+          keytool -genkeypair -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -keystore android/app/debug.keystore -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US"
+          echo "=== SHA-1 FINGERPRINT OF REPOSITORY KEYSTORE ==="
+          keytool -list -v -keystore android/app/debug.keystore -alias androiddebugkey -storepass android -keypass android | grep -i "SHA1:"
+
       - name: Build Android APK (Debug)
         run: |
           cd android
