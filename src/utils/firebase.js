@@ -28,7 +28,8 @@ const provider = new GoogleAuthProvider();
 
 /**
  * Sign in with Google.
- * On Native Mobile App (Android/iOS): Uses native Google Sign-In bottom sheet inside the app (no Chrome redirects).
+ * On Native Mobile App (Android/iOS): STRICTLY uses native Google Sign-In bottom sheet inside the app.
+ * NEVER redirects to Chrome browser on mobile.
  * On Web Browser: Uses standard Firebase popup window.
  */
 export async function signInWithGoogle() {
@@ -42,11 +43,14 @@ export async function signInWithGoogle() {
         return userCredential.user;
       }
     } catch (err) {
-      console.warn('Native Google Auth failed:', err);
+      console.error('Native Google Auth Error:', err);
+      // Ensure we NEVER fall back to opening Chrome on Android
+      throw err;
     }
+    return;
   }
 
-  // Web Browser / Fallback Popup
+  // Web Browser ONLY
   const result = await signInWithPopup(auth, provider);
   return result.user;
 }
