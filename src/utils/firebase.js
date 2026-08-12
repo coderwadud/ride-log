@@ -9,7 +9,6 @@ import {
 } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
-import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDw1fKp9qDmicU_--gY-ohPvg3QHvfXPmg",
@@ -35,7 +34,8 @@ const provider = new GoogleAuthProvider();
 export async function signInWithGoogle() {
   if (Capacitor.isNativePlatform()) {
     try {
-      // Native Android Google Account Selector Prompt (Bottom Sheet)
+      // Dynamic import to prevent web bundlers from breaking if native plugin is unneeded on web
+      const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
       const res = await FirebaseAuthentication.signInWithGoogle();
       if (res.credential?.idToken) {
         const credential = GoogleAuthProvider.credential(res.credential.idToken);
@@ -56,6 +56,7 @@ export async function signInWithGoogle() {
 export async function signOutUser() {
   if (Capacitor.isNativePlatform()) {
     try {
+      const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
       await FirebaseAuthentication.signOut();
     } catch (e) {
       console.warn('Native sign out error:', e);
