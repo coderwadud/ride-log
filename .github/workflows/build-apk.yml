@@ -45,9 +45,21 @@ jobs:
 
       - name: Generate fixed debug.keystore & Log SHA-1
         run: |
-          keytool -genkeypair -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -keystore android/app/debug.keystore -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US"
-          echo "=== SHA-1 FINGERPRINT OF REPOSITORY KEYSTORE ==="
+          if [ ! -f android/app/debug.keystore ]; then
+            keytool -genkeypair -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -keystore android/app/debug.keystore -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          echo "=================================================="
+          echo "=== SHA-1 FINGERPRINT OF YOUR APK KEYSTORE ==="
           keytool -list -v -keystore android/app/debug.keystore -alias androiddebugkey -storepass android -keypass android | grep -i "SHA1:"
+          echo "=================================================="
+
+      - name: Commit Keystore to Repo (if new)
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add -f android/app/debug.keystore || true
+          git commit -m "chore: persist fixed debug.keystore" || true
+          git push origin main || true
 
       - name: Build Android APK (Debug)
         run: |
