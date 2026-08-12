@@ -11,7 +11,7 @@ import { getFirestore } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDw1fKp9qDmicU_--gY-ohPvg3QHvfXPmg",
+  apiKey: "AIzaSyAgD2gnEiEoalKfespgnhMA_H2DvPfrD5M",
   authDomain: "ridelogbd1.firebaseapp.com",
   projectId: "ridelogbd1",
   storageBucket: "ridelogbd1.firebasestorage.app",

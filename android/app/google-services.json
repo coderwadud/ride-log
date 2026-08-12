@@ -7,20 +7,30 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:4274608297:android:6eff7fd5886eb238f1f1b8",
+        "mobilesdk_app_id": "1:4274608297:android:afaff9820e31bfbdf1f1b8",
         "android_client_info": {
           "package_name": "com.ridelog.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "4274608297-eu3aq3b2vgurf8a9vvu685ikjdns1gbd.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyDw1fKp9qDmicU_--gY-ohPvg3QHvfXPmg"
+          "current_key": "AIzaSyAgD2gnEiEoalKfespgnhMA_H2DvPfrD5M"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "4274608297-eu3aq3b2vgurf8a9vvu685ikjdns1gbd.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
