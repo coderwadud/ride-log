@@ -1,11 +1,23 @@
 {
+  "id": "/",
   "short_name": "RideLog BD",
   "name": "RideLog BD - Bike Fuel & Service Log",
+  "description": "Track bike fuel mileage (km/l), refill expenses, maintenance service history, engine oil reminders and cost analytics.",
+  "start_url": "/",
+  "scope": "/",
+  "lang": "bn",
+  "dir": "ltr",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "display": "standalone",
+  "orientation": "portrait",
+  "categories": ["lifestyle", "utilities"],
   "icons": [
     {
       "src": "/pwa-192x192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any"
     },
     {
       "src": "/pwa-512x512.png",
@@ -14,10 +26,20 @@
       "purpose": "any maskable"
     }
   ],
-  "start_url": "/",
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a",
-  "display": "standalone",
-  "orientation": "portrait",
-  "description": "Track bike fuel mileage (km/l), refill expenses, maintenance service history and cost stats."
+  "shortcuts": [
+    {
+      "name": "Add Fuel Entry",
+      "short_name": "+ Fuel",
+      "description": "Quickly add a new fuel refill log",
+      "url": "/?action=add-fuel",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Add Service Entry",
+      "short_name": "+ Service",
+      "description": "Quickly log bike maintenance service",
+      "url": "/?action=add-service",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    }
+  ]
 }
