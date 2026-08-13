@@ -53,22 +53,26 @@ export default function BikeModal({
   const handleSubmit = (e) => {
     e.preventDefault();
     if (isAddingNew) {
-      onAddBike({
-        name: name || 'My Bike',
-        regNumber,
-        initialOdometer: Number(initialOdometer) || 0,
-        currentOdometer: Number(initialOdometer) || 0,
-        targetOilKm: Number(targetOilKm) || 1000
-      });
+      if (typeof onAddBike === 'function') {
+        onAddBike({
+          name: name || 'My Bike',
+          regNumber,
+          initialOdometer: Number(initialOdometer) || 0,
+          currentOdometer: Number(initialOdometer) || 0,
+          targetOilKm: Number(targetOilKm) || 1000
+        });
+      }
       setIsAddingNew(false);
     } else {
-      onSave({
-        ...bikeProfile,
-        name: name || 'My Bike',
-        regNumber,
-        initialOdometer: Number(initialOdometer),
-        targetOilKm: Number(targetOilKm)
-      });
+      if (typeof onSave === 'function') {
+        onSave({
+          ...bikeProfile,
+          name: name || 'My Bike',
+          regNumber,
+          initialOdometer: Number(initialOdometer),
+          targetOilKm: Number(targetOilKm)
+        });
+      }
     }
     onClose();
   };

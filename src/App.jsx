@@ -174,7 +174,8 @@ export default function App() {
   };
 
   const handleSaveBikeProfile = (updatedProfile) => {
-    setBikes(prev => prev.map(b => b.id === activeBikeId ? { ...b, ...updatedProfile } : b));
+    const targetId = updatedProfile?.id || activeBikeId;
+    setBikes(prev => prev.map(b => b.id === targetId ? { ...b, ...updatedProfile } : b));
   };
 
   const handleToggleLang = () => {
@@ -388,6 +389,7 @@ export default function App() {
         lang={lang}
         isOpen={isBikeModalOpen}
         onClose={() => setIsBikeModalOpen(false)}
+        onSave={handleSaveBikeProfile}
         bikes={bikes}
         activeBikeId={activeBikeId}
         onSelectBike={handleSelectBike}
