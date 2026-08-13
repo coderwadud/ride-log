@@ -100,6 +100,26 @@ export default function BikeModal({ lang, isOpen, onClose, onSave, bikeProfile }
               <span>{t.save}</span>
             </button>
           </div>
+
+          {onClearAllData && (
+            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)', textAlign: 'center' }}>
+              <button 
+                type="button" 
+                className="btn" 
+                onClick={onClearAllData}
+                style={{ 
+                  width: '100%', 
+                  background: 'rgba(239, 68, 68, 0.12)', 
+                  color: 'var(--accent-danger)',
+                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                  fontSize: '0.82rem',
+                  padding: '8px'
+                }}
+              >
+                {lang === 'bn' ? '🗑️ সমস্ত ডাটা রিসেট করুন (খালি করুন)' : '🗑️ Reset / Clear All Data'}
+              </button>
+            </div>
+          )}
         </form>
       </div>
     </div>

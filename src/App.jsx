@@ -18,7 +18,8 @@ import {
   saveServiceLogs, 
   loadSettings, 
   saveSettings,
-  exportBackupData
+  exportBackupData,
+  clearAllData
 } from './utils/storage';
 
 import { 
@@ -309,6 +310,15 @@ export default function App() {
         onClose={() => setIsBikeModalOpen(false)}
         onSave={(updated) => setBikeProfile(updated)}
         bikeProfile={bikeProfile}
+        onClearAllData={() => {
+          if (window.confirm(lang === 'bn' ? 'আপনি কি নিশ্চিত যে সমস্ত ডাটা মুছে ফেলতে চান?' : 'Are you sure you want to clear all data?')) {
+            clearAllData();
+            setBikeProfile({ id: 'bike_1', name: 'My Bike', regNumber: '', initialOdometer: 0, currentOdometer: 0, targetOilKm: 1000 });
+            setFuelLogs([]);
+            setServiceLogs([]);
+            setIsBikeModalOpen(false);
+          }
+        }}
       />
 
       <PWAInstallModal 

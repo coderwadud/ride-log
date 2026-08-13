@@ -9,87 +9,19 @@ const STORAGE_KEYS = {
   SETTINGS: 'ridelog_settings'
 };
 
-// Initial realistic default data (Bangladeshi bike example)
+// Default empty initial state
 const DEFAULT_BIKE = {
   id: 'bike_1',
-  name: 'Yamaha FZS V3 Deluxe',
-  regNumber: 'ঢাকা মেট্রো ল-৩৫-৯৮১২',
-  initialOdometer: 12000,
-  currentOdometer: 14250,
+  name: 'My Bike',
+  regNumber: '',
+  initialOdometer: 0,
+  currentOdometer: 0,
   targetOilKm: 1000
 };
 
-const DEFAULT_FUEL_LOGS = [
-  {
-    id: 'f1',
-    date: '2026-07-05',
-    odometer: 12400,
-    liters: 9.5,
-    totalAmount: 1235,
-    pricePerLiter: 130,
-    isFullTank: true,
-    stationName: 'মেসার্স মেঘনা ফিলিং স্টেশন, মহাখালী',
-    notes: 'অক্টেন ফুল ট্যাংক'
-  },
-  {
-    id: 'f2',
-    date: '2026-07-18',
-    odometer: 12820,
-    liters: 9.8,
-    totalAmount: 1274,
-    pricePerLiter: 130,
-    isFullTank: true,
-    stationName: 'পদ্মা ওয়েল পাম্প, ফার্মগেট',
-    notes: 'অক্টেন রিফিল'
-  },
-  {
-    id: 'f3',
-    date: '2026-08-01',
-    odometer: 13240,
-    liters: 9.6,
-    totalAmount: 1248,
-    pricePerLiter: 130,
-    isFullTank: true,
-    stationName: 'মেঘনা ফিলিং স্টেশন',
-    notes: 'লং রাইডের পর তেলের রিফিল'
-  },
-  {
-    id: 'f4',
-    date: '2026-08-12',
-    odometer: 13680,
-    liters: 10.0,
-    totalAmount: 1300,
-    pricePerLiter: 130,
-    isFullTank: true,
-    stationName: 'যমুনা পেট্রোলিয়াম, উত্তরা',
-    notes: 'ফুল ট্যাংক অক্টেন'
-  }
-];
+const DEFAULT_FUEL_LOGS = [];
 
-const DEFAULT_SERVICE_LOGS = [
-  {
-    id: 's1',
-    date: '2026-07-05',
-    odometer: 12400,
-    types: ['catEngineOil', 'catOilFilter', 'catChainLube'],
-    serviceCost: 200,
-    partsCost: 750,
-    garageName: 'ইয়ামাহা ফ্ল্যাগশিপ সার্ভিস সেন্টার, তেজগাঁও',
-    isEngineOilChange: true,
-    notes: 'Yamalube Fully Synthetic 10W40'
-  },
-  {
-    id: 's2',
-    date: '2026-08-01',
-    odometer: 13240,
-    types: ['catEngineOil', 'catAirFilter', 'catBrakePad'],
-    serviceCost: 350,
-    partsCost: 1100,
-    garageName: 'বিসমিল্লাহ বাইক কেয়ার, মিরপুর',
-    isEngineOilChange: true,
-    notes: 'ইঞ্জিন অয়েল ও ফন্ট ব্রেইক প্যাড চেঞ্জ'
-  }
-];
+const DEFAULT_SERVICE_LOGS = [];
 
 const DEFAULT_SETTINGS = {
   lang: 'bn',
