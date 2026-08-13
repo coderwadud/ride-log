@@ -998,3 +998,106 @@ h1, h2, h3, h4, h5 {
   background: rgba(255, 255, 255, 0.15);
   border-radius: 4px;
 }
+
+/* ===== CUSTOM RESPONSIVE BIKE SELECTOR & DROPDOWN MENU ===== */
+.desktop-bike-selector {
+  display: none;
+}
+
+.mobile-bike-selector {
+  display: flex;
+  width: 100%;
+  padding: 8px 16px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-color);
+  align-items: center;
+  justify-content: space-between;
+  backdrop-filter: blur(12px);
+}
+
+@media (min-width: 768px) {
+  .desktop-bike-selector {
+    display: flex;
+    align-items: center;
+  }
+  .mobile-bike-selector {
+    display: none !important;
+  }
+}
+
+.bike-dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 12px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: var(--accent-fuel);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme='light'] .bike-dropdown-trigger {
+  background: rgba(5, 150, 105, 0.1);
+  border: 1px solid rgba(5, 150, 105, 0.35);
+  color: #047857;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.bike-dropdown-trigger:hover {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: rgba(16, 185, 129, 0.55);
+  transform: translateY(-1px);
+}
+
+.bike-dropdown-trigger:active {
+  transform: scale(0.97);
+}
+
+.bike-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 240px;
+  background: var(--bg-main);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.6), 0 0 20px rgba(16, 185, 129, 0.15);
+  z-index: 1000;
+  overflow: hidden;
+  padding: 6px;
+  backdrop-filter: blur(20px);
+}
+
+.bike-dropdown-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.bike-dropdown-item:hover {
+  background: var(--bg-card-hover);
+  color: var(--accent-fuel);
+}
+
+.bike-dropdown-item.active {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--accent-fuel);
+  font-weight: 700;
+}
+

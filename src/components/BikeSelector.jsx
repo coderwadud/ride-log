@@ -1,48 +1,93 @@
-import React from 'react';
-import { Bike, Plus } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Bike, ChevronDown, Plus, Check } from 'lucide-react';
 
-export default function BikeSelector({ bikes = [], activeBikeId, onSelectBike, onOpenBikeModal, lang = 'bn' }) {
+export default function BikeSelector({ bikes = [], activeBikeId, onSelectBike, onOpenBikeModal, lang = 'bn', align = 'right' }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  const activeBike = bikes.find(b => b.id === activeBikeId) || bikes[0] || { name: 'My Bike' };
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   return (
-    <div className="w-full px-4 py-2 bg-slate-900/60 border-b border-slate-800/80 backdrop-blur-md flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
-      <div className="flex items-center gap-2 overflow-x-auto py-0.5 no-scrollbar flex-1">
-        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap mr-1 flex items-center gap-1">
-          <Bike className="w-3.5 h-3.5 text-emerald-400" />
-          <span>{lang === 'bn' ? 'বাইক নির্বাচন:' : 'Select Bike:'}</span>
-        </span>
-
-        {bikes.map((bike) => {
-          const isActive = bike.id === activeBikeId;
-          return (
-            <button
-              key={bike.id}
-              type="button"
-              onClick={() => onSelectBike(bike.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-200 shrink-0 shadow-sm active:scale-95 ${
-                isActive
-                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/40 shadow-emerald-950/20'
-                  : 'bg-slate-800/70 text-slate-300 border border-slate-700/50 hover:bg-slate-700/80 hover:text-white'
-              }`}
-            >
-              <Bike className={`w-3.5 h-3.5 ${isActive ? 'text-emerald-400' : 'text-slate-400'}`} />
-              <span className="max-w-[120px] truncate">{bike.name}</span>
-              {isActive && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
+    <div className="relative inline-block" ref={dropdownRef}>
       <button
         type="button"
-        onClick={onOpenBikeModal}
-        className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800/90 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 text-xs font-bold transition-all shrink-0 active:scale-95"
-        title={lang === 'bn' ? 'নতুন বাইক যোগ করুন' : 'Add Bike'}
+        onClick={() => setIsOpen(!isOpen)}
+        className="bike-dropdown-trigger"
       >
-        <Plus className="w-3.5 h-3.5" />
-        <span className="hidden sm:inline">{lang === 'bn' ? 'নতুন বাইক' : 'Add Bike'}</span>
+        <Bike size={16} />
+        <span style={{ maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {activeBike.name || 'My Bike'}
+        </span>
+        <ChevronDown size={14} style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }} />
       </button>
+
+      {isOpen && (
+        <div 
+          className="bike-dropdown-menu"
+          style={{ [align === 'left' ? 'left' : 'right']: 0 }}
+        >
+          <div style={{ padding: '6px 10px 4px', borderBottom: '1px solid var(--border-color)', marginBottom: '4px' }}>
+            <p style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-dim)', fontWeight: 700, margin: 0 }}>
+              {lang === 'bn' ? 'আপনার বাইকসমূহ' : 'YOUR BIKES'}
+            </p>
+          </div>
+
+          <div style={{ maxHeight: '180px', overflowY: 'auto' }}>
+            {bikes.map((bike) => {
+              const isActive = bike.id === activeBikeId;
+              return (
+                <button
+                  key={bike.id}
+                  type="button"
+                  onClick={() => {
+                    onSelectBike(bike.id);
+                    setIsOpen(false);
+                  }}
+                  className={`bike-dropdown-item ${isActive ? 'active' : ''}`}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                    <Bike size={15} style={{ color: isActive ? 'var(--accent-fuel)' : 'var(--text-muted)' }} />
+                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <p style={{ margin: 0, fontWeight: isActive ? 700 : 600 }}>{bike.name}</p>
+                      {bike.regNumber && (
+                        <p style={{ margin: 0, fontSize: '10px', color: 'var(--text-dim)' }}>{bike.regNumber}</p>
+                      )}
+                    </div>
+                  </div>
+                  {isActive && <Check size={14} style={{ color: 'var(--accent-fuel)', flexShrink: 0 }} />}
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '4px', paddingTop: '4px' }}>
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                onOpenBikeModal();
+              }}
+              className="bike-dropdown-item"
+              style={{ color: 'var(--accent-fuel)', justifyContent: 'center', gap: '6px', fontWeight: 700 }}
+            >
+              <Plus size={15} />
+              <span>{lang === 'bn' ? 'নতুন বাইক যোগ করুন' : 'Add New Bike'}</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
 

@@ -1,10 +1,14 @@
 import React from 'react';
 import { Bike, Languages, Sun, Moon, Settings, CloudCheck, CloudOff, RefreshCw } from 'lucide-react';
 import { translations } from '../utils/translations';
+import BikeSelector from './BikeSelector';
 
 export default function Header({ 
   lang, 
   onToggleLang, 
+  bikes = [],
+  activeBikeId,
+  onSelectBike,
   bikeProfile, 
   onEditBike, 
   theme,
@@ -31,6 +35,18 @@ export default function Header({
       </div>
 
       <div className="top-actions flex items-center gap-1.5">
+        {/* Desktop Bike Custom Dropdown Selector */}
+        <div className="desktop-bike-selector">
+          <BikeSelector
+            bikes={bikes}
+            activeBikeId={activeBikeId}
+            onSelectBike={onSelectBike}
+            onOpenBikeModal={onEditBike}
+            lang={lang}
+            align="right"
+          />
+        </div>
+
         {/* Google Drive Cloud Sync Status Pill */}
         {gdriveUser ? (
           <button

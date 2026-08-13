@@ -57,9 +57,9 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.16
-          name: "RideLog BD Android App v1.0.16 (Redesigned Bike Chips Bar + Header Clean UI)"
-          body: "✅ নতুন ডিজাইন ও আপডেট:\n- 🏍️ **Redesigned Bike Selection Bar:** হেডার থেকে ড্রপডাউন সরিয়ে হেডারের নিচে একটি অত্যন্ত সুন্দর ও রেসপনসিভ **বাইক সিলেক্টর চিপস বার** যুক্ত করা হয়েছে।\n- 📱 **Clean Header Layout:** হেডার থেকে অ্যান্ড্রয়েড ইনস্টল বাটনটি সরিয়ে ক্লাউড সিঙ্ক, ল্যাঙ্গুয়েজ এবং সেটিংস অপশনগুলোকে ফ্রেশ ও ক্লিন লুক দেওয়া হয়েছে।"
+          tag_name: v1.0.17
+          name: "RideLog BD Android App v1.0.17 (Custom Dropdown Menu + Desktop/Mobile Adaptive Placement)"
+          body: "✅ নতুন সুন্দর ডিজাইন ও ফিক্স:\n- 🏍️ **Custom Dropdown Menu:** আধুনিক গ্লাসমোর্ফিজম ড্রপডাউন মেনু যা ১-ক্লিকে চমৎকার এনিমেশনের সাথে ওপেন হয়।\n- 🖥️📱 **Adaptive Layout:** ডেসকেটপে হেডার বারের ভেতরে ডানপাশে থাকবে এবং মোবাইলে হেডারের নিচে সুন্দর বার হিসেবে প্রদর্শন করবে।"
           files: android/app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

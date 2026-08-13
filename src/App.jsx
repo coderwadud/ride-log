@@ -291,10 +291,13 @@ export default function App() {
 
   return (
     <div className="app-container">
-      {/* Header Bar */}
+      {/* Header Bar (Desktop Bike Selector inside) */}
       <Header 
         lang={lang}
         onToggleLang={handleToggleLang}
+        bikes={bikes}
+        activeBikeId={activeBikeId}
+        onSelectBike={handleSelectBike}
         bikeProfile={activeBike}
         onEditBike={() => setIsBikeModalOpen(true)}
         theme={theme}
@@ -304,14 +307,20 @@ export default function App() {
         onTriggerSync={triggerAutoGDriveSync}
       />
 
-      {/* Dedicated Bike Chips Selector Bar below Header */}
-      <BikeSelector
-        bikes={bikes}
-        activeBikeId={activeBikeId}
-        onSelectBike={handleSelectBike}
-        onOpenBikeModal={() => setIsBikeModalOpen(true)}
-        lang={lang}
-      />
+      {/* Mobile-Only Custom Bike Selector Bar below Header */}
+      <div className="mobile-bike-selector">
+        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span>{lang === 'bn' ? 'বর্তমান বাইক:' : 'Active Bike:'}</span>
+        </span>
+        <BikeSelector
+          bikes={bikes}
+          activeBikeId={activeBikeId}
+          onSelectBike={handleSelectBike}
+          onOpenBikeModal={() => setIsBikeModalOpen(true)}
+          lang={lang}
+          align="right"
+        />
+      </div>
 
       {/* Main Tab Navigation for Desktop */}
       <nav className="nav-tabs">
