@@ -1,0 +1,23 @@
+{
+  "short_name": "RideLog BD",
+  "name": "RideLog BD - Bike Fuel & Service Log",
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "display": "standalone",
+  "orientation": "portrait",
+  "description": "Track bike fuel mileage (km/l), refill expenses, maintenance service history and cost stats."
+}

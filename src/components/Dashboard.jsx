@@ -1,0 +1,198 @@
+import React from 'react';
+import { Gauge, Fuel, Wrench, Coins, Droplets } from 'lucide-react';
+import { translations } from '../utils/translations';
+import { formatCurrency, formatNum } from '../utils/calculations';
+
+export default function Dashboard({
+  lang,
+  fuelStats,
+  serviceStats,
+  bikeProfile,
+  onOpenAddFuel,
+  onOpenAddService,
+  recentLogs
+}) {
+  const t = translations[lang];
+  const { avgMileage, totalFuelSpent, costPerKm } = fuelStats;
+  const { totalServiceSpent, kmUntilNextOilChange, oilHealthPercentage, oilStatus, lastOilChangeKm } = serviceStats;
+
+  return (
+    <div className="dashboard-view">
+      {/* Engine Oil Health Banner */}
+      <div className={`card oil-health-card ${oilStatus}`}>
+        <div className="oil-info-left">
+          <div style={{
+            width: 44,
+            height: 44,
+            borderRadius: '12px',
+            background: oilStatus === 'good' ? 'rgba(16, 185, 129, 0.15)' : oilStatus === 'warning' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+            color: oilStatus === 'good' ? '#10b981' : oilStatus === 'warning' ? '#f59e0b' : '#ef4444',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0
+          }}>
+            <Droplets size={24} />
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <h4 style={{ fontSize: '0.98rem' }}>{t.oilHealth}</h4>
+              <span className={`log-badge ${oilStatus === 'good' ? 'badge-full' : 'badge-partial'}`}>
+                {oilStatus === 'good' ? t.oilStatusGood : oilStatus === 'warning' ? t.oilStatusWarning : t.oilStatusDanger}
+              </span>
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+              {t.lastOilChange}: {lastOilChangeKm ? `${formatNum(lastOilChangeKm, lang)} ${t.km}` : 'N/A'} • {formatNum(kmUntilNextOilChange, lang)} {t.kmRemaining}
+            </p>
+            
+            {/* Progress bar */}
+            <div className="oil-progress-bar-bg">
+              <div 
+                className="oil-progress-fill"
+                style={{
+                  width: `${oilHealthPercentage}%`,
+                  background: oilStatus === 'good' ? '#10b981' : oilStatus === 'warning' ? '#f59e0b' : '#ef4444'
+                }}
+              />
+            </div>
+          </div>
+        </div>
+
+        <button className="btn btn-service" onClick={onOpenAddService} style={{ fontSize: '0.8rem', padding: '8px 12px' }}>
+          <Wrench size={16} />
+          <span>{t.addService}</span>
+        </button>
+      </div>
+
+      {/* Primary KPI Stats Grid */}
+      <div className="stats-grid">
+        {/* Average Mileage */}
+        <div className="card stat-card mileage">
+          <div className="stat-icon-wrap">
+            <span className="stat-label">{t.avgMileage}</span>
+            <div className="stat-icon"><Gauge size={18} /></div>
+          </div>
+          <div>
+            <div className="stat-value">
+              {formatNum(avgMileage, lang)}
+              <span className="stat-unit">{t.kmPerLiter}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Total Fuel Expense */}
+        <div className="card stat-card fuel">
+          <div className="stat-icon-wrap">
+            <span className="stat-label">{t.totalFuelExpense}</span>
+            <div className="stat-icon"><Fuel size={18} /></div>
+          </div>
+          <div>
+            <div className="stat-value">
+              {formatCurrency(totalFuelSpent, lang)}
+            </div>
+          </div>
+        </div>
+
+        {/* Total Service Expense */}
+        <div className="card stat-card service">
+          <div className="stat-icon-wrap">
+            <span className="stat-label">{t.totalServiceExpense}</span>
+            <div className="stat-icon"><Wrench size={18} /></div>
+          </div>
+          <div>
+            <div className="stat-value">
+              {formatCurrency(totalServiceSpent, lang)}
+            </div>
+          </div>
+        </div>
+
+        {/* Cost Per Km */}
+        <div className="card stat-card cost">
+          <div className="stat-icon-wrap">
+            <span className="stat-label">{t.costPerKm}</span>
+            <div className="stat-icon"><Coins size={18} /></div>
+          </div>
+          <div>
+            <div className="stat-value">
+              {formatNum(costPerKm, lang)}
+              <span className="stat-unit">৳/{t.km}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Action Buttons */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+        <button className="btn btn-primary" style={{ flex: 1, padding: '12px' }} onClick={onOpenAddFuel}>
+          <Fuel size={18} />
+          <span>{t.addFuel}</span>
+        </button>
+        <button className="btn btn-service" style={{ flex: 1, padding: '12px' }} onClick={onOpenAddService}>
+          <Wrench size={18} />
+          <span>{t.addService}</span>
+        </button>
+      </div>
+
+      {/* Recent Activity Feed */}
+      <div className="card">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap' }}>
+          <h3 style={{ fontSize: '1.05rem' }}>{t.recentLogs}</h3>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>
+            {t.odometerLabel} {formatNum(bikeProfile?.currentOdometer || 0, lang)} {t.km}
+          </span>
+        </div>
+
+        {recentLogs.length === 0 ? (
+          <div className="empty-state">
+            <Fuel className="empty-icon" />
+            <p style={{ fontWeight: 600 }}>{t.noData}</p>
+            <p style={{ fontSize: '0.85rem' }}>{t.noDataSub}</p>
+          </div>
+        ) : (
+          <div className="log-list">
+            {recentLogs.slice(0, 6).map((log) => (
+              <div key={log.id} className="log-item">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                  <div style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '10px',
+                    background: log.isFuel ? 'rgba(16, 185, 129, 0.12)' : 'rgba(139, 92, 246, 0.12)',
+                    color: log.isFuel ? 'var(--accent-fuel)' : 'var(--accent-service)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    {log.isFuel ? <Fuel size={18} /> : <Wrench size={18} />}
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="log-main-title">
+                      {log.isFuel 
+                        ? `${formatNum(log.liters, lang)} ${t.liter} ${t.fuelRefillLabel}` 
+                        : (log.notes || t.bikeServiceLabel)}
+                    </div>
+                    <div className="log-date">
+                      {log.date} • {formatNum(log.odometer, lang)} {t.km}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>
+                    {formatCurrency(log.totalAmount || (log.serviceCost + log.partsCost), lang)}
+                  </div>
+                  {log.isFuel && log.calculatedMileage && (
+                    <span className="log-badge badge-full">
+                      {formatNum(log.calculatedMileage, lang)} {t.kmPerLiter}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
