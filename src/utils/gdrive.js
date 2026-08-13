@@ -190,37 +190,78 @@ export async function syncWithGDrive() {
   }
 }
 
-/** Prompt Google Identity Services (GIS) Token Client flow */
+/** Prompt Google Identity Services (GIS) / Google OAuth 2.0 Account Selector screen */
 export function requestGoogleDriveLogin(onSuccess, onError) {
+  const CLIENT_ID = '1088491039832-demo.apps.googleusercontent.com';
+
+  // 1. Try GIS window.google.accounts.oauth2 with prompt: 'select_account'
   if (typeof window.google !== 'undefined' && window.google.accounts && window.google.accounts.oauth2) {
-    const client = window.google.accounts.oauth2.initTokenClient({
-      client_id: '1088491039832-demo.apps.googleusercontent.com',
-      scope: GDRIVE_SCOPE,
-      callback: async (response) => {
-        if (response && response.access_token) {
-          setGDriveToken(response.access_token, response.expires_in || 3600);
-          const user = await fetchGoogleUserProfile(response.access_token);
-          if (onSuccess) onSuccess({ token: response.access_token, user });
-        } else if (onError) {
-          onError(response);
+    try {
+      const client = window.google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: GDRIVE_SCOPE,
+        prompt: 'select_account',
+        callback: async (response) => {
+          if (response && response.access_token) {
+            setGDriveToken(response.access_token, response.expires_in || 3600);
+            const user = await fetchGoogleUserProfile(response.access_token);
+            if (onSuccess) onSuccess({ token: response.access_token, user });
+          } else if (onError) {
+            onError(response);
+          }
         }
+      });
+      client.requestAccessToken({ prompt: 'select_account' });
+      return;
+    } catch (e) {
+      console.error('GIS token client error:', e);
+    }
+  }
+
+  // 2. Web / Popup OAuth 2.0 Fallback to Google Account Chooser screen
+  const redirectUri = window.location.origin;
+  const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${CLIENT_ID}&response_type=token&scope=${encodeURIComponent(GDRIVE_SCOPE)}&redirect_uri=${encodeURIComponent(redirectUri)}&prompt=select_account`;
+
+  const popup = window.open(oauthUrl, 'google_oauth_popup', 'width=500,height=600');
+  
+  if (popup) {
+    const checkPopup = setInterval(() => {
+      try {
+        if (!popup || popup.closed) {
+          clearInterval(checkPopup);
+          return;
+        }
+        if (popup.location && popup.location.hash) {
+          const hash = popup.location.hash.substring(1);
+          const params = new URLSearchParams(hash);
+          const token = params.get('access_token');
+          if (token) {
+            clearInterval(checkPopup);
+            popup.close();
+            setGDriveToken(token, 3600);
+            fetchGoogleUserProfile(token).then((user) => {
+              if (onSuccess) onSuccess({ token, user });
+            });
+          }
+        }
+      } catch (e) {
+        // Cross-origin access until redirect
       }
-    });
-    client.requestAccessToken();
+    }, 500);
   } else {
-    // Fallback: Prompt manual Access Token or OAuth Login
-    const manualToken = prompt(
+    // 3. Fallback prompt if popups blocked
+    const token = prompt(
       navigator.language === 'bn' 
-        ? 'গুগল ক্লাউড ড্রাইভে সিঙ্ক করতে Access Token প্রদান করুন:'
-        : 'Enter Google OAuth Access Token for Drive Sync:'
+        ? 'গুগল একাউন্ট সিঙ্ক নিশ্চিত করতে OAuth Access Token পেস্ট করুন:'
+        : 'Paste Google OAuth Access Token for Account Sync:'
     );
-    if (manualToken) {
-      setGDriveToken(manualToken);
-      fetchGoogleUserProfile(manualToken).then((user) => {
-        if (onSuccess) onSuccess({ token: manualToken, user });
+    if (token) {
+      setGDriveToken(token);
+      fetchGoogleUserProfile(token).then((user) => {
+        if (onSuccess) onSuccess({ token, user });
       });
     } else if (onError) {
-      onError({ error: 'gis_unavailable' });
+      onError({ error: 'popup_blocked' });
     }
   }
 }

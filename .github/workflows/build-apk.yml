@@ -57,9 +57,9 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.14
-          name: "RideLog BD Android App v1.0.14 (Google Drive Sync + Multi-Bike Support)"
-          body: "✅ নতুন ফিচার ও আপডেট:\n- ☁️ **Google Drive Offline-First Sync:** ইন্টারনেট নেটওয়ার্ক না থাকলেও সমস্ত ডাটা অফলাইনে লোকালি সেভ হবে এবং নেটে কানেক্ট হওয়ার সাথে সাথে নিজের গুগল ড্রাইভে অটো সিঙ্ক হবে।\n- 🏍️ **মাল্টিপল বাইক কার্ড সাপোর্ট:** একাধিক বাইক যুক্ত করা, এডিট করা ও প্রতি বাইকের আলাদা আলাদা ফুয়েল ও সার্ভিস রেকর্ড ট্র্যাক করার সুবিধা।"
+          tag_name: v1.0.15
+          name: "RideLog BD Android App v1.0.15 (Native Google Account Chooser Auth Screen)"
+          body: "✅ নতুন ফিচার ও আপডেট:\n- 🔑 **Google Auth Account Chooser Screen:** গুগল ড্রাইভে সিঙ্ক করার সময় ম্যানুয়াল টেক্সট ইনপুট পপ-আপের পরিবর্তে এখন সরাসরি স্ট্যান্ডার্ড গুগল সাইন-ইন স্ক্রিন (Account Chooser Popup) ওপেন হবে, যা থেকে ব্যবহারকারী ১-ক্লিকে তার জি-মেইল অ্যাকাউন্ট বেছে নিয়ে ক্লাউড সিঙ্ক করতে পারবেন।"
           files: android/app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
