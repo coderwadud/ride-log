@@ -1,6 +1,3 @@
-import { Share } from '@capacitor/share';
-import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
-
 /**
  * LocalStorage helper for RideLog BD application
  */
@@ -122,6 +119,9 @@ export async function exportBackupData() {
 
   // 1. Try Capacitor Native Filesystem + Share (100% works on Android APK!)
   try {
+    const { Share } = await import('@capacitor/share');
+    const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
+
     const writeResult = await Filesystem.writeFile({
       path: fileName,
       data: jsonStr,

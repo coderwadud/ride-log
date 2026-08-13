@@ -1,12 +1,7 @@
-const CACHE_NAME = 'ridelog-v2';
+const CACHE_NAME = 'ridelog-v3';
 const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
   '/manifest.json',
-  '/favicon.svg',
-  '/pwa-192x192.png',
-  '/pwa-512x512.png',
-  '/apple-touch-icon.png'
+  '/favicon.svg'
 ];
 
 // Install Event
