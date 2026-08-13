@@ -57,9 +57,9 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.2
-          name: "RideLog BD Native Android App v1.0.2"
-          body: "Direct 1-click download of RideLog BD Native APK with clean initial state and header clearance."
+          tag_name: v1.0.3
+          name: "RideLog BD Android App v1.0.3 (Light Mode + Bug Fixes)"
+          body: "✅ নতুন আপডেট:\n- ☀️ Light / Dark Mode টগল বাটন যোগ হয়েছে\n- 🐛 Settings বাগ ঠিক হয়েছে\n- 🧹 Clean initial empty state\n- 📱 Mobile header safe area clearance"
           files: android/app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
