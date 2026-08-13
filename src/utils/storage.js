@@ -3,13 +3,16 @@
  */
 
 const STORAGE_KEYS = {
-  BIKE_PROFILE: 'ridelog_bike_profile',
+  BIKES: 'ridelog_bikes',
+  ACTIVE_BIKE_ID: 'ridelog_active_bike_id',
+  BIKE_PROFILE: 'ridelog_bike_profile', // Legacy fallback
   FUEL_LOGS: 'ridelog_fuel_logs',
   SERVICE_LOGS: 'ridelog_service_logs',
-  SETTINGS: 'ridelog_settings'
+  SETTINGS: 'ridelog_settings',
+  GDRIVE_USER: 'ridelog_gdrive_user'
 };
 
-// Default empty initial state
+// Default empty initial bike
 const DEFAULT_BIKE = {
   id: 'bike_1',
   name: 'My Bike',
@@ -19,8 +22,8 @@ const DEFAULT_BIKE = {
   targetOilKm: 1000
 };
 
+const DEFAULT_BIKES = [DEFAULT_BIKE];
 const DEFAULT_FUEL_LOGS = [];
-
 const DEFAULT_SERVICE_LOGS = [];
 
 const DEFAULT_SETTINGS = {
@@ -28,19 +31,85 @@ const DEFAULT_SETTINGS = {
   theme: 'dark'
 };
 
-export function loadBikeProfile() {
+/** Load all bikes array with automatic legacy migration */
+export function loadBikes() {
   try {
-    const data = localStorage.getItem(STORAGE_KEYS.BIKE_PROFILE);
-    return data ? JSON.parse(data) : DEFAULT_BIKE;
+    const data = localStorage.getItem(STORAGE_KEYS.BIKES);
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+
+    // Legacy migration check: load old single BIKE_PROFILE if present
+    const oldSingle = localStorage.getItem(STORAGE_KEYS.BIKE_PROFILE);
+    if (oldSingle) {
+      const parsedOld = JSON.parse(oldSingle);
+      const migratedBikes = [{
+        id: parsedOld.id || 'bike_1',
+        name: parsedOld.name || 'My Bike',
+        regNumber: parsedOld.regNumber || '',
+        initialOdometer: Number(parsedOld.initialOdometer || 0),
+        currentOdometer: Number(parsedOld.currentOdometer || 0),
+        targetOilKm: Number(parsedOld.targetOilKm || 1000)
+      }];
+      saveBikes(migratedBikes);
+      return migratedBikes;
+    }
+
+    return DEFAULT_BIKES;
   } catch (e) {
-    console.error('Failed to load bike profile:', e);
-    return DEFAULT_BIKE;
+    console.error('Failed to load bikes list:', e);
+    return DEFAULT_BIKES;
   }
+}
+
+export function saveBikes(bikes) {
+  try {
+    const list = Array.isArray(bikes) && bikes.length > 0 ? bikes : DEFAULT_BIKES;
+    localStorage.setItem(STORAGE_KEYS.BIKES, JSON.stringify(list));
+  } catch (e) {
+    console.error('Failed to save bikes list:', e);
+  }
+}
+
+export function loadActiveBikeId() {
+  try {
+    const activeId = localStorage.getItem(STORAGE_KEYS.ACTIVE_BIKE_ID);
+    if (activeId) return activeId;
+    const bikes = loadBikes();
+    return bikes[0]?.id || 'bike_1';
+  } catch (e) {
+    return 'bike_1';
+  }
+}
+
+export function saveActiveBikeId(bikeId) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.ACTIVE_BIKE_ID, bikeId);
+  } catch (e) {
+    console.error('Failed to save active bike id:', e);
+  }
+}
+
+export function loadBikeProfile() {
+  const bikes = loadBikes();
+  const activeId = loadActiveBikeId();
+  return bikes.find(b => b.id === activeId) || bikes[0] || DEFAULT_BIKE;
 }
 
 export function saveBikeProfile(profile) {
   try {
-    localStorage.setItem(STORAGE_KEYS.BIKE_PROFILE, JSON.stringify(profile));
+    const bikes = loadBikes();
+    const activeId = loadActiveBikeId();
+    const index = bikes.findIndex(b => b.id === activeId);
+    let updatedBikes = [];
+    if (index >= 0) {
+      updatedBikes = [...bikes];
+      updatedBikes[index] = { ...updatedBikes[index], ...profile };
+    } else {
+      updatedBikes = [...bikes, { ...DEFAULT_BIKE, ...profile, id: activeId }];
+    }
+    saveBikes(updatedBikes);
   } catch (e) {
     console.error('Failed to save bike profile:', e);
   }
@@ -49,7 +118,14 @@ export function saveBikeProfile(profile) {
 export function loadFuelLogs() {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.FUEL_LOGS);
-    return data ? JSON.parse(data) : DEFAULT_FUEL_LOGS;
+    if (!data) return DEFAULT_FUEL_LOGS;
+    const parsed = JSON.parse(data);
+    if (!Array.isArray(parsed)) return DEFAULT_FUEL_LOGS;
+    // Ensure every log has a bikeId
+    return parsed.map(log => ({
+      ...log,
+      bikeId: log.bikeId || 'bike_1'
+    }));
   } catch (e) {
     console.error('Failed to load fuel logs:', e);
     return DEFAULT_FUEL_LOGS;
@@ -67,7 +143,14 @@ export function saveFuelLogs(logs) {
 export function loadServiceLogs() {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.SERVICE_LOGS);
-    return data ? JSON.parse(data) : DEFAULT_SERVICE_LOGS;
+    if (!data) return DEFAULT_SERVICE_LOGS;
+    const parsed = JSON.parse(data);
+    if (!Array.isArray(parsed)) return DEFAULT_SERVICE_LOGS;
+    // Ensure every log has a bikeId
+    return parsed.map(log => ({
+      ...log,
+      bikeId: log.bikeId || 'bike_1'
+    }));
   } catch (e) {
     console.error('Failed to load service logs:', e);
     return DEFAULT_SERVICE_LOGS;
@@ -99,17 +182,43 @@ export function saveSettings(settings) {
   }
 }
 
-// Get raw backup JSON string
-export function getBackupJsonString() {
-  const backup = {
-    version: '2.0',
+export function loadGDriveUser() {
+  try {
+    const data = localStorage.getItem(STORAGE_KEYS.GDRIVE_USER);
+    return data ? JSON.parse(data) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+export function saveGDriveUser(user) {
+  try {
+    if (user) {
+      localStorage.setItem(STORAGE_KEYS.GDRIVE_USER, JSON.stringify(user));
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.GDRIVE_USER);
+    }
+  } catch (e) {
+    console.error('Failed to save GDrive user:', e);
+  }
+}
+
+// Get raw backup JSON object/string
+export function getBackupJsonObject() {
+  return {
+    version: '3.0',
     exportDate: new Date().toISOString(),
+    bikes: loadBikes(),
+    activeBikeId: loadActiveBikeId(),
     bikeProfile: loadBikeProfile(),
     fuelLogs: loadFuelLogs(),
     serviceLogs: loadServiceLogs(),
     settings: loadSettings()
   };
-  return JSON.stringify(backup, null, 2);
+}
+
+export function getBackupJsonString() {
+  return JSON.stringify(getBackupJsonObject(), null, 2);
 }
 
 // Backup & Restore (Android App Native Share + Filesystem Compatible)
@@ -189,13 +298,34 @@ export async function exportBackupData() {
  */
 export function mergeImportBackupData(jsonString) {
   try {
-    const backup = JSON.parse(jsonString);
+    const backup = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
     
+    // Merge bikes list - skip duplicates by id
+    if (backup.bikes && Array.isArray(backup.bikes)) {
+      const existingBikes = loadBikes();
+      const existingBikeIds = new Set(existingBikes.map(b => b.id));
+      const newBikes = backup.bikes.filter(b => !existingBikeIds.has(b.id));
+      if (newBikes.length > 0) {
+        saveBikes([...existingBikes, ...newBikes]);
+      }
+    } else if (backup.bikeProfile) {
+      // Legacy single bike merge
+      const existingBikes = loadBikes();
+      const legacyId = backup.bikeProfile.id || 'bike_1';
+      if (!existingBikes.some(b => b.id === legacyId)) {
+        saveBikes([...existingBikes, backup.bikeProfile]);
+      }
+    }
+
+    if (backup.activeBikeId) {
+      saveActiveBikeId(backup.activeBikeId);
+    }
+
     // Merge fuel logs - skip duplicates by id
     if (backup.fuelLogs && Array.isArray(backup.fuelLogs)) {
       const existing = loadFuelLogs();
       const existingIds = new Set(existing.map(l => l.id));
-      const newLogs = backup.fuelLogs.filter(l => !existingIds.has(l.id));
+      const newLogs = backup.fuelLogs.filter(l => !existingIds.has(l.id)).map(l => ({ ...l, bikeId: l.bikeId || 'bike_1' }));
       saveFuelLogs([...existing, ...newLogs]);
     }
     
@@ -203,16 +333,8 @@ export function mergeImportBackupData(jsonString) {
     if (backup.serviceLogs && Array.isArray(backup.serviceLogs)) {
       const existing = loadServiceLogs();
       const existingIds = new Set(existing.map(l => l.id));
-      const newLogs = backup.serviceLogs.filter(l => !existingIds.has(l.id));
+      const newLogs = backup.serviceLogs.filter(l => !existingIds.has(l.id)).map(l => ({ ...l, bikeId: l.bikeId || 'bike_1' }));
       saveServiceLogs([...existing, ...newLogs]);
-    }
-
-    // Bike profile: only update if current is default/empty
-    if (backup.bikeProfile) {
-      const current = loadBikeProfile();
-      if (!current.regNumber && !current.currentOdometer) {
-        saveBikeProfile(backup.bikeProfile);
-      }
     }
 
     return { success: true, message: 'Data merged successfully' };
@@ -225,10 +347,15 @@ export function mergeImportBackupData(jsonString) {
 /** Full replace import (overwrites all existing data) */
 export function importBackupData(jsonString) {
   try {
-    const backup = JSON.parse(jsonString);
-    if (backup.bikeProfile) saveBikeProfile(backup.bikeProfile);
-    if (backup.fuelLogs) saveFuelLogs(backup.fuelLogs);
-    if (backup.serviceLogs) saveServiceLogs(backup.serviceLogs);
+    const backup = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+    if (backup.bikes && Array.isArray(backup.bikes)) {
+      saveBikes(backup.bikes);
+    } else if (backup.bikeProfile) {
+      saveBikes([backup.bikeProfile]);
+    }
+    if (backup.activeBikeId) saveActiveBikeId(backup.activeBikeId);
+    if (backup.fuelLogs && Array.isArray(backup.fuelLogs)) saveFuelLogs(backup.fuelLogs);
+    if (backup.serviceLogs && Array.isArray(backup.serviceLogs)) saveServiceLogs(backup.serviceLogs);
     if (backup.settings) saveSettings(backup.settings);
     return true;
   } catch (e) {
@@ -238,8 +365,11 @@ export function importBackupData(jsonString) {
 }
 
 export function clearAllData() {
+  localStorage.removeItem(STORAGE_KEYS.BIKES);
+  localStorage.removeItem(STORAGE_KEYS.ACTIVE_BIKE_ID);
   localStorage.removeItem(STORAGE_KEYS.BIKE_PROFILE);
   localStorage.removeItem(STORAGE_KEYS.FUEL_LOGS);
   localStorage.removeItem(STORAGE_KEYS.SERVICE_LOGS);
   localStorage.removeItem(STORAGE_KEYS.SETTINGS);
+  localStorage.removeItem(STORAGE_KEYS.GDRIVE_USER);
 }

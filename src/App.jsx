@@ -10,6 +10,10 @@ import BikeModal from './components/BikeModal';
 import PWAInstallModal from './components/PWAInstallModal';
 
 import { 
+  loadBikes,
+  saveBikes,
+  loadActiveBikeId,
+  saveActiveBikeId,
   loadBikeProfile, 
   saveBikeProfile, 
   loadFuelLogs, 
@@ -18,12 +22,20 @@ import {
   saveServiceLogs, 
   loadSettings, 
   saveSettings,
+  loadGDriveUser,
   exportBackupData,
   mergeImportBackupData,
   loadFuelLogs as reloadFuelLogs,
   loadServiceLogs as reloadServiceLogs,
   clearAllData
 } from './utils/storage';
+
+import { 
+  syncWithGDrive, 
+  requestGoogleDriveLogin, 
+  clearGDriveToken, 
+  isGDriveTokenValid 
+} from './utils/gdrive';
 
 import { 
   calculateFuelLogStats, 
@@ -44,10 +56,27 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
+  // Multi-Bike Core States
+  const [bikes, setBikes] = useState(loadBikes());
+  const [activeBikeId, setActiveBikeId] = useState(loadActiveBikeId());
+
   // Core Data States
-  const [bikeProfile, setBikeProfile] = useState(loadBikeProfile());
   const [fuelLogs, setFuelLogs] = useState(loadFuelLogs());
   const [serviceLogs, setServiceLogs] = useState(loadServiceLogs());
+
+  // Google Drive Cloud Sync State
+  const [gdriveUser, setGDriveUser] = useState(loadGDriveUser());
+  const [gdriveSyncing, setGDriveSyncing] = useState(false);
+
+  // Active Bike Profile
+  const activeBike = bikes.find(b => b.id === activeBikeId) || bikes[0] || {
+    id: 'bike_1',
+    name: 'My Bike',
+    regNumber: '',
+    initialOdometer: 0,
+    currentOdometer: 0,
+    targetOilKm: 1000
+  };
 
   // Modal States
   const [isFuelModalOpen, setIsFuelModalOpen] = useState(false);
@@ -73,8 +102,12 @@ export default function App() {
 
   // Save to LocalStorage whenever data changes
   useEffect(() => {
-    saveBikeProfile(bikeProfile);
-  }, [bikeProfile]);
+    saveBikes(bikes);
+  }, [bikes]);
+
+  useEffect(() => {
+    saveActiveBikeId(activeBikeId);
+  }, [activeBikeId]);
 
   useEffect(() => {
     saveFuelLogs(fuelLogs);
@@ -84,32 +117,97 @@ export default function App() {
     saveServiceLogs(serviceLogs);
   }, [serviceLogs]);
 
-  // Derived Stats Calculations
-  const fuelStats = calculateFuelLogStats(fuelLogs);
+  // Background Google Drive Auto-Sync Trigger
+  const triggerAutoGDriveSync = async () => {
+    if (isGDriveTokenValid() && navigator.onLine) {
+      setGDriveSyncing(true);
+      try {
+        const res = await syncWithGDrive();
+        if (res.success) {
+          // Reload merged data from localStorage
+          setBikes(loadBikes());
+          setActiveBikeId(loadActiveBikeId());
+          setFuelLogs(reloadFuelLogs());
+          setServiceLogs(reloadServiceLogs());
+        }
+      } catch (e) {
+        console.error('Auto sync error:', e);
+      } finally {
+        setGDriveSyncing(false);
+      }
+    }
+  };
+
+  // Auto-sync on boot and when internet restores
+  useEffect(() => {
+    triggerAutoGDriveSync();
+    const handleOnline = () => triggerAutoGDriveSync();
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, []);
+
+  // Filter fuel and service logs for active bike
+  const activeFuelLogs = fuelLogs.filter(l => (l.bikeId || 'bike_1') === activeBikeId);
+  const activeServiceLogs = serviceLogs.filter(s => (s.bikeId || 'bike_1') === activeBikeId);
+
+  // Derived Stats Calculations for active bike
+  const fuelStats = calculateFuelLogStats(activeFuelLogs);
   const currentOdometer = Math.max(
-    bikeProfile.initialOdometer || 0,
-    ...(fuelLogs.map(l => l.odometer || 0)),
-    ...(serviceLogs.map(s => s.odometer || 0))
+    activeBike.initialOdometer || 0,
+    ...(activeFuelLogs.map(l => l.odometer || 0)),
+    ...(activeServiceLogs.map(s => s.odometer || 0))
   );
 
-  // Auto-sync current odometer to bikeProfile if higher
+  // Auto-sync current odometer to activeBike if higher
   useEffect(() => {
-    if (currentOdometer > (bikeProfile.currentOdometer || 0)) {
-      setBikeProfile(prev => ({ ...prev, currentOdometer }));
+    if (currentOdometer > (activeBike.currentOdometer || 0)) {
+      setBikes(prev => prev.map(b => b.id === activeBikeId ? { ...b, currentOdometer } : b));
     }
-  }, [currentOdometer]);
+  }, [currentOdometer, activeBikeId]);
 
-  const serviceStats = calculateServiceStats(serviceLogs, currentOdometer, bikeProfile.targetOilKm || 1000);
+  const serviceStats = calculateServiceStats(activeServiceLogs, currentOdometer, activeBike.targetOilKm || 1000);
 
-  // Combine Recent Activity
+  // Combine Recent Activity for active bike
   const recentLogs = [
-    ...fuelLogs.map(f => ({ ...f, isFuel: true })),
-    ...serviceLogs.map(s => ({ ...s, isFuel: false }))
+    ...activeFuelLogs.map(f => ({ ...f, isFuel: true })),
+    ...activeServiceLogs.map(s => ({ ...s, isFuel: false }))
   ].sort((a, b) => new Date(b.date) - new Date(a.date) || (b.odometer || 0) - (a.odometer || 0));
 
   const t = translations[lang];
 
-  // Handlers
+  // Multi-Bike Handlers
+  const handleSelectBike = (bikeId) => {
+    setActiveBikeId(bikeId);
+    saveActiveBikeId(bikeId);
+  };
+
+  const handleAddBike = (newBikeData) => {
+    const newBike = {
+      ...newBikeData,
+      id: `bike_${Date.now()}`
+    };
+    const updated = [...bikes, newBike];
+    setBikes(updated);
+    setActiveBikeId(newBike.id);
+    triggerAutoGDriveSync();
+  };
+
+  const handleDeleteBike = (bikeId) => {
+    if (bikes.length <= 1) return;
+    const updated = bikes.filter(b => b.id !== bikeId);
+    setBikes(updated);
+    if (activeBikeId === bikeId) {
+      setActiveBikeId(updated[0].id);
+    }
+    triggerAutoGDriveSync();
+  };
+
+  const handleSaveBikeProfile = (updatedProfile) => {
+    setBikes(prev => prev.map(b => b.id === activeBikeId ? { ...b, ...updatedProfile } : b));
+    triggerAutoGDriveSync();
+  };
+
+  // Language & Theme Handlers
   const handleToggleLang = () => {
     const nextLang = lang === 'bn' ? 'en' : 'bn';
     setLang(nextLang);
@@ -122,34 +220,62 @@ export default function App() {
     saveSettings({ lang, theme: nextTheme });
   };
 
+  // Fuel & Service Handlers
   const handleSaveFuel = (entry) => {
+    const entryWithBike = { ...entry, bikeId: activeBikeId };
     if (editingFuelData) {
-      setFuelLogs(prev => prev.map(item => item.id === entry.id ? entry : item));
+      setFuelLogs(prev => prev.map(item => item.id === entryWithBike.id ? entryWithBike : item));
     } else {
-      setFuelLogs(prev => [...prev, entry]);
+      setFuelLogs(prev => [...prev, entryWithBike]);
     }
     setEditingFuelData(null);
+    triggerAutoGDriveSync();
   };
 
   const handleDeleteFuel = (id) => {
     if (window.confirm(t.confirmDeleteFuel)) {
       setFuelLogs(prev => prev.filter(item => item.id !== id));
+      triggerAutoGDriveSync();
     }
   };
 
   const handleSaveService = (entry) => {
+    const entryWithBike = { ...entry, bikeId: activeBikeId };
     if (editingServiceData) {
-      setServiceLogs(prev => prev.map(item => item.id === entry.id ? entry : item));
+      setServiceLogs(prev => prev.map(item => item.id === entryWithBike.id ? entryWithBike : item));
     } else {
-      setServiceLogs(prev => [...prev, entry]);
+      setServiceLogs(prev => [...prev, entryWithBike]);
     }
     setEditingServiceData(null);
+    triggerAutoGDriveSync();
   };
 
   const handleDeleteService = (id) => {
     if (window.confirm(t.confirmDeleteService)) {
       setServiceLogs(prev => prev.filter(item => item.id !== id));
+      triggerAutoGDriveSync();
     }
+  };
+
+  // Google Drive Handlers
+  const handleGoogleLogin = () => {
+    requestGoogleDriveLogin(
+      async ({ token, user }) => {
+        setGDriveUser(user);
+        alert(lang === 'bn' ? '✅ গুগল অ্যাকাউন্ট সফলভাবে কানেক্ট হয়েছে!' : '✅ Google account connected successfully!');
+        triggerAutoGDriveSync();
+      },
+      (err) => {
+        console.error('Google login failed:', err);
+        alert(lang === 'bn' ? '⚠️ গুগল ক্লাউড সাইন-ইন ব্যাহত হয়েছে।' : '⚠️ Google login interrupted.');
+      }
+    );
+  };
+
+  const handleGoogleLogout = () => {
+    clearGDriveToken();
+    setGDriveUser(null);
+    alert(lang === 'bn' ? '🚪 গুগল ক্লাউড থেকে সাইন-আউট করা হয়েছে।' : '🚪 Signed out from Google Drive.');
   };
 
   const handleTriggerInstall = async () => {
@@ -168,11 +294,17 @@ export default function App() {
       <Header 
         lang={lang}
         onToggleLang={handleToggleLang}
-        bikeProfile={bikeProfile}
+        bikes={bikes}
+        activeBikeId={activeBikeId}
+        onSelectBike={handleSelectBike}
+        bikeProfile={activeBike}
         onEditBike={() => setIsBikeModalOpen(true)}
         onOpenInstall={() => setIsInstallModalOpen(true)}
         theme={theme}
         onToggleTheme={handleToggleTheme}
+        gdriveUser={gdriveUser}
+        gdriveSyncing={gdriveSyncing}
+        onTriggerSync={triggerAutoGDriveSync}
       />
 
       {/* Main Tab Navigation for Desktop */}
@@ -217,7 +349,7 @@ export default function App() {
             lang={lang}
             fuelStats={fuelStats}
             serviceStats={serviceStats}
-            bikeProfile={bikeProfile}
+            bikeProfile={activeBike}
             onOpenAddFuel={() => { setEditingFuelData(null); setIsFuelModalOpen(true); }}
             onOpenAddService={() => { setEditingServiceData(null); setIsServiceModalOpen(true); }}
             recentLogs={recentLogs}
@@ -237,7 +369,7 @@ export default function App() {
         {activeTab === 'service' && (
           <ServiceLogsTab 
             lang={lang}
-            serviceLogs={serviceLogs}
+            serviceLogs={activeServiceLogs}
             serviceStats={serviceStats}
             onOpenAddService={() => { setEditingServiceData(null); setIsServiceModalOpen(true); }}
             onEditService={(data) => { setEditingServiceData(data); setIsServiceModalOpen(true); }}
@@ -248,8 +380,8 @@ export default function App() {
         {activeTab === 'analytics' && (
           <AnalyticsTab 
             lang={lang}
-            fuelLogs={fuelLogs}
-            serviceLogs={serviceLogs}
+            fuelLogs={activeFuelLogs}
+            serviceLogs={activeServiceLogs}
             fuelStats={fuelStats}
           />
         )}
@@ -324,27 +456,37 @@ export default function App() {
         lang={lang}
         isOpen={isBikeModalOpen}
         onClose={() => setIsBikeModalOpen(false)}
-        onSave={(updated) => setBikeProfile(updated)}
-        bikeProfile={bikeProfile}
+        bikes={bikes}
+        activeBikeId={activeBikeId}
+        onSelectBike={handleSelectBike}
+        onAddBike={handleAddBike}
+        onDeleteBike={handleDeleteBike}
+        bikeProfile={activeBike}
+        onSave={handleSaveBikeProfile}
         onExportData={exportBackupData}
         onImportData={(jsonStr) => {
           const result = mergeImportBackupData(jsonStr);
           if (result.success) {
-            // Reload all data from storage after merge
+            setBikes(loadBikes());
+            setActiveBikeId(loadActiveBikeId());
             setFuelLogs(reloadFuelLogs());
             setServiceLogs(reloadServiceLogs());
           }
           return result;
         }}
+        gdriveUser={gdriveUser}
+        gdriveSyncing={gdriveSyncing}
+        onGoogleLogin={handleGoogleLogin}
+        onGoogleLogout={handleGoogleLogout}
+        onTriggerSync={triggerAutoGDriveSync}
         onClearAllData={() => {
           clearAllData();
           const defaultBike = { id: 'bike_1', name: 'My Bike', regNumber: '', initialOdometer: 0, currentOdometer: 0, targetOilKm: 1000 };
-          saveBikeProfile(defaultBike);
-          saveFuelLogs([]);
-          saveServiceLogs([]);
-          setBikeProfile(defaultBike);
+          setBikes([defaultBike]);
+          setActiveBikeId('bike_1');
           setFuelLogs([]);
           setServiceLogs([]);
+          setGDriveUser(null);
           setIsBikeModalOpen(false);
           alert(lang === 'bn' ? '✅ সমস্ত ডাটা সফলভাবে মুছে ফেলা হয়েছে!' : '✅ All data reset successfully!');
         }}
@@ -360,3 +502,4 @@ export default function App() {
     </div>
   );
 }
+
