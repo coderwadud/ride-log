@@ -1,0 +1,13 @@
+{
+  "appId": "com.ridelog.app",
+  "appName": "RideLog BD",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": true
+  }
+}
