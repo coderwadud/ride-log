@@ -111,13 +111,24 @@ export function calculateFuelLogStats(fuelLogs = []) {
   // Cost per KM driven
   const costPerKm = totalDistance > 0 ? totalFuelSpent / totalDistance : 0;
 
+  const processedLogs = processed.reverse();
+  const latestLog = processedLogs[0] || null;
+  const lastFuelLiters = latestLog ? Number(latestLog.liters || 0) : 0;
+  const lastFuelCost = latestLog ? Number(latestLog.totalAmount || 0) : 0;
+
+  const lastMileageLog = processedLogs.find(l => l.calculatedMileage !== null && l.calculatedMileage > 0);
+  const lastMileage = lastMileageLog ? Number(lastMileageLog.calculatedMileage) : 0;
+
   return {
-    processedLogs: processed.reverse(),
+    processedLogs,
     totalDistance,
     totalFuelSpent,
-    totalLiters,        // ALL liters (for display in stats)
+    totalLiters,
     avgMileage: Number(avgMileage.toFixed(2)),
-    costPerKm: Number(costPerKm.toFixed(2))
+    costPerKm: Number(costPerKm.toFixed(2)),
+    lastFuelLiters,
+    lastFuelCost,
+    lastMileage
   };
 }
 

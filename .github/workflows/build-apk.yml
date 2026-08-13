@@ -57,9 +57,9 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.7
-          name: "RideLog BD Android App v1.0.7 (Default Price 145 BDT)"
-          body: "✅ নতুন আপডেট:\n- ⛽ প্রতি লিটার জ্বালানির ডিফল্ট দাম ১৩০ টাকার জায়গায় ১৪৫ টাকা নির্ধারণ করা হয়েছে"
+          tag_name: v1.0.8
+          name: "RideLog BD Android App v1.0.8 (Last Refill + Last Mileage Cards)"
+          body: "✅ নতুন ফিচার ও আপডেট:\n- ⛽ প্রতি লিটার জ্বালানির ডিফল্ট দাম ১৪৫ ৳ করা হয়েছে\n- 📊 ড্যাশবোর্ডে মোট দূরত্বের পাশাপাশি **সর্বশেষ ফুয়েল এন্ট্রি (Last Refill)** ও **সর্বশেষ মাইলেজ (Last Mileage)** যুক্ত করা হয়েছে"
           files: android/app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
