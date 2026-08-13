@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Bike, Check } from 'lucide-react';
 import { translations } from '../utils/translations';
 
-export default function BikeModal({ lang, isOpen, onClose, onSave, bikeProfile }) {
+export default function BikeModal({ lang, isOpen, onClose, onSave, bikeProfile, onClearAllData }) {
   const t = translations[lang];
 
   const [name, setName] = useState(bikeProfile?.name || 'Yamaha FZS V3');
