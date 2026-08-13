@@ -1,21 +1,14 @@
 import React from 'react';
-import { Bike, Languages, Sun, Moon, Settings, CloudCheck, CloudOff, RefreshCw } from 'lucide-react';
+import { Bike, Languages, Sun, Moon, Settings } from 'lucide-react';
 import { translations } from '../utils/translations';
-import BikeSelector from './BikeSelector';
 
 export default function Header({ 
   lang, 
   onToggleLang, 
-  bikes = [],
-  activeBikeId,
-  onSelectBike,
   bikeProfile, 
   onEditBike, 
   theme,
-  onToggleTheme,
-  gdriveUser,
-  gdriveSyncing,
-  onTriggerSync
+  onToggleTheme
 }) {
   const t = translations[lang];
   const isLight = theme === 'light';
@@ -35,47 +28,6 @@ export default function Header({
       </div>
 
       <div className="top-actions flex items-center gap-1.5">
-        {/* Desktop Bike Custom Dropdown Selector */}
-        <div className="desktop-bike-selector">
-          <BikeSelector
-            bikes={bikes}
-            activeBikeId={activeBikeId}
-            onSelectBike={onSelectBike}
-            onOpenBikeModal={onEditBike}
-            lang={lang}
-            align="right"
-          />
-        </div>
-
-        {/* Google Drive Cloud Sync Status Pill */}
-        {gdriveUser ? (
-          <button
-            type="button"
-            onClick={onTriggerSync}
-            disabled={gdriveSyncing}
-            className="btn btn-icon text-emerald-400 border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20"
-            title={gdriveSyncing ? 'Syncing with Google Drive...' : 'Google Drive Synced (Click to sync now)'}
-            style={{ padding: '6px 8px', fontSize: '0.75rem', gap: '4px' }}
-          >
-            {gdriveSyncing ? (
-              <RefreshCw size={15} className="animate-spin text-emerald-400" />
-            ) : (
-              <CloudCheck size={15} className="text-emerald-400" />
-            )}
-            <span className="hide-mobile font-semibold">☁️ {gdriveSyncing ? 'Syncing' : 'Synced'}</span>
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onEditBike}
-            className="btn btn-icon text-slate-400"
-            title="Google Drive Sync Not Connected (Open Settings)"
-            style={{ padding: '6px 8px' }}
-          >
-            <CloudOff size={15} />
-          </button>
-        )}
-
         {/* Settings Modal Button */}
         <button 
           className="btn btn-icon" 

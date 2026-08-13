@@ -291,20 +291,14 @@ export default function App() {
 
   return (
     <div className="app-container">
-      {/* Header Bar (Desktop Bike Selector inside) */}
+      {/* Header Bar */}
       <Header 
         lang={lang}
         onToggleLang={handleToggleLang}
-        bikes={bikes}
-        activeBikeId={activeBikeId}
-        onSelectBike={handleSelectBike}
         bikeProfile={activeBike}
         onEditBike={() => setIsBikeModalOpen(true)}
         theme={theme}
         onToggleTheme={handleToggleTheme}
-        gdriveUser={gdriveUser}
-        gdriveSyncing={gdriveSyncing}
-        onTriggerSync={triggerAutoGDriveSync}
       />
 
       {/* Mobile-Only Custom Bike Selector Bar below Header */}

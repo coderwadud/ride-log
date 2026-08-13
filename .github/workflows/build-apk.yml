@@ -57,9 +57,9 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.17
-          name: "RideLog BD Android App v1.0.17 (Custom Dropdown Menu + Desktop/Mobile Adaptive Placement)"
-          body: "✅ নতুন সুন্দর ডিজাইন ও ফিক্স:\n- 🏍️ **Custom Dropdown Menu:** আধুনিক গ্লাসমোর্ফিজম ড্রপডাউন মেনু যা ১-ক্লিকে চমৎকার এনিমেশনের সাথে ওপেন হয়।\n- 🖥️📱 **Adaptive Layout:** ডেসকেটপে হেডার বারের ভেতরে ডানপাশে থাকবে এবং মোবাইলে হেডারের নিচে সুন্দর বার হিসেবে প্রদর্শন করবে।"
+          tag_name: v1.0.18
+          name: "RideLog BD Android App v1.0.18 (Clean Header UI Fix)"
+          body: "✅ নতুন ক্লিন ডিজাইন:\n- 📱 **Clean Header Actions:** হেডার বার থেকে অতিরিক্ত বাইক ড্রপডাউন এবং গুগল ড্রাইভ স্ট্যাটাস আইকনটি সরিয়ে অ্যাপের হেডারটি সম্পূর্ণরূপে ক্লিন ও সুন্দর করা হয়েছে।"
           files: android/app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
