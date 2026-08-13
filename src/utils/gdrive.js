@@ -192,7 +192,8 @@ export async function syncWithGDrive() {
 
 /** Prompt Google Identity Services (GIS) / Google OAuth 2.0 Account Selector screen */
 export function requestGoogleDriveLogin(onSuccess, onError) {
-  const CLIENT_ID = '1088491039832-demo.apps.googleusercontent.com';
+  const customClientId = localStorage.getItem('ridelog_gdrive_client_id');
+  const CLIENT_ID = customClientId || '492835434755-eh4f7kscnck169n18e30ncodpc8vh6mo.apps.googleusercontent.com';
 
   // 1. Try GIS window.google.accounts.oauth2 with prompt: 'select_account'
   if (typeof window.google !== 'undefined' && window.google.accounts && window.google.accounts.oauth2) {

@@ -57,9 +57,9 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.18
-          name: "RideLog BD Android App v1.0.18 (Clean Header UI Fix)"
-          body: "✅ নতুন ক্লিন ডিজাইন:\n- 📱 **Clean Header Actions:** হেডার বার থেকে অতিরিক্ত বাইক ড্রপডাউন এবং গুগল ড্রাইভ স্ট্যাটাস আইকনটি সরিয়ে অ্যাপের হেডারটি সম্পূর্ণরূপে ক্লিন ও সুন্দর করা হয়েছে।"
+          tag_name: v1.0.19
+          name: "RideLog BD Android App v1.0.19 (Official Google OAuth Client ID Integration)"
+          body: "✅ গুগল ড্রাইভ সিঙ্ক আপডেট:\n- 🔑 **Official Google OAuth Client ID:** ব্যবহারকারীর নিজস্ব অনুমোদিত গুগল ড্রাইভ ও-অথ ক্লায়েন্ট আইডি সিস্টেমে ইন্টিগ্রেট করা হয়েছে।"
           files: android/app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
