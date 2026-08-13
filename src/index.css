@@ -61,7 +61,8 @@ html, body {
   max-width: 1080px;
   margin: 0 auto;
   padding: 12px;
-  padding-bottom: 95px; /* space for mobile bottom navbar */
+  padding-top: max(12px, env(safe-area-inset-top));
+  padding-bottom: max(95px, calc(95px + env(safe-area-inset-bottom))); /* space for mobile bottom navbar */
 }
 
 @media (min-width: 768px) {
@@ -206,12 +207,16 @@ h1, h2, h3, h4, h5 {
     position: sticky;
     top: 0;
     z-index: 900;
-    background: rgba(11, 15, 25, 0.92);
+    background: rgba(11, 15, 25, 0.96);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    padding: 10px 12px;
+    padding-top: max(22px, calc(14px + env(safe-area-inset-top, 14px)));
+    padding-bottom: 12px;
+    padding-left: 14px;
+    padding-right: 14px;
     margin: -12px -12px 16px -12px;
     width: calc(100% + 24px);
+    border-bottom: 1px solid var(--border-color);
   }
 }
 
