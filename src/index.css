@@ -33,89 +33,243 @@
   --theme-transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-/* ===== LIGHT MODE THEME ===== */
+/* ===== COMPLETE LIGHT MODE THEME ===== */
+
+/* --- Root Color Variables --- */
 [data-theme='light'] {
-  --bg-main: #f0f4f8;
-  --bg-card: rgba(255, 255, 255, 0.9);
+  --bg-main: #eef2f7;
+  --bg-card: rgba(255, 255, 255, 0.96);
   --bg-card-hover: rgba(255, 255, 255, 1);
-  --bg-input: #ffffff;
-  --border-color: rgba(0, 0, 0, 0.1);
-  --border-highlight: rgba(16, 185, 129, 0.4);
+  --bg-input: #f8fafc;
+  --border-color: rgba(0, 0, 0, 0.09);
+  --border-highlight: rgba(5, 150, 105, 0.4);
 
   --text-main: #0f172a;
   --text-muted: #475569;
   --text-dim: #94a3b8;
 
   --accent-fuel: #059669;
-  --accent-fuel-glow: rgba(5, 150, 105, 0.2);
+  --accent-fuel-glow: rgba(5, 150, 105, 0.18);
 
   --accent-mileage: #0284c7;
-  --accent-mileage-glow: rgba(2, 132, 199, 0.2);
+  --accent-mileage-glow: rgba(2, 132, 199, 0.18);
 
   --accent-service: #7c3aed;
-  --accent-service-glow: rgba(124, 58, 237, 0.2);
+  --accent-service-glow: rgba(124, 58, 237, 0.18);
 
-  --accent-amber: #d97706;
+  --accent-amber: #b45309;
   --accent-danger: #dc2626;
 }
 
-[data-theme='light'] html,
+/* --- Page Background --- */
 [data-theme='light'] body,
-html[data-theme='light'],
-body[data-theme='light'] {
+[data-theme='light'] html {
+  background-color: #eef2f7;
   background-image:
-    radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.06) 0px, transparent 50%),
+    radial-gradient(at 0% 0%, rgba(5, 150, 105, 0.07) 0px, transparent 50%),
     radial-gradient(at 100% 0%, rgba(124, 58, 237, 0.06) 0px, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(2, 132, 199, 0.04) 0px, transparent 50%);
+    radial-gradient(at 50% 100%, rgba(2, 132, 199, 0.05) 0px, transparent 50%);
 }
 
+/* --- Cards --- */
+[data-theme='light'] .card {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.1), 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme='light'] .card:hover {
+  border-color: rgba(0, 0, 0, 0.12);
+  box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.13);
+}
+
+/* --- Header Bar --- */
 [data-theme='light'] .header-bar {
-  background: rgba(240, 244, 248, 0.97) !important;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  background: rgba(238, 242, 247, 0.97) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.09) !important;
 }
 
-[data-theme='light'] .mobile-nav-bar {
-  background: rgba(255, 255, 255, 0.98);
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
-}
-
+/* --- Brand Name --- */
 [data-theme='light'] .brand-name {
-  background: linear-gradient(135deg, #0f172a 30%, #475569 100%);
+  background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-[data-theme='light'] .form-input,
-[data-theme='light'] .form-textarea {
-  background: #fff;
-  border-color: rgba(0, 0, 0, 0.15);
-  color: #0f172a;
+/* --- Stat Cards (mileage, fuel, service, cost icons) --- */
+[data-theme='light'] .mileage .stat-icon {
+  background: rgba(2, 132, 199, 0.12);
+  color: #0284c7;
+}
+[data-theme='light'] .fuel .stat-icon {
+  background: rgba(5, 150, 105, 0.12);
+  color: #059669;
+}
+[data-theme='light'] .service .stat-icon {
+  background: rgba(124, 58, 237, 0.12);
+  color: #7c3aed;
+}
+[data-theme='light'] .cost .stat-icon {
+  background: rgba(180, 83, 9, 0.12);
+  color: #b45309;
 }
 
+/* --- Oil Health Card (Engine Oil Status) --- */
+[data-theme='light'] .oil-health-card {
+  background: linear-gradient(135deg, rgba(240, 249, 255, 0.9), rgba(236, 253, 245, 0.9));
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+[data-theme='light'] .oil-health-card.warning {
+  background: linear-gradient(135deg, rgba(255, 251, 235, 0.95), rgba(254, 243, 199, 0.9));
+  border-color: rgba(180, 83, 9, 0.2);
+}
+[data-theme='light'] .oil-health-card.danger {
+  background: linear-gradient(135deg, rgba(255, 241, 242, 0.95), rgba(254, 226, 226, 0.9));
+  border-color: rgba(220, 38, 38, 0.2);
+}
+[data-theme='light'] .oil-progress-bar-bg {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+/* --- Mobile Bottom Nav Bar --- */
+[data-theme='light'] .mobile-nav-bar {
+  background: rgba(255, 255, 255, 0.98);
+  border-top: 1px solid rgba(0, 0, 0, 0.09);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+}
+[data-theme='light'] .mobile-nav-item {
+  color: #94a3b8;
+}
+[data-theme='light'] .mobile-nav-item.active {
+  color: #0284c7;
+}
+[data-theme='light'] .mobile-nav-item.active svg {
+  filter: drop-shadow(0 0 6px rgba(2, 132, 199, 0.5));
+}
+
+/* --- Desktop Nav Tabs --- */
+[data-theme='light'] .nav-tabs {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+[data-theme='light'] .nav-tab-btn {
+  color: #64748b;
+}
+[data-theme='light'] .nav-tab-btn.active {
+  background: rgba(2, 132, 199, 0.1);
+  color: #0284c7;
+  border-color: rgba(2, 132, 199, 0.25);
+}
+
+/* --- Buttons --- */
 [data-theme='light'] .btn-secondary {
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(0, 0, 0, 0.04);
   border-color: rgba(0, 0, 0, 0.12);
   color: #0f172a;
 }
-
+[data-theme='light'] .btn-secondary:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
 [data-theme='light'] .btn-icon {
-  color: #334155;
+  background: rgba(0, 0, 0, 0.04);
+  color: #475569;
+  border-color: rgba(0, 0, 0, 0.1);
+}
+[data-theme='light'] .btn-icon:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: #0f172a;
 }
 
+/* --- Log Items --- */
+[data-theme='light'] .log-item {
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+[data-theme='light'] .log-item:hover {
+  background: rgba(0, 0, 0, 0.025);
+}
+[data-theme='light'] .log-date {
+  color: #64748b;
+}
+[data-theme='light'] .log-main-title {
+  color: #0f172a;
+}
+[data-theme='light'] .log-badge.badge-full {
+  background: rgba(5, 150, 105, 0.1);
+  color: #059669;
+  border-color: rgba(5, 150, 105, 0.25);
+}
+[data-theme='light'] .log-badge.badge-partial {
+  background: rgba(180, 83, 9, 0.1);
+  color: #b45309;
+  border-color: rgba(180, 83, 9, 0.25);
+}
+
+/* --- Modals --- */
+[data-theme='light'] .modal-overlay {
+  background: rgba(15, 23, 42, 0.5);
+}
 [data-theme='light'] .modal-content {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.2);
+}
+[data-theme='light'] .modal-drag-handle {
+  background: rgba(0, 0, 0, 0.15);
+}
+[data-theme='light'] .modal-header {
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+/* --- Forms --- */
+[data-theme='light'] .form-label {
+  color: #475569;
+}
+[data-theme='light'] .form-input,
+[data-theme='light'] .form-select,
+[data-theme='light'] .form-textarea {
+  background: #f8fafc;
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #0f172a;
+}
+[data-theme='light'] .form-input:focus,
+[data-theme='light'] .form-select:focus,
+[data-theme='light'] .form-textarea:focus {
+  border-color: #0284c7;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
   background: #ffffff;
 }
 
+/* --- Checkbox Tags --- */
 [data-theme='light'] .tag-checkbox {
-  background: rgba(0, 0, 0, 0.04);
+  background: rgba(0, 0, 0, 0.03);
   border-color: rgba(0, 0, 0, 0.1);
-  color: #334155;
+  color: #475569;
+}
+[data-theme='light'] .tag-checkbox.checked {
+  background: rgba(124, 58, 237, 0.08);
+  border-color: rgba(124, 58, 237, 0.35);
+  color: #7c3aed;
 }
 
-[data-theme='light'] .tag-checkbox.checked {
-  background: rgba(5, 150, 105, 0.1);
-  border-color: rgba(5, 150, 105, 0.4);
-  color: #059669;
+/* --- Service Category Badges in Log list --- */
+[data-theme='light'] .service-logs-view span[style] {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #475569 !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+/* --- Empty State --- */
+[data-theme='light'] .empty-state {
+  color: #94a3b8;
+}
+
+/* --- Scrollbar --- */
+[data-theme='light'] ::-webkit-scrollbar-track {
+  background: #eef2f7;
+}
+[data-theme='light'] ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.18);
 }
 
 /* Smooth transition for all theme changes */
