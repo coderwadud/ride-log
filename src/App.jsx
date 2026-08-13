@@ -394,16 +394,26 @@ export default function App() {
         onAddBike={handleAddBike}
         onDeleteBike={handleDeleteBike}
         bikeProfile={activeBike}
-        onSave={handleSaveBikeProfile}
         onExportData={() => exportBackupData({ bikes, activeBikeId, fuelLogs, serviceLogs, settings: { lang, theme } })}
         onImportData={(jsonStr) => {
-          const result = mergeImportBackupData(jsonStr);
-          if (result.success) {
-            // Import updates state directly
-            if (result.data?.bikes) setBikes(result.data.bikes);
-            if (result.data?.activeBikeId) setActiveBikeId(result.data.activeBikeId);
-            if (result.data?.fuelLogs) setFuelLogs(result.data.fuelLogs);
-            if (result.data?.serviceLogs) setServiceLogs(result.data.serviceLogs);
+          const result = mergeImportBackupData(jsonStr, { bikes, activeBikeId, fuelLogs, serviceLogs });
+          if (result.success && result.data) {
+            // Update React state directly
+            if (result.data.bikes) setBikes(result.data.bikes);
+            if (result.data.activeBikeId) setActiveBikeId(result.data.activeBikeId);
+            if (result.data.fuelLogs) setFuelLogs(result.data.fuelLogs);
+            if (result.data.serviceLogs) setServiceLogs(result.data.serviceLogs);
+
+            // Persist imported data immediately to Firestore Database
+            if (user) {
+              saveUserData(user.uid, {
+                settings: { lang, theme },
+                activeBikeId: result.data.activeBikeId || activeBikeId,
+                bikes: result.data.bikes || bikes,
+                fuelLogs: result.data.fuelLogs || fuelLogs,
+                serviceLogs: result.data.serviceLogs || serviceLogs
+              });
+            }
           }
           return result;
         }}

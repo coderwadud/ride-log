@@ -204,7 +204,19 @@ export function saveGDriveUser(user) {
 }
 
 // Get raw backup JSON object/string
-export function getBackupJsonObject() {
+export function getBackupJsonObject(customData) {
+  if (customData && typeof customData === 'object') {
+    return {
+      version: '3.0',
+      exportDate: new Date().toISOString(),
+      bikes: customData.bikes || loadBikes(),
+      activeBikeId: customData.activeBikeId || loadActiveBikeId(),
+      bikeProfile: customData.bikeProfile || (customData.bikes ? customData.bikes.find(b => b.id === (customData.activeBikeId || loadActiveBikeId())) : loadBikeProfile()),
+      fuelLogs: customData.fuelLogs || loadFuelLogs(),
+      serviceLogs: customData.serviceLogs || loadServiceLogs(),
+      settings: customData.settings || loadSettings()
+    };
+  }
   return {
     version: '3.0',
     exportDate: new Date().toISOString(),
@@ -217,14 +229,23 @@ export function getBackupJsonObject() {
   };
 }
 
-export function getBackupJsonString() {
-  return JSON.stringify(getBackupJsonObject(), null, 2);
+export function getBackupJsonString(customData) {
+  return JSON.stringify(getBackupJsonObject(customData), null, 2);
 }
 
 // Backup & Restore (Android App Native Share + Filesystem Compatible)
-export async function exportBackupData() {
-  const jsonStr = getBackupJsonString();
+export async function exportBackupData(customData) {
+  const jsonStr = getBackupJsonString(customData);
   const fileName = `ridelog_backup_${new Date().toISOString().slice(0, 10)}.json`;
+
+  // Also sync to localStorage so local fallback stays fresh
+  if (customData) {
+    if (customData.bikes) saveBikes(customData.bikes);
+    if (customData.activeBikeId) saveActiveBikeId(customData.activeBikeId);
+    if (customData.fuelLogs) saveFuelLogs(customData.fuelLogs);
+    if (customData.serviceLogs) saveServiceLogs(customData.serviceLogs);
+    if (customData.settings) saveSettings(customData.settings);
+  }
 
   // 1. Try Capacitor Native Filesystem + Share (100% works on Android APK!)
   try {
@@ -245,7 +266,7 @@ export async function exportBackupData() {
         url: writeResult.uri,
         dialogTitle: 'Save / Share Backup File'
       });
-      return { success: true, method: 'native-share' };
+      return { success: true, method: 'native-share', jsonStr };
     }
   } catch (e) {
     console.log('Capacitor native share/filesystem attempt:', e);
@@ -260,7 +281,7 @@ export async function exportBackupData() {
           title: 'RideLog BD Backup',
           files: [file]
         });
-        return { success: true, method: 'web-share' };
+        return { success: true, method: 'web-share', jsonStr };
       }
     } catch (e) {
       console.log('Web share file failed:', e);
@@ -277,7 +298,7 @@ export async function exportBackupData() {
     document.body.appendChild(a);
     a.click();
     setTimeout(() => document.body.removeChild(a), 500);
-    return { success: true, method: 'download' };
+    return { success: true, method: 'download', jsonStr };
   } catch (e) {
     console.error('Data URL download failed:', e);
   }
@@ -285,7 +306,6 @@ export async function exportBackupData() {
   // 4. Last fallback: Copy JSON to clipboard
   try {
     await navigator.clipboard.writeText(jsonStr);
-    alert(navigator.language === 'bn' ? '📋 ব্যাকআপ ডাটা ক্লিপবোর্ডে কপি করা হয়েছে!' : '📋 Backup copied to clipboard!');
     return { success: true, method: 'clipboard', jsonStr };
   } catch (e) {
     return { success: false, jsonStr };
@@ -296,48 +316,76 @@ export async function exportBackupData() {
  * Import backup and MERGE with existing data (add entries, don't replace)
  * Duplicate entries (same id) are skipped
  */
-export function mergeImportBackupData(jsonString) {
+export function mergeImportBackupData(jsonString, currentData) {
   try {
     const backup = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
-    
+    if (!backup || typeof backup !== 'object') {
+      return { success: false, message: 'Invalid backup file' };
+    }
+
+    const existingBikes = (currentData && Array.isArray(currentData.bikes)) ? currentData.bikes : loadBikes();
+    const existingFuel = (currentData && Array.isArray(currentData.fuelLogs)) ? currentData.fuelLogs : loadFuelLogs();
+    const existingService = (currentData && Array.isArray(currentData.serviceLogs)) ? currentData.serviceLogs : loadServiceLogs();
+
+    let mergedBikes = [...existingBikes];
+    let mergedActiveBikeId = (currentData && currentData.activeBikeId) || loadActiveBikeId();
+    let mergedFuelLogs = [...existingFuel];
+    let mergedServiceLogs = [...existingService];
+
     // Merge bikes list - skip duplicates by id
     if (backup.bikes && Array.isArray(backup.bikes)) {
-      const existingBikes = loadBikes();
-      const existingBikeIds = new Set(existingBikes.map(b => b.id));
-      const newBikes = backup.bikes.filter(b => !existingBikeIds.has(b.id));
+      const existingBikeIds = new Set(mergedBikes.map(b => b.id));
+      const newBikes = backup.bikes.filter(b => b && b.id && !existingBikeIds.has(b.id));
       if (newBikes.length > 0) {
-        saveBikes([...existingBikes, ...newBikes]);
+        mergedBikes = [...mergedBikes, ...newBikes];
       }
-    } else if (backup.bikeProfile) {
+    } else if (backup.bikeProfile && backup.bikeProfile.id) {
       // Legacy single bike merge
-      const existingBikes = loadBikes();
-      const legacyId = backup.bikeProfile.id || 'bike_1';
-      if (!existingBikes.some(b => b.id === legacyId)) {
-        saveBikes([...existingBikes, backup.bikeProfile]);
+      if (!mergedBikes.some(b => b.id === backup.bikeProfile.id)) {
+        mergedBikes.push(backup.bikeProfile);
       }
     }
 
     if (backup.activeBikeId) {
-      saveActiveBikeId(backup.activeBikeId);
+      mergedActiveBikeId = backup.activeBikeId;
     }
 
     // Merge fuel logs - skip duplicates by id
     if (backup.fuelLogs && Array.isArray(backup.fuelLogs)) {
-      const existing = loadFuelLogs();
-      const existingIds = new Set(existing.map(l => l.id));
-      const newLogs = backup.fuelLogs.filter(l => !existingIds.has(l.id)).map(l => ({ ...l, bikeId: l.bikeId || 'bike_1' }));
-      saveFuelLogs([...existing, ...newLogs]);
+      const existingIds = new Set(mergedFuelLogs.map(l => l.id));
+      const newLogs = backup.fuelLogs
+        .filter(l => l && l.id && !existingIds.has(l.id))
+        .map(l => ({ ...l, bikeId: l.bikeId || 'bike_1' }));
+      mergedFuelLogs = [...mergedFuelLogs, ...newLogs];
     }
     
     // Merge service logs - skip duplicates by id
     if (backup.serviceLogs && Array.isArray(backup.serviceLogs)) {
-      const existing = loadServiceLogs();
-      const existingIds = new Set(existing.map(l => l.id));
-      const newLogs = backup.serviceLogs.filter(l => !existingIds.has(l.id)).map(l => ({ ...l, bikeId: l.bikeId || 'bike_1' }));
-      saveServiceLogs([...existing, ...newLogs]);
+      const existingIds = new Set(mergedServiceLogs.map(l => l.id));
+      const newLogs = backup.serviceLogs
+        .filter(l => l && l.id && !existingIds.has(l.id))
+        .map(l => ({ ...l, bikeId: l.bikeId || 'bike_1' }));
+      mergedServiceLogs = [...mergedServiceLogs, ...newLogs];
     }
 
-    return { success: true, message: 'Data merged successfully' };
+    // Save to LocalStorage
+    saveBikes(mergedBikes);
+    saveActiveBikeId(mergedActiveBikeId);
+    saveFuelLogs(mergedFuelLogs);
+    saveServiceLogs(mergedServiceLogs);
+    if (backup.settings) saveSettings(backup.settings);
+
+    return {
+      success: true,
+      message: 'Data merged successfully',
+      data: {
+        bikes: mergedBikes,
+        activeBikeId: mergedActiveBikeId,
+        fuelLogs: mergedFuelLogs,
+        serviceLogs: mergedServiceLogs,
+        settings: backup.settings
+      }
+    };
   } catch (e) {
     console.error('Invalid backup file:', e);
     return { success: false, message: 'Invalid backup file' };
@@ -348,19 +396,32 @@ export function mergeImportBackupData(jsonString) {
 export function importBackupData(jsonString) {
   try {
     const backup = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
-    if (backup.bikes && Array.isArray(backup.bikes)) {
-      saveBikes(backup.bikes);
-    } else if (backup.bikeProfile) {
-      saveBikes([backup.bikeProfile]);
-    }
-    if (backup.activeBikeId) saveActiveBikeId(backup.activeBikeId);
-    if (backup.fuelLogs && Array.isArray(backup.fuelLogs)) saveFuelLogs(backup.fuelLogs);
-    if (backup.serviceLogs && Array.isArray(backup.serviceLogs)) saveServiceLogs(backup.serviceLogs);
+    if (!backup || typeof backup !== 'object') return { success: false };
+
+    const newBikes = backup.bikes && Array.isArray(backup.bikes) ? backup.bikes : (backup.bikeProfile ? [backup.bikeProfile] : DEFAULT_BIKES);
+    const newActiveId = backup.activeBikeId || newBikes[0]?.id || 'bike_1';
+    const newFuel = backup.fuelLogs && Array.isArray(backup.fuelLogs) ? backup.fuelLogs : [];
+    const newService = backup.serviceLogs && Array.isArray(backup.serviceLogs) ? backup.serviceLogs : [];
+
+    saveBikes(newBikes);
+    saveActiveBikeId(newActiveId);
+    saveFuelLogs(newFuel);
+    saveServiceLogs(newService);
     if (backup.settings) saveSettings(backup.settings);
-    return true;
+
+    return {
+      success: true,
+      data: {
+        bikes: newBikes,
+        activeBikeId: newActiveId,
+        fuelLogs: newFuel,
+        serviceLogs: newService,
+        settings: backup.settings
+      }
+    };
   } catch (e) {
     console.error('Invalid backup file:', e);
-    return false;
+    return { success: false };
   }
 }
 

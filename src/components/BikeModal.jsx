@@ -344,7 +344,12 @@ export default function BikeModal({
               }}
               onClick={async () => {
                 const res = await onExportData?.();
-                if (res?.jsonStr || typeof res === 'object') {
+                if (res?.jsonStr) {
+                  try {
+                    await navigator.clipboard.writeText(res.jsonStr);
+                  } catch (e) {
+                    console.error('Clipboard copy error:', e);
+                  }
                   alert(lang === 'bn' ? '📋 ব্যাকআপ কোড ক্লিপবোর্ডে কপি করা হয়েছে!' : '📋 Backup code copied to clipboard!');
                 }
               }}
