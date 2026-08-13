@@ -57,9 +57,9 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.4
-          name: "RideLog BD Android App v1.0.4 (Mileage Calc + Import/Export)"
-          body: "✅ নতুন ফিচার ও আপডেট:\n- ⛽ গড় মাইলেজ গণনায় সর্বশেষ ফুয়েল রিফিল বাদ দিয়ে সঠিক হিসাব\n- 📊 মোট ব্যবহৃত জ্বালানি (Total Liters) ড্যাশবোর্ডে যোগ করা হয়েছে\n- 📦 সেটিংস মোডালে ব্যাকআপ এক্সপোর্ট ও রিস্টোর (ইম্পোর্ট মার্জ) অপশন যোগ করা হয়েছে"
+          tag_name: v1.0.5
+          name: "RideLog BD Android App v1.0.5 (Android Export Fix)"
+          body: "✅ নতুন আপডেট:\n- 📱 অ্যান্ড্রয়েড ফোনে ব্যাকআপ এক্সপোর্ট করা কাজ না করার বাগ সমাধান (Android Web Share & Data URL সাপোর্ট যোগ করা হয়েছে)"
           files: android/app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

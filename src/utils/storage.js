@@ -99,8 +99,8 @@ export function saveSettings(settings) {
   }
 }
 
-// Backup & Restore
-export function exportBackupData() {
+// Backup & Restore (Android WebView + Web Browser Compatible)
+export async function exportBackupData() {
   const backup = {
     version: '2.0',
     exportDate: new Date().toISOString(),
@@ -110,13 +110,60 @@ export function exportBackupData() {
     settings: loadSettings()
   };
   
-  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `ridelog_backup_${new Date().toISOString().slice(0,10)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+  const jsonStr = JSON.stringify(backup, null, 2);
+  const fileName = `ridelog_backup_${new Date().toISOString().slice(0, 10)}.json`;
+
+  // 1. Try Web Share API (Android native share sheet to save/share file)
+  if (navigator.share) {
+    try {
+      const file = new File([jsonStr], fileName, { type: 'application/json' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: 'RideLog BD Backup',
+          files: [file]
+        });
+        return true;
+      }
+    } catch (e) {
+      console.log('Web share file failed, trying text share or link...', e);
+    }
+
+    // Try text share as fallback if file share wasn't supported
+    try {
+      await navigator.share({
+        title: 'RideLog BD Backup',
+        text: jsonStr
+      });
+      return true;
+    } catch (e) {
+      console.log('Web share text failed, falling back to download link...', e);
+    }
+  }
+
+  // 2. Data URL download fallback
+  try {
+    const dataUrl = 'data:application/json;charset=utf-8,' + encodeURIComponent(jsonStr);
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = fileName;
+    a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => document.body.removeChild(a), 500);
+    return true;
+  } catch (e) {
+    console.error('Data URL download failed:', e);
+  }
+
+  // 3. Last fallback: Copy JSON to clipboard
+  try {
+    await navigator.clipboard.writeText(jsonStr);
+    alert('📋 ব্যাকআপ ডাটা ক্লিপবোর্ডে কপি করা হয়েছে! (Save in text file)');
+    return true;
+  } catch (e) {
+    alert('❌ ডাটা এক্সপোর্ট করা সম্ভব হয়নি।');
+    return false;
+  }
 }
 
 /**
