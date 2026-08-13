@@ -30,6 +30,7 @@ export function formatNum(num, lang = 'bn') {
 
 /**
  * Process fuel logs sorted chronologically to calculate mileage (km/l) for each entry
+ * Average mileage is calculated excluding the LAST fuel entry (no trip data yet for it)
  */
 export function calculateFuelLogStats(fuelLogs = []) {
   if (!fuelLogs || fuelLogs.length === 0) {
@@ -38,6 +39,7 @@ export function calculateFuelLogStats(fuelLogs = []) {
       totalDistance: 0,
       totalFuelSpent: 0,
       totalLiters: 0,
+      totalLitersForMileage: 0,
       avgMileage: 0,
       costPerKm: 0
     };
@@ -47,9 +49,12 @@ export function calculateFuelLogStats(fuelLogs = []) {
   const sorted = [...fuelLogs].sort((a, b) => new Date(a.date) - new Date(b.date) || a.odometer - b.odometer);
 
   let totalFuelSpent = 0;
-  let totalLiters = 0;
+  let totalLiters = 0; // all liters summed (for display)
   let validMileageDistance = 0;
   let validMileageLiters = 0;
+
+  // Exclude LAST entry from mileage average (we haven't driven that fuel yet)
+  const lastIndex = sorted.length - 1;
 
   const processed = sorted.map((log, index) => {
     totalFuelSpent += Number(log.totalAmount || 0);
@@ -61,16 +66,20 @@ export function calculateFuelLogStats(fuelLogs = []) {
     if (index > 0) {
       const prev = sorted[index - 1];
       tripDistance = Math.max(0, Number(log.odometer) - Number(prev.odometer));
-      
-      // Calculate mileage if liters > 0
-      if (log.liters > 0 && tripDistance > 0) {
+
+      // Calculate mileage if liters > 0 — but only for entries that are NOT the last entry
+      if (log.liters > 0 && tripDistance > 0 && index < lastIndex) {
         calculatedMileage = tripDistance / Number(log.liters);
-        
-        // Include in average mileage calculation if it's a full tank refill
+
+        // Include in average mileage only if full tank
         if (log.isFullTank) {
           validMileageDistance += tripDistance;
           validMileageLiters += Number(log.liters);
         }
+      } else if (log.liters > 0 && tripDistance > 0 && index === lastIndex) {
+        // Still show individual mileage for last entry (distance from prev fill)
+        // but do NOT include in overall average
+        calculatedMileage = tripDistance / Number(log.liters);
       }
     }
 
@@ -86,12 +95,17 @@ export function calculateFuelLogStats(fuelLogs = []) {
   const maxOdo = sorted[sorted.length - 1]?.odometer || 0;
   const totalDistance = Math.max(0, maxOdo - minOdo);
 
-  // Calculate overall average mileage
+  // Calculate overall average mileage (excluding last entry's liters)
   let avgMileage = 0;
   if (validMileageLiters > 0 && validMileageDistance > 0) {
+    // Best method: full tank fills excluding last entry
     avgMileage = validMileageDistance / validMileageLiters;
-  } else if (totalLiters > 0 && totalDistance > 0) {
-    avgMileage = totalDistance / totalLiters;
+  } else if (sorted.length >= 2) {
+    // Fallback: total distance / liters of all except last entry
+    const litersExcludingLast = sorted.slice(0, -1).reduce((sum, l) => sum + Number(l.liters || 0), 0);
+    if (litersExcludingLast > 0 && totalDistance > 0) {
+      avgMileage = totalDistance / litersExcludingLast;
+    }
   }
 
   // Cost per KM driven
@@ -101,11 +115,12 @@ export function calculateFuelLogStats(fuelLogs = []) {
     processedLogs: processed.reverse(),
     totalDistance,
     totalFuelSpent,
-    totalLiters,
+    totalLiters,        // ALL liters (for display in stats)
     avgMileage: Number(avgMileage.toFixed(2)),
     costPerKm: Number(costPerKm.toFixed(2))
   };
 }
+
 
 /**
  * Calculate total service expenses and latest engine oil change info

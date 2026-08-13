@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { X, Bike, Check } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Bike, Check, Download, Upload } from 'lucide-react';
 import { translations } from '../utils/translations';
 
-export default function BikeModal({ lang, isOpen, onClose, onSave, bikeProfile, onClearAllData }) {
+export default function BikeModal({ lang, isOpen, onClose, onSave, bikeProfile, onClearAllData, onExportData, onImportData }) {
   const t = translations[lang];
+  const fileInputRef = useRef(null);
 
   const [name, setName] = useState(bikeProfile?.name || 'Yamaha FZS V3');
   const [regNumber, setRegNumber] = useState(bikeProfile?.regNumber || '');
@@ -29,6 +30,24 @@ export default function BikeModal({ lang, isOpen, onClose, onSave, bikeProfile, 
       targetOilKm: Number(targetOilKm)
     });
     onClose();
+  };
+
+  const handleImportFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const result = onImportData(evt.target.result);
+      if (result?.success === false) {
+        alert(lang === 'bn' ? '❌ ফাইলটি সঠিক নয়!' : '❌ Invalid backup file!');
+      } else {
+        alert(lang === 'bn' ? '✅ ডাটা সফলভাবে যুক্ত হয়েছে! (duplicate বাদ দেওয়া হয়েছে)' : '✅ Data merged successfully! (duplicates skipped)');
+        onClose();
+      }
+    };
+    reader.readAsText(file);
+    // Reset file input so same file can be selected again
+    e.target.value = '';
   };
 
   if (!isOpen) return null;
@@ -101,22 +120,66 @@ export default function BikeModal({ lang, isOpen, onClose, onSave, bikeProfile, 
             </button>
           </div>
 
+          {/* ===== Data Backup & Restore Section ===== */}
+          <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              {lang === 'bn' ? '📦 ডাটা ব্যাকআপ ও রিস্টোর' : '📦 Data Backup & Restore'}
+            </p>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {/* Export Button */}
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ flex: 1, fontSize: '0.82rem', gap: '6px' }}
+                onClick={() => { onExportData?.(); }}
+              >
+                <Download size={15} />
+                <span>{lang === 'bn' ? 'এক্সপোর্ট' : 'Export'}</span>
+              </button>
+
+              {/* Import Button */}
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ flex: 1, fontSize: '0.82rem', gap: '6px', color: 'var(--accent-mileage)', borderColor: 'rgba(56, 189, 248, 0.3)' }}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload size={15} />
+                <span>{lang === 'bn' ? 'ইম্পোর্ট' : 'Import'}</span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                style={{ display: 'none' }}
+                onChange={handleImportFile}
+              />
+            </div>
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '6px' }}>
+              {lang === 'bn' 
+                ? 'ইম্পোর্ট করলে নতুন ডাটা যোগ হবে, পুরনো ডাটা মুছবে না' 
+                : 'Import adds new data without removing existing entries'}
+            </p>
+          </div>
+
+          {/* Clear All Data */}
           {onClearAllData && (
-            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)', textAlign: 'center' }}>
+            <div style={{ marginTop: '12px', textAlign: 'center' }}>
               <button 
                 type="button" 
                 className="btn" 
                 onClick={onClearAllData}
                 style={{ 
                   width: '100%', 
-                  background: 'rgba(239, 68, 68, 0.12)', 
+                  background: 'rgba(239, 68, 68, 0.1)', 
                   color: 'var(--accent-danger)',
-                  border: '1px solid rgba(239, 68, 68, 0.25)',
-                  fontSize: '0.82rem',
+                  border: '1px solid rgba(239, 68, 68, 0.22)',
+                  fontSize: '0.8rem',
                   padding: '8px'
                 }}
               >
-                {lang === 'bn' ? '🗑️ সমস্ত ডাটা রিসেট করুন (খালি করুন)' : '🗑️ Reset / Clear All Data'}
+                {lang === 'bn' ? '🗑️ সমস্ত ডাটা রিসেট করুন' : '🗑️ Reset / Clear All Data'}
               </button>
             </div>
           )}

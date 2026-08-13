@@ -13,7 +13,7 @@ export default function Dashboard({
   recentLogs
 }) {
   const t = translations[lang];
-  const { avgMileage, totalFuelSpent, costPerKm } = fuelStats;
+  const { avgMileage, totalFuelSpent, costPerKm, totalDistance, totalLiters } = fuelStats;
   const { totalServiceSpent, kmUntilNextOilChange, oilHealthPercentage, oilStatus, lastOilChangeKm } = serviceStats;
 
   return (
@@ -116,6 +116,32 @@ export default function Dashboard({
             <div className="stat-value">
               {formatNum(costPerKm, lang)}
               <span className="stat-unit">৳/{t.km}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Total Distance + Total Liters Summary Row */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+        <div className="card" style={{ flex: 1, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ width: 32, height: 32, borderRadius: '8px', background: 'rgba(56, 189, 248, 0.12)', color: 'var(--accent-mileage)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Gauge size={16} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>{t.totalDistance}</div>
+            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' }}>
+              {formatNum(totalDistance, lang)} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-dim)' }}>{t.km}</span>
+            </div>
+          </div>
+        </div>
+        <div className="card" style={{ flex: 1, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ width: 32, height: 32, borderRadius: '8px', background: 'rgba(16, 185, 129, 0.12)', color: 'var(--accent-fuel)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Fuel size={16} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>{t.totalLiters || 'মোট জ্বালানি'}</div>
+            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' }}>
+              {formatNum(totalLiters, lang)} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-dim)' }}>{t.liter}</span>
             </div>
           </div>
         </div>

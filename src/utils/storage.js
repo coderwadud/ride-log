@@ -102,7 +102,7 @@ export function saveSettings(settings) {
 // Backup & Restore
 export function exportBackupData() {
   const backup = {
-    version: '1.0',
+    version: '2.0',
     exportDate: new Date().toISOString(),
     bikeProfile: loadBikeProfile(),
     fuelLogs: loadFuelLogs(),
@@ -119,6 +119,46 @@ export function exportBackupData() {
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Import backup and MERGE with existing data (add entries, don't replace)
+ * Duplicate entries (same id) are skipped
+ */
+export function mergeImportBackupData(jsonString) {
+  try {
+    const backup = JSON.parse(jsonString);
+    
+    // Merge fuel logs - skip duplicates by id
+    if (backup.fuelLogs && Array.isArray(backup.fuelLogs)) {
+      const existing = loadFuelLogs();
+      const existingIds = new Set(existing.map(l => l.id));
+      const newLogs = backup.fuelLogs.filter(l => !existingIds.has(l.id));
+      saveFuelLogs([...existing, ...newLogs]);
+    }
+    
+    // Merge service logs - skip duplicates by id
+    if (backup.serviceLogs && Array.isArray(backup.serviceLogs)) {
+      const existing = loadServiceLogs();
+      const existingIds = new Set(existing.map(l => l.id));
+      const newLogs = backup.serviceLogs.filter(l => !existingIds.has(l.id));
+      saveServiceLogs([...existing, ...newLogs]);
+    }
+
+    // Bike profile: only update if current is default/empty
+    if (backup.bikeProfile) {
+      const current = loadBikeProfile();
+      if (!current.regNumber && !current.currentOdometer) {
+        saveBikeProfile(backup.bikeProfile);
+      }
+    }
+
+    return { success: true, message: 'Data merged successfully' };
+  } catch (e) {
+    console.error('Invalid backup file:', e);
+    return { success: false, message: 'Invalid backup file' };
+  }
+}
+
+/** Full replace import (overwrites all existing data) */
 export function importBackupData(jsonString) {
   try {
     const backup = JSON.parse(jsonString);

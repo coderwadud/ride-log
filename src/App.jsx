@@ -19,6 +19,9 @@ import {
   loadSettings, 
   saveSettings,
   exportBackupData,
+  mergeImportBackupData,
+  loadFuelLogs as reloadFuelLogs,
+  loadServiceLogs as reloadServiceLogs,
   clearAllData
 } from './utils/storage';
 
@@ -323,6 +326,16 @@ export default function App() {
         onClose={() => setIsBikeModalOpen(false)}
         onSave={(updated) => setBikeProfile(updated)}
         bikeProfile={bikeProfile}
+        onExportData={exportBackupData}
+        onImportData={(jsonStr) => {
+          const result = mergeImportBackupData(jsonStr);
+          if (result.success) {
+            // Reload all data from storage after merge
+            setFuelLogs(reloadFuelLogs());
+            setServiceLogs(reloadServiceLogs());
+          }
+          return result;
+        }}
         onClearAllData={() => {
           if (window.confirm(lang === 'bn' ? 'আপনি কি নিশ্চিত যে সমস্ত ডাটা মুছে ফেলতে চান?' : 'Are you sure you want to clear all data?')) {
             clearAllData();
