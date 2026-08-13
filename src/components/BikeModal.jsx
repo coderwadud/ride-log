@@ -122,12 +122,13 @@ export default function BikeModal({ lang, isOpen, onClose, onSave, bikeProfile, 
               <span>{t.save}</span>
             </button>
           </div>
+        </form>
 
-          {/* ===== Data Backup & Restore Section ===== */}
-          <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              {lang === 'bn' ? '📦 ডাটা ব্যাকআপ ও রিস্টোর' : '📦 Data Backup & Restore'}
-            </p>
+        {/* ===== Data Backup & Restore Section ===== */}
+        <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
+          <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700, marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            {lang === 'bn' ? '📦 ডাটা ব্যাকআপ ও রিস্টোর' : '📦 Data Backup & Restore'}
+          </p>
 
             <div style={{ display: 'flex', gap: '8px' }}>
               {/* Export Button */}
@@ -221,7 +222,6 @@ export default function BikeModal({ lang, isOpen, onClose, onSave, bikeProfile, 
                 ? 'ফাইল বা কোড পেস্ট করে ব্যাকআপ সংরক্ষণ ও যুক্ত করা যায়' 
                 : 'Save via file share or copy/paste backup code'}
             </p>
-          </div>
 
           {/* Clear All Data */}
           {onClearAllData && (
@@ -287,7 +287,7 @@ export default function BikeModal({ lang, isOpen, onClose, onSave, bikeProfile, 
               )}
             </div>
           )}
-        </form>
+        </div>
       </div>
     </div>
   );

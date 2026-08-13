@@ -338,10 +338,15 @@ export default function App() {
         }}
         onClearAllData={() => {
           clearAllData();
-          setBikeProfile({ id: 'bike_1', name: 'My Bike', regNumber: '', initialOdometer: 0, currentOdometer: 0, targetOilKm: 1000 });
+          const defaultBike = { id: 'bike_1', name: 'My Bike', regNumber: '', initialOdometer: 0, currentOdometer: 0, targetOilKm: 1000 };
+          saveBikeProfile(defaultBike);
+          saveFuelLogs([]);
+          saveServiceLogs([]);
+          setBikeProfile(defaultBike);
           setFuelLogs([]);
           setServiceLogs([]);
           setIsBikeModalOpen(false);
+          alert(lang === 'bn' ? '✅ সমস্ত ডাটা সফলভাবে মুছে ফেলা হয়েছে!' : '✅ All data reset successfully!');
         }}
       />
 
