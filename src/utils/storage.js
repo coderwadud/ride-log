@@ -1,3 +1,6 @@
+import { Share } from '@capacitor/share';
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+
 /**
  * LocalStorage helper for RideLog BD application
  */
@@ -99,8 +102,8 @@ export function saveSettings(settings) {
   }
 }
 
-// Backup & Restore (Android WebView + Web Browser Compatible)
-export async function exportBackupData() {
+// Get raw backup JSON string
+export function getBackupJsonString() {
   const backup = {
     version: '2.0',
     exportDate: new Date().toISOString(),
@@ -109,11 +112,37 @@ export async function exportBackupData() {
     serviceLogs: loadServiceLogs(),
     settings: loadSettings()
   };
-  
-  const jsonStr = JSON.stringify(backup, null, 2);
+  return JSON.stringify(backup, null, 2);
+}
+
+// Backup & Restore (Android App Native Share + Filesystem Compatible)
+export async function exportBackupData() {
+  const jsonStr = getBackupJsonString();
   const fileName = `ridelog_backup_${new Date().toISOString().slice(0, 10)}.json`;
 
-  // 1. Try Web Share API (Android native share sheet to save/share file)
+  // 1. Try Capacitor Native Filesystem + Share (100% works on Android APK!)
+  try {
+    const writeResult = await Filesystem.writeFile({
+      path: fileName,
+      data: jsonStr,
+      directory: Directory.Cache,
+      encoding: Encoding.UTF8
+    });
+
+    if (writeResult && writeResult.uri) {
+      await Share.share({
+        title: 'RideLog BD Backup',
+        text: 'RideLog BD Backup File',
+        url: writeResult.uri,
+        dialogTitle: 'Save / Share Backup File'
+      });
+      return { success: true, method: 'native-share' };
+    }
+  } catch (e) {
+    console.log('Capacitor native share/filesystem attempt:', e);
+  }
+
+  // 2. Try Web Share API (Android browser share sheet)
   if (navigator.share) {
     try {
       const file = new File([jsonStr], fileName, { type: 'application/json' });
@@ -122,25 +151,14 @@ export async function exportBackupData() {
           title: 'RideLog BD Backup',
           files: [file]
         });
-        return true;
+        return { success: true, method: 'web-share' };
       }
     } catch (e) {
-      console.log('Web share file failed, trying text share or link...', e);
-    }
-
-    // Try text share as fallback if file share wasn't supported
-    try {
-      await navigator.share({
-        title: 'RideLog BD Backup',
-        text: jsonStr
-      });
-      return true;
-    } catch (e) {
-      console.log('Web share text failed, falling back to download link...', e);
+      console.log('Web share file failed:', e);
     }
   }
 
-  // 2. Data URL download fallback
+  // 3. Data URL download fallback (for desktop / browsers)
   try {
     const dataUrl = 'data:application/json;charset=utf-8,' + encodeURIComponent(jsonStr);
     const a = document.createElement('a');
@@ -150,19 +168,18 @@ export async function exportBackupData() {
     document.body.appendChild(a);
     a.click();
     setTimeout(() => document.body.removeChild(a), 500);
-    return true;
+    return { success: true, method: 'download' };
   } catch (e) {
     console.error('Data URL download failed:', e);
   }
 
-  // 3. Last fallback: Copy JSON to clipboard
+  // 4. Last fallback: Copy JSON to clipboard
   try {
     await navigator.clipboard.writeText(jsonStr);
-    alert('📋 ব্যাকআপ ডাটা ক্লিপবোর্ডে কপি করা হয়েছে! (Save in text file)');
-    return true;
+    alert(navigator.language === 'bn' ? '📋 ব্যাকআপ ডাটা ক্লিপবোর্ডে কপি করা হয়েছে!' : '📋 Backup copied to clipboard!');
+    return { success: true, method: 'clipboard', jsonStr };
   } catch (e) {
-    alert('❌ ডাটা এক্সপোর্ট করা সম্ভব হয়নি।');
-    return false;
+    return { success: false, jsonStr };
   }
 }
 

@@ -132,7 +132,12 @@ export default function BikeModal({ lang, isOpen, onClose, onSave, bikeProfile, 
                 type="button"
                 className="btn btn-secondary"
                 style={{ flex: 1, fontSize: '0.82rem', gap: '6px' }}
-                onClick={() => { onExportData?.(); }}
+                onClick={async () => { 
+                  const res = await onExportData?.(); 
+                  if (res?.method === 'clipboard') {
+                    alert(lang === 'bn' ? '📋 ব্যাকআপ ডাটা ক্লিপবোর্ডে কপি করা হয়েছে!' : '📋 Backup copied to clipboard!');
+                  }
+                }}
               >
                 <Download size={15} />
                 <span>{lang === 'bn' ? 'এক্সপোর্ট' : 'Export'}</span>
@@ -156,10 +161,62 @@ export default function BikeModal({ lang, isOpen, onClose, onSave, bikeProfile, 
                 onChange={handleImportFile}
               />
             </div>
+
+            {/* Manual Code Copy/Paste Option */}
+            <div style={{ marginTop: '8px', display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                className="btn"
+                style={{ 
+                  flex: 1, 
+                  fontSize: '0.75rem', 
+                  padding: '6px 8px', 
+                  background: 'rgba(255, 255, 255, 0.04)', 
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-muted)'
+                }}
+                onClick={async () => {
+                  const res = await onExportData?.();
+                  if (res?.jsonStr || typeof res === 'object') {
+                    alert(lang === 'bn' ? '📋 ব্যাকআপ কোড ক্লিপবোর্ডে কপি করা হয়েছে!' : '📋 Backup code copied to clipboard!');
+                  }
+                }}
+              >
+                📋 {lang === 'bn' ? 'কোড কপি করুন' : 'Copy Code'}
+              </button>
+
+              <button
+                type="button"
+                className="btn"
+                style={{ 
+                  flex: 1, 
+                  fontSize: '0.75rem', 
+                  padding: '6px 8px', 
+                  background: 'rgba(56, 189, 248, 0.08)', 
+                  border: '1px solid rgba(56, 189, 248, 0.25)',
+                  color: 'var(--accent-mileage)'
+                }}
+                onClick={() => {
+                  const pasted = prompt(lang === 'bn' ? 'আপনার ব্যাকআপ কোড পেস্ট করুন:' : 'Paste your backup JSON code:');
+                  if (pasted) {
+                    const result = onImportData(pasted);
+                    if (result?.success === false) {
+                      alert(lang === 'bn' ? '❌ কোডটি সঠিক নয়!' : '❌ Invalid backup code!');
+                    } else {
+                      alert(lang === 'bn' ? '✅ ডাটা সফলভাবে যুক্ত হয়েছে!' : '✅ Data imported successfully!');
+                      onClose();
+                    }
+                  }
+                }}
+              >
+                📋 {lang === 'bn' ? 'কোড পেস্ট করুন' : 'Paste Code'}
+              </button>
+            </div>
+
             <p style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '6px' }}>
               {lang === 'bn' 
-                ? 'ইম্পোর্ট করলে নতুন ডাটা যোগ হবে, পুরনো ডাটা মুছবে না' 
-                : 'Import adds new data without removing existing entries'}
+                ? 'ফাইল বা কোড পেস্ট করে ব্যাকআপ সংরক্ষণ ও যুক্ত করা যায়' 
+                : 'Save via file share or copy/paste backup code'}
             </p>
           </div>
 

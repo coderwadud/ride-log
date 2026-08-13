@@ -57,9 +57,9 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.5
-          name: "RideLog BD Android App v1.0.5 (Android Export Fix)"
-          body: "✅ নতুন আপডেট:\n- 📱 অ্যান্ড্রয়েড ফোনে ব্যাকআপ এক্সপোর্ট করা কাজ না করার বাগ সমাধান (Android Web Share & Data URL সাপোর্ট যোগ করা হয়েছে)"
+          tag_name: v1.0.6
+          name: "RideLog BD Android App v1.0.6 (Native Share + Backup Code)"
+          body: "✅ নতুন বৈশিষ্ট্য ও রিলিজ:\n- 📦 @capacitor/share & @capacitor/filesystem যুক্ত করার পর অ্যান্ড্রয়েডে ১-ক্লিকে সেভ/শেয়ার শেয়ার শিট পপ-আপ কাজ করবে\n- 📋 ব্যাকআপ কোড কপি ও পেস্ট (Copy Code & Paste Code) করার সুবিধা যুক্ত করা হয়েছে যাতে ১-ক্লিকে টেক্সট কপি করে সেভ করে রাখা যায়"
           files: android/app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
