@@ -25,6 +25,9 @@ jobs:
       - name: Build Web Assets
         run: npm run build
 
+      - name: Sync Capacitor Android Project
+        run: npx cap sync android
+
       - name: Setup Java JDK 21
         uses: actions/setup-java@v4
         with:
@@ -40,7 +43,7 @@ jobs:
       - name: Build Android APK (Debug)
         run: |
           cd android
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
