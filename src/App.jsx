@@ -337,13 +337,11 @@ export default function App() {
           return result;
         }}
         onClearAllData={() => {
-          if (window.confirm(lang === 'bn' ? 'আপনি কি নিশ্চিত যে সমস্ত ডাটা মুছে ফেলতে চান?' : 'Are you sure you want to clear all data?')) {
-            clearAllData();
-            setBikeProfile({ id: 'bike_1', name: 'My Bike', regNumber: '', initialOdometer: 0, currentOdometer: 0, targetOilKm: 1000 });
-            setFuelLogs([]);
-            setServiceLogs([]);
-            setIsBikeModalOpen(false);
-          }
+          clearAllData();
+          setBikeProfile({ id: 'bike_1', name: 'My Bike', regNumber: '', initialOdometer: 0, currentOdometer: 0, targetOilKm: 1000 });
+          setFuelLogs([]);
+          setServiceLogs([]);
+          setIsBikeModalOpen(false);
         }}
       />
 

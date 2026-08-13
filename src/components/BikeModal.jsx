@@ -11,12 +11,15 @@ export default function BikeModal({ lang, isOpen, onClose, onSave, bikeProfile, 
   const [initialOdometer, setInitialOdometer] = useState(bikeProfile?.initialOdometer || 0);
   const [targetOilKm, setTargetOilKm] = useState(bikeProfile?.targetOilKm || 1000);
 
+  const [showConfirmReset, setShowConfirmReset] = useState(false);
+
   useEffect(() => {
     if (bikeProfile) {
       setName(bikeProfile.name || '');
       setRegNumber(bikeProfile.regNumber || '');
       setInitialOdometer(bikeProfile.initialOdometer || 0);
       setTargetOilKm(bikeProfile.targetOilKm || 1000);
+      setShowConfirmReset(false);
     }
   }, [bikeProfile, isOpen]);
 
@@ -222,22 +225,66 @@ export default function BikeModal({ lang, isOpen, onClose, onSave, bikeProfile, 
 
           {/* Clear All Data */}
           {onClearAllData && (
-            <div style={{ marginTop: '12px', textAlign: 'center' }}>
-              <button 
-                type="button" 
-                className="btn" 
-                onClick={onClearAllData}
-                style={{ 
-                  width: '100%', 
-                  background: 'rgba(239, 68, 68, 0.1)', 
-                  color: 'var(--accent-danger)',
-                  border: '1px solid rgba(239, 68, 68, 0.22)',
-                  fontSize: '0.8rem',
-                  padding: '8px'
-                }}
-              >
-                {lang === 'bn' ? '🗑️ সমস্ত ডাটা রিসেট করুন' : '🗑️ Reset / Clear All Data'}
-              </button>
+            <div style={{ marginTop: '16px', textAlign: 'center' }}>
+              {!showConfirmReset ? (
+                <button 
+                  type="button" 
+                  className="btn" 
+                  onClick={() => setShowConfirmReset(true)}
+                  style={{ 
+                    width: '100%', 
+                    background: 'rgba(239, 68, 68, 0.1)', 
+                    color: 'var(--accent-danger)',
+                    border: '1px solid rgba(239, 68, 68, 0.22)',
+                    fontSize: '0.8rem',
+                    padding: '9px',
+                    fontWeight: 600
+                  }}
+                >
+                  {lang === 'bn' ? '🗑️ সমস্ত ডাটা রিসেট করুন' : '🗑️ Reset / Clear All Data'}
+                </button>
+              ) : (
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '10px',
+                  padding: '12px',
+                  textAlign: 'center'
+                }}>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--accent-danger)', fontWeight: 700, marginBottom: '10px' }}>
+                    {lang === 'bn' ? '⚠️ আপনি কি নিশ্চিত যে সমস্ত ডাটা মুছে ফেলবেন?' : '⚠️ Confirm clearing all stored data?'}
+                  </p>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button 
+                      type="button" 
+                      className="btn btn-secondary" 
+                      style={{ flex: 1, fontSize: '0.8rem', padding: '6px' }}
+                      onClick={() => setShowConfirmReset(false)}
+                    >
+                      {lang === 'bn' ? 'বাতিল' : 'Cancel'}
+                    </button>
+                    <button 
+                      type="button" 
+                      className="btn" 
+                      style={{ 
+                        flex: 1, 
+                        background: '#ef4444', 
+                        color: '#ffffff', 
+                        fontSize: '0.8rem', 
+                        fontWeight: 700,
+                        padding: '6px',
+                        border: 'none'
+                      }}
+                      onClick={() => {
+                        setShowConfirmReset(false);
+                        onClearAllData();
+                      }}
+                    >
+                      {lang === 'bn' ? 'হ্যাঁ, মুছে ফেলুন' : 'Yes, Reset All'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </form>

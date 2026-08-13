@@ -57,9 +57,9 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.10
-          name: "RideLog BD Android App v1.0.10 (Black Screen Fix + Stale SW Cleanup)"
-          body: "✅ নতুন ফিক্স ও সমাধান:\n- 📱 অ্যান্ড্রয়েড অ্যাপে পুরনো সার্ভিস ওয়ার্কার ক্যাশ ও স্ক্রিপ্ট হ্যাশ ব্লকিংয়ের কারণে কালো স্ক্রিন হওয়ার সমস্যা সমাধান করা হয়েছে\n- 🛡️ রিয়্যাক্ট এরর বাউন্ডারি (React Error Boundary) যোগ করা হয়েছে"
+          tag_name: v1.0.11
+          name: "RideLog BD Android App v1.0.11 (Reset Button Confirmation Fix)"
+          body: "✅ নতুন ফিক্স ও সমাধান:\n- 📱 অ্যান্ড্রয়েড ফোনে ব্রাউজার window.confirm ব্লক হওয়ার সমস্যা দূর করে সেটিংস মোডালে ইনলাইন (Inline Confirmation) রিসেট বাটন যোগ করা হয়েছে"
           files: android/app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
