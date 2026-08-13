@@ -33,7 +33,13 @@ import { LayoutDashboard, Fuel, Wrench, BarChart3 } from 'lucide-react';
 export default function App() {
   const initialSettings = loadSettings();
   const [lang, setLang] = useState(initialSettings?.lang || 'bn');
+  const [theme, setTheme] = useState(initialSettings?.theme || 'dark');
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  // Apply theme to document root
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
 
   // Core Data States
   const [bikeProfile, setBikeProfile] = useState(loadBikeProfile());
@@ -104,7 +110,13 @@ export default function App() {
   const handleToggleLang = () => {
     const nextLang = lang === 'bn' ? 'en' : 'bn';
     setLang(nextLang);
-    saveSettings({ lang: nextLang });
+    saveSettings({ lang: nextLang, theme });
+  };
+
+  const handleToggleTheme = () => {
+    const nextTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(nextTheme);
+    saveSettings({ lang, theme: nextTheme });
   };
 
   const handleSaveFuel = (entry) => {
@@ -156,7 +168,8 @@ export default function App() {
         bikeProfile={bikeProfile}
         onEditBike={() => setIsBikeModalOpen(true)}
         onOpenInstall={() => setIsInstallModalOpen(true)}
-        onExportData={exportBackupData}
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
       />
 
       {/* Main Tab Navigation for Desktop */}

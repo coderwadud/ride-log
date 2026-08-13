@@ -30,6 +30,97 @@
   --radius-lg: 20px;
   --radius-full: 9999px;
   --transition-fast: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --theme-transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* ===== LIGHT MODE THEME ===== */
+[data-theme='light'] {
+  --bg-main: #f0f4f8;
+  --bg-card: rgba(255, 255, 255, 0.9);
+  --bg-card-hover: rgba(255, 255, 255, 1);
+  --bg-input: #ffffff;
+  --border-color: rgba(0, 0, 0, 0.1);
+  --border-highlight: rgba(16, 185, 129, 0.4);
+
+  --text-main: #0f172a;
+  --text-muted: #475569;
+  --text-dim: #94a3b8;
+
+  --accent-fuel: #059669;
+  --accent-fuel-glow: rgba(5, 150, 105, 0.2);
+
+  --accent-mileage: #0284c7;
+  --accent-mileage-glow: rgba(2, 132, 199, 0.2);
+
+  --accent-service: #7c3aed;
+  --accent-service-glow: rgba(124, 58, 237, 0.2);
+
+  --accent-amber: #d97706;
+  --accent-danger: #dc2626;
+}
+
+[data-theme='light'] html,
+[data-theme='light'] body,
+html[data-theme='light'],
+body[data-theme='light'] {
+  background-image:
+    radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.06) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(124, 58, 237, 0.06) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(2, 132, 199, 0.04) 0px, transparent 50%);
+}
+
+[data-theme='light'] .header-bar {
+  background: rgba(240, 244, 248, 0.97) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='light'] .mobile-nav-bar {
+  background: rgba(255, 255, 255, 0.98);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='light'] .brand-name {
+  background: linear-gradient(135deg, #0f172a 30%, #475569 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+[data-theme='light'] .form-input,
+[data-theme='light'] .form-textarea {
+  background: #fff;
+  border-color: rgba(0, 0, 0, 0.15);
+  color: #0f172a;
+}
+
+[data-theme='light'] .btn-secondary {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #0f172a;
+}
+
+[data-theme='light'] .btn-icon {
+  color: #334155;
+}
+
+[data-theme='light'] .modal-content {
+  background: #ffffff;
+}
+
+[data-theme='light'] .tag-checkbox {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #334155;
+}
+
+[data-theme='light'] .tag-checkbox.checked {
+  background: rgba(5, 150, 105, 0.1);
+  border-color: rgba(5, 150, 105, 0.4);
+  color: #059669;
+}
+
+/* Smooth transition for all theme changes */
+*, *::before, *::after {
+  transition: background-color 0.25s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
 * {

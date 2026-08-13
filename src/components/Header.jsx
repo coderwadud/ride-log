@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bike, Languages, Download, Smartphone, Settings } from 'lucide-react';
+import { Bike, Languages, Sun, Moon, Smartphone, Settings } from 'lucide-react';
 import { translations } from '../utils/translations';
 
 export default function Header({ 
@@ -8,9 +8,11 @@ export default function Header({
   bikeProfile, 
   onEditBike, 
   onOpenInstall,
-  onExportData
+  theme,
+  onToggleTheme
 }) {
   const t = translations[lang];
+  const isLight = theme === 'light';
 
   return (
     <header className="header-bar">
@@ -47,13 +49,23 @@ export default function Header({
           <span>{lang === 'bn' ? 'ENG' : 'বাংলা'}</span>
         </button>
 
-        {/* Export Data */}
+        {/* Light / Dark Mode Toggle */}
         <button 
-          className="btn btn-icon" 
-          onClick={onExportData}
-          title={t.exportData}
+          className="btn btn-icon theme-toggle-btn" 
+          onClick={onToggleTheme}
+          title={isLight ? 'Dark Mode' : 'Light Mode'}
+          style={{
+            background: isLight 
+              ? 'rgba(245, 158, 11, 0.15)' 
+              : 'rgba(148, 163, 184, 0.1)',
+            color: isLight ? '#d97706' : '#94a3b8',
+            border: isLight 
+              ? '1px solid rgba(245, 158, 11, 0.3)' 
+              : '1px solid rgba(148, 163, 184, 0.15)',
+            transition: 'all 0.3s ease'
+          }}
         >
-          <Download size={16} />
+          {isLight ? <Moon size={17} /> : <Sun size={17} />}
         </button>
 
         {/* Install Android PWA Button */}
