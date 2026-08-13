@@ -12,6 +12,7 @@ export default function Dashboard({
   onOpenAddService,
   recentLogs
 }) {
+  const t = translations[lang] || translations.bn;
   const { 
     avgMileage, 
     totalFuelSpent, 

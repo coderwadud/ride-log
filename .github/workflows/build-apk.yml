@@ -57,9 +57,9 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.12
-          name: "RideLog BD Android App v1.0.12 (Reset Button Form Separation Fix)"
-          body: "✅ নতুন ফিক্স ও সমাধান:\n- 📱 রিসেট বাটনটি ফর্ম (form) ট্যাগের বাইরে এনে কনফার্মেশনের পর সঙ্গে সঙ্গে '✅ সমস্ত ডাটা সফলভাবে মুছে ফেলা হয়েছে!' কনফার্মেশন মেসেজ প্রদর্শন নিশ্চিত করা হয়েছে"
+          tag_name: v1.0.13
+          name: "RideLog BD Android App v1.0.13 (Black Screen Root Cause Fix)"
+          body: "✅ নতুন সমাধান:\n- 📱 ড্যাশবোর্ড কম্পোনেন্টে ReferenceError: t is not defined এর কারণে অ্যাপ কালো স্ক্রিন হওয়া সম্পূর্ণভাবে সমাধান করা হয়েছে"
           files: android/app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
