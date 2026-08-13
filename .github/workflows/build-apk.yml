@@ -57,9 +57,9 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.15
-          name: "RideLog BD Android App v1.0.15 (Native Google Account Chooser Auth Screen)"
-          body: "✅ নতুন ফিচার ও আপডেট:\n- 🔑 **Google Auth Account Chooser Screen:** গুগল ড্রাইভে সিঙ্ক করার সময় ম্যানুয়াল টেক্সট ইনপুট পপ-আপের পরিবর্তে এখন সরাসরি স্ট্যান্ডার্ড গুগল সাইন-ইন স্ক্রিন (Account Chooser Popup) ওপেন হবে, যা থেকে ব্যবহারকারী ১-ক্লিকে তার জি-মেইল অ্যাকাউন্ট বেছে নিয়ে ক্লাউড সিঙ্ক করতে পারবেন।"
+          tag_name: v1.0.16
+          name: "RideLog BD Android App v1.0.16 (Redesigned Bike Chips Bar + Header Clean UI)"
+          body: "✅ নতুন ডিজাইন ও আপডেট:\n- 🏍️ **Redesigned Bike Selection Bar:** হেডার থেকে ড্রপডাউন সরিয়ে হেডারের নিচে একটি অত্যন্ত সুন্দর ও রেসপনসিভ **বাইক সিলেক্টর চিপস বার** যুক্ত করা হয়েছে।\n- 📱 **Clean Header Layout:** হেডার থেকে অ্যান্ড্রয়েড ইনস্টল বাটনটি সরিয়ে ক্লাউড সিঙ্ক, ল্যাঙ্গুয়েজ এবং সেটিংস অপশনগুলোকে ফ্রেশ ও ক্লিন লুক দেওয়া হয়েছে।"
           files: android/app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

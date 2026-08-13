@@ -8,6 +8,7 @@ import FuelModal from './components/FuelModal';
 import ServiceModal from './components/ServiceModal';
 import BikeModal from './components/BikeModal';
 import PWAInstallModal from './components/PWAInstallModal';
+import BikeSelector from './components/BikeSelector';
 
 import { 
   loadBikes,
@@ -294,17 +295,22 @@ export default function App() {
       <Header 
         lang={lang}
         onToggleLang={handleToggleLang}
-        bikes={bikes}
-        activeBikeId={activeBikeId}
-        onSelectBike={handleSelectBike}
         bikeProfile={activeBike}
         onEditBike={() => setIsBikeModalOpen(true)}
-        onOpenInstall={() => setIsInstallModalOpen(true)}
         theme={theme}
         onToggleTheme={handleToggleTheme}
         gdriveUser={gdriveUser}
         gdriveSyncing={gdriveSyncing}
         onTriggerSync={triggerAutoGDriveSync}
+      />
+
+      {/* Dedicated Bike Chips Selector Bar below Header */}
+      <BikeSelector
+        bikes={bikes}
+        activeBikeId={activeBikeId}
+        onSelectBike={handleSelectBike}
+        onOpenBikeModal={() => setIsBikeModalOpen(true)}
+        lang={lang}
       />
 
       {/* Main Tab Navigation for Desktop */}

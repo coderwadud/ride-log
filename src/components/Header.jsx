@@ -1,17 +1,12 @@
 import React from 'react';
-import { Bike, Languages, Sun, Moon, Smartphone, Settings, CloudCheck, CloudOff, RefreshCw } from 'lucide-react';
+import { Bike, Languages, Sun, Moon, Settings, CloudCheck, CloudOff, RefreshCw } from 'lucide-react';
 import { translations } from '../utils/translations';
-import BikeSelector from './BikeSelector';
 
 export default function Header({ 
   lang, 
   onToggleLang, 
-  bikes = [],
-  activeBikeId,
-  onSelectBike,
   bikeProfile, 
   onEditBike, 
-  onOpenInstall,
   theme,
   onToggleTheme,
   gdriveUser,
@@ -36,15 +31,6 @@ export default function Header({
       </div>
 
       <div className="top-actions flex items-center gap-1.5">
-        {/* Bike Switcher Selector */}
-        <BikeSelector
-          bikes={bikes}
-          activeBikeId={activeBikeId}
-          onSelectBike={onSelectBike}
-          onOpenBikeModal={onEditBike}
-          lang={lang}
-        />
-
         {/* Google Drive Cloud Sync Status Pill */}
         {gdriveUser ? (
           <button
@@ -111,17 +97,6 @@ export default function Header({
           }}
         >
           {isLight ? <Moon size={17} /> : <Sun size={17} />}
-        </button>
-
-        {/* Install Android PWA Button */}
-        <button 
-          className="btn btn-primary" 
-          onClick={onOpenInstall}
-          style={{ padding: '6px 10px', fontSize: '0.78rem' }}
-          title={t.installApp}
-        >
-          <Smartphone size={16} />
-          <span className="hide-mobile">{t.installApp}</span>
         </button>
       </div>
     </header>
