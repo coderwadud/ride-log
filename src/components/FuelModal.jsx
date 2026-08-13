@@ -9,7 +9,7 @@ export default function FuelModal({ lang, isOpen, onClose, onSave, initialData, 
   const [odometer, setOdometer] = useState(currentOdometer || '');
   const [liters, setLiters] = useState('');
   const [totalAmount, setTotalAmount] = useState('');
-  const [pricePerLiter, setPricePerLiter] = useState('130'); // default BDT octane price
+  const [pricePerLiter, setPricePerLiter] = useState('145'); // default BDT octane price
   const [isFullTank, setIsFullTank] = useState(true);
   const [stationName, setStationName] = useState('');
   const [notes, setNotes] = useState('');
@@ -20,7 +20,7 @@ export default function FuelModal({ lang, isOpen, onClose, onSave, initialData, 
       setOdometer(initialData.odometer || '');
       setLiters(initialData.liters || '');
       setTotalAmount(initialData.totalAmount || '');
-      setPricePerLiter(initialData.pricePerLiter || '130');
+      setPricePerLiter(initialData.pricePerLiter || '145');
       setIsFullTank(initialData.isFullTank !== false);
       setStationName(initialData.stationName || '');
       setNotes(initialData.notes || '');
@@ -29,7 +29,7 @@ export default function FuelModal({ lang, isOpen, onClose, onSave, initialData, 
       setOdometer(currentOdometer || '');
       setLiters('');
       setTotalAmount('');
-      setPricePerLiter('130');
+      setPricePerLiter('145');
       setIsFullTank(true);
       setStationName('');
       setNotes('');
@@ -140,7 +140,7 @@ export default function FuelModal({ lang, isOpen, onClose, onSave, initialData, 
               <input 
                 type="number" 
                 className="form-input" 
-                placeholder="130" 
+                placeholder="145" 
                 value={pricePerLiter} 
                 onChange={handlePriceChange} 
                 required 
