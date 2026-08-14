@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bike, Languages, Sun, Moon, Settings, LogOut } from 'lucide-react';
 import { translations } from '../utils/translations';
 
@@ -14,6 +14,11 @@ export default function Header({
 }) {
   const t = translations[lang];
   const isLight = theme === 'light';
+  const [avatarError, setAvatarError] = useState(false);
+
+  useEffect(() => {
+    setAvatarError(false);
+  }, [user?.photoURL]);
 
   return (
     <header className="header-bar">
@@ -72,11 +77,13 @@ export default function Header({
         {/* User Avatar + Logout */}
         {user && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: '2px' }}>
-            {user.photoURL ? (
+            {user.photoURL && !avatarError ? (
               <img
                 src={user.photoURL}
                 alt={user.displayName || 'User'}
                 title={user.displayName || user.email}
+                referrerPolicy="no-referrer"
+                onError={() => setAvatarError(true)}
                 style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(56,189,248,0.4)' }}
               />
             ) : (
