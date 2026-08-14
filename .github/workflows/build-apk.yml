@@ -76,8 +76,17 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
-          name: "RideLog BD Android App v1.0.${{ github.run_number }} (Default English Language + Web Live DB & Mobile Offline Cache)"
-          body: "✅ ডিফল্ট ইংলিশ ল্যাঙ্গুয়েজ ও ফ্লেক্সিবল ডাটা লজিক:\n- 🌐 **Default Language English:** নতুন ইনস্টল বা রিসেটের সময় ডিফল্ট ল্যাঙ্গুয়েজ হিসেবে ইংরেজি (English) সিলেক্টেড থাকবে। ব্যবহারকারী চাইলে যেকোনো সময় এক ক্লিকে বাংলা ও ইংরেজি সুইচে সুইচ করতে পারবেন।\n- 🌐 **Web Browser Mode:** ওয়েব ব্রাউজারে অ্যাপ ডিরেক্ট লাইভ ফায়ারবেস ক্লাউড ডাটাবেজ থেকে ডাটা লোড ও আপডেট করবে।\n- 📱 **Native Android App (APK) Mode:** মোবাইল অ্যাপে অফলাইন এন্ট্রি ও ২-ওয়ে ক্লাউড অটো-সিঙ্ক সক্রিয় থাকবে।"
+          name: "RideLog BD Android App v1.0.${{ github.run_number }}"
+          body: |
+            ### 🏍️ RideLog BD Official Android Release (v1.0.${{ github.run_number }})
+
+            #### 🌟 Key Highlights & Feature Updates:
+            - 🏷️ **Custom APK Package Name**: Download binary is directly named **`Ride-Log-BD.apk`** for convenient installation.
+            - 🌐 **Default Language English**: Interface defaults to English out-of-the-box, with seamless 1-click toggle to Bengali (`ENG / বাংলা`).
+            - 📱 **Offline-First Resilience**: Native Mobile App supports full offline data logging with automatic 2-way cloud synchronization upon network reconnect.
+            - ☁️ **Web Live Cloud Database**: Web browser application fetches live data directly from Firebase Cloud Firestore.
+            - 🖼️ **Google Profile Avatar Fix**: Smooth avatar image rendering in Android WebView using `referrerPolicy="no-referrer"`.
+            - 🏍️ **Multi-Bike & Service Analytics**: Complete mileage tracking ($\text{Km/L}$), cost per km ($\text{৳/Km}$), engine oil health indicator, and JSON backup/restore.
           files: android/app/build/outputs/apk/debug/Ride-Log-BD.apk
           make_latest: true
           target_commitish: ${{ github.sha }}
