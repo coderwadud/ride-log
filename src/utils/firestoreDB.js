@@ -1,5 +1,8 @@
 import { db } from './firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { Capacitor } from '@capacitor/core';
+
+const isNative = Capacitor.isNativePlatform();
 
 const DEFAULT_BIKE = {
   id: 'bike_1',
@@ -18,9 +21,9 @@ const DEFAULT_DATA = {
   serviceLogs: []
 };
 
-/** Get local user cache from localStorage for offline-first resilience */
+/** Get local user cache from localStorage for offline-first resilience (Native Mobile APK only) */
 export function getLocalUserDataCache(uid) {
-  if (!uid) return null;
+  if (!uid || !isNative) return null;
   try {
     const raw = localStorage.getItem(`ridelog_user_cache_${uid}`);
     if (raw) return JSON.parse(raw);
@@ -30,9 +33,9 @@ export function getLocalUserDataCache(uid) {
   return null;
 }
 
-/** Save local user cache to localStorage */
+/** Save local user cache to localStorage (Native Mobile APK only) */
 export function saveLocalUserDataCache(uid, data) {
-  if (!uid || !data) return;
+  if (!uid || !data || !isNative) return;
   try {
     localStorage.setItem(`ridelog_user_cache_${uid}`, JSON.stringify(data));
   } catch (e) {
@@ -130,12 +133,36 @@ export function mergeDataSets(localData, cloudData) {
 }
 
 /**
- * Load user data with Offline-First protection & 2-way cloud merge
+ * Load user data with platform distinction:
+ * - On Web Browser: ALWAYS fetch live fresh data directly from Firestore Database (No Stale Local Cache)
+ * - On Native Android App (APK): Use Offline-First Local Cache + 2-Way Cloud Merge
  */
 export async function loadUserData(uid) {
   if (!uid) return DEFAULT_DATA;
 
-  // 1. Get cached local data for this user
+  // ── 1. WEB BROWSER MODE: Direct Live Database Fetch ──
+  if (!isNative) {
+    try {
+      const docRef = doc(db, 'users', uid);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        return {
+          settings: data.settings || DEFAULT_DATA.settings,
+          activeBikeId: data.activeBikeId || DEFAULT_DATA.activeBikeId,
+          bikes: (data.bikes && data.bikes.length > 0) ? data.bikes : DEFAULT_DATA.bikes,
+          fuelLogs: data.fuelLogs || [],
+          serviceLogs: data.serviceLogs || []
+        };
+      }
+      return { ...DEFAULT_DATA };
+    } catch (err) {
+      console.error('Web Firestore live fetch error:', err);
+      return { ...DEFAULT_DATA };
+    }
+  }
+
+  // ── 2. NATIVE ANDROID APP (APK) MODE: Offline-First Cache & 2-Way Merge ──
   const localCache = getLocalUserDataCache(uid);
 
   try {
@@ -144,26 +171,20 @@ export async function loadUserData(uid) {
 
     if (snap.exists()) {
       const cloudData = snap.data();
-      // 2-Way Merge local cache (offline entries) with cloud data
       const merged = mergeDataSets(localCache, cloudData);
 
-      // Save merged to local cache
       saveLocalUserDataCache(uid, merged);
-
-      // Async push merged data back to cloud to upload any missing offline logs
       saveUserData(uid, merged).catch(e => console.warn('Cloud sync update failed:', e));
 
       return merged;
     } else {
-      // New user doc on cloud - if local cache exists, preserve local data!
       const initialData = localCache || DEFAULT_DATA;
       saveLocalUserDataCache(uid, initialData);
       saveUserData(uid, initialData).catch(e => console.warn('New user cloud init failed:', e));
       return initialData;
     }
   } catch (err) {
-    console.warn('Firestore offline / network error. Using local cache:', err);
-    // Offline mode: ALWAYS return local cache if present, so screen is NEVER empty!
+    console.warn('Native Android App offline mode. Using local cache:', err);
     if (localCache) return localCache;
     return DEFAULT_DATA;
   }

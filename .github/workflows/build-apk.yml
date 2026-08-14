@@ -76,8 +76,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
-          name: "RideLog BD Android App v1.0.${{ github.run_number }} (Google Avatar Image Display Fix + Offline-First Sync)"
-          body: "✅ অফলাইন-ফাস্ট লজিক, ইমেজ ডিসপ্লে ও প্রোফাইল ডাটা ইম্পোর্ট ফিক্স:\n- 🖼️ **Google Profile Image Display Fix:** অ্যান্ড্রয়েড অ্যাপে গুগল অ্যাকাউন্ট থেকে প্রাপ্ত ব্যবহারকারীর ছবি (Google Avatar Image) প্রদর্শন না করার সমস্যাটি `referrerPolicy=\"no-referrer\"` ও অ্যান্ড্রয়েড নেটিভ নেটওয়ার্ক পলিসি কনফিগারেশনের মাধ্যমে সম্পূর্ণরূপে ঠিক করা হয়েছে।\n- 📱 **Offline-First Resilience:** ইন্টারনেট কানেকশন না থাকলেও সিস্টেমে কোনো ডাটা খালি দেখাবে না। লোকাল মেমোরি থেকে সাথে সাথে ডাটা লোড হবে এবং অফলাইনে যুক্ত করা নতুন ফুয়েল/সার্ভিস রেকর্ড সমূহে ইন্টারনেট পাওয়ার সাথে সাথে ক্লাউডে ২-ওয়ে অটো সিঙ্ক হবে।\n- 📦 **Complete Backup Import Fix:** ব্যাকআপ ডাটা ইম্পোর্ট করার সময় সব বাইকের নাম, রেজিস্ট্রেশন নম্বর, ইনিশিয়াল ওডোমিটার, ওয়েল চেঞ্জ টার্গেট, ল্যাঙ্গুয়েজ এবং থিম সহ সমস্ত প্রোফাইল তথ্য এক ক্লিকে আপডেট হয়ে যাবে।"
+          name: "RideLog BD Android App v1.0.${{ github.run_number }} (Web Live DB + Android App Offline Cache)"
+          body: "✅ ওয়েব ও মোবাইল প্লাটফর্ম ভিত্তিক ডাটা স্টোরেজ লজিক:\n- 🌐 **Web Browser Mode:** ওয়েব ব্রাউজারে অ্যাপ ওপেন করলে কোনো পুরানো লোকাল ক্যাশ রিড/রাইট করবে না। সরাসরি লাইভ ফায়ারবেস ক্লাউড ডাটাবেজ থেকে ফ্রেশ ডাটা লোড ও আপডেট হবে।\n- 📱 **Native Android App (APK) Mode:** মোবাইল অ্যাপে অফলাইন সুবিধা ১০০% বহাল থাকবে। লোকাল ক্যাশ থেকে ডাটা সাথে সাথে লোড হবে এবং অফলাইনে কোনো ডাটা এন্ট্রি করলে পরবর্তীতে ইন্টারনেট কানেকশন পাওয়া মাত্রই ক্লাউডে অটো ২-ওয়ে সিঙ্ক হয়ে আপডেট হয়ে যাবে।"
           files: android/app/build/outputs/apk/debug/app-debug.apk
           make_latest: true
           target_commitish: ${{ github.sha }}
