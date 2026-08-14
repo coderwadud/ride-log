@@ -7,7 +7,7 @@ import {
   signOut,
   onAuthStateChanged
 } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, getFirestore } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 
 const firebaseConfig = {
@@ -22,7 +22,17 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+// Initialize Firestore with persistent offline local cache
+let firestoreDb;
+try {
+  firestoreDb = initializeFirestore(app, {
+    localCache: persistentLocalCache()
+  });
+} catch (e) {
+  firestoreDb = getFirestore(app);
+}
+export const db = firestoreDb;
 
 const provider = new GoogleAuthProvider();
 

@@ -121,6 +121,26 @@ export default function App() {
     scheduleSave();
   }, [bikes, fuelLogs, serviceLogs, activeBikeId, lang, theme, scheduleSave]);
 
+  // ── AUTO ONLINE RECONNECT SYNC ──
+  useEffect(() => {
+    const handleOnline = async () => {
+      if (user && isLoadedRef.current) {
+        console.log('🌐 Internet connection restored. Performing 2-way sync with cloud...');
+        const merged = await loadUserData(user.uid);
+        if (merged) {
+          setBikes(merged.bikes);
+          setActiveBikeId(merged.activeBikeId);
+          setFuelLogs(merged.fuelLogs);
+          setServiceLogs(merged.serviceLogs);
+          if (merged.settings?.lang) setLang(merged.settings.lang);
+          if (merged.settings?.theme) setTheme(merged.settings.theme);
+        }
+      }
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [user]);
+
   // Active Bike Profile
   const activeBike = bikes.find(b => b.id === activeBikeId) || bikes[0] || DEFAULT_BIKE;
 
@@ -405,16 +425,19 @@ export default function App() {
             if (result.data.activeBikeId) setActiveBikeId(result.data.activeBikeId);
             if (result.data.fuelLogs) setFuelLogs(result.data.fuelLogs);
             if (result.data.serviceLogs) setServiceLogs(result.data.serviceLogs);
+            if (result.data.settings?.lang) setLang(result.data.settings.lang);
+            if (result.data.settings?.theme) setTheme(result.data.settings.theme);
 
-            // Persist imported data immediately to Firestore Database
+            // Persist imported data immediately to Firestore Database & Local User Cache
             if (user) {
-              saveUserData(user.uid, {
-                settings: { lang, theme },
+              const fullData = {
+                settings: result.data.settings || { lang, theme },
                 activeBikeId: result.data.activeBikeId || activeBikeId,
                 bikes: result.data.bikes || bikes,
                 fuelLogs: result.data.fuelLogs || fuelLogs,
                 serviceLogs: result.data.serviceLogs || serviceLogs
-              });
+              };
+              saveUserData(user.uid, fullData);
             }
           }
           return result;
