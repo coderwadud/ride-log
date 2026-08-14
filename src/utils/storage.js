@@ -27,7 +27,7 @@ const DEFAULT_FUEL_LOGS = [];
 const DEFAULT_SERVICE_LOGS = [];
 
 const DEFAULT_SETTINGS = {
-  lang: 'bn',
+  lang: 'en',
   theme: 'dark'
 };
 

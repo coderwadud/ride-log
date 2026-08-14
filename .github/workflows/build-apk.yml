@@ -76,8 +76,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
-          name: "RideLog BD Android App v1.0.${{ github.run_number }} (Web Live DB + Android App Offline Cache)"
-          body: "✅ ওয়েব ও মোবাইল প্লাটফর্ম ভিত্তিক ডাটা স্টোরেজ লজিক:\n- 🌐 **Web Browser Mode:** ওয়েব ব্রাউজারে অ্যাপ ওপেন করলে কোনো পুরানো লোকাল ক্যাশ রিড/রাইট করবে না। সরাসরি লাইভ ফায়ারবেস ক্লাউড ডাটাবেজ থেকে ফ্রেশ ডাটা লোড ও আপডেট হবে।\n- 📱 **Native Android App (APK) Mode:** মোবাইল অ্যাপে অফলাইন সুবিধা ১০০% বহাল থাকবে। লোকাল ক্যাশ থেকে ডাটা সাথে সাথে লোড হবে এবং অফলাইনে কোনো ডাটা এন্ট্রি করলে পরবর্তীতে ইন্টারনেট কানেকশন পাওয়া মাত্রই ক্লাউডে অটো ২-ওয়ে সিঙ্ক হয়ে আপডেট হয়ে যাবে।"
+          name: "RideLog BD Android App v1.0.${{ github.run_number }} (Default English Language + Web Live DB & Mobile Offline Cache)"
+          body: "✅ ডিফল্ট ইংলিশ ল্যাঙ্গুয়েজ ও ফ্লেক্সিবল ডাটা লজিক:\n- 🌐 **Default Language English:** নতুন ইনস্টল বা রিসেটের সময় ডিফল্ট ল্যাঙ্গুয়েজ হিসেবে ইংরেজি (English) সিলেক্টেড থাকবে। ব্যবহারকারী চাইলে যেকোনো সময় এক ক্লিকে বাংলা ও ইংরেজি সুইচে সুইচ করতে পারবেন।\n- 🌐 **Web Browser Mode:** ওয়েব ব্রাউজারে অ্যাপ ডিরেক্ট লাইভ ফায়ারবেস ক্লাউড ডাটাবেজ থেকে ডাটা লোড ও আপডেট করবে।\n- 📱 **Native Android App (APK) Mode:** মোবাইল অ্যাপে অফলাইন এন্ট্রি ও ২-ওয়ে ক্লাউড অটো-সিঙ্ক সক্রিয় থাকবে।"
           files: android/app/build/outputs/apk/debug/app-debug.apk
           make_latest: true
           target_commitish: ${{ github.sha }}

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Bike, ChevronDown, Plus, Check } from 'lucide-react';
 
-export default function BikeSelector({ bikes = [], activeBikeId, onSelectBike, onOpenBikeModal, lang = 'bn', align = 'right' }) {
+export default function BikeSelector({ bikes = [], activeBikeId, onSelectBike, onOpenBikeModal, lang = 'en', align = 'right' }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 

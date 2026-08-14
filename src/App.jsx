@@ -28,7 +28,7 @@ const DEFAULT_BIKE = {
 };
 
 export default function App() {
-  const [lang, setLang] = useState('bn');
+  const [lang, setLang] = useState('en');
   const [theme, setTheme] = useState('dark');
   const [activeTab, setActiveTab] = useState('dashboard');
 

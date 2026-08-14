@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { signInWithGoogle } from '../utils/firebase';
 
-export default function LoginScreen({ lang = 'bn' }) {
+export default function LoginScreen({ lang = 'en' }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 

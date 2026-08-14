@@ -14,7 +14,7 @@ const DEFAULT_BIKE = {
 };
 
 const DEFAULT_DATA = {
-  settings: { lang: 'bn', theme: 'dark' },
+  settings: { lang: 'en', theme: 'dark' },
   activeBikeId: 'bike_1',
   bikes: [DEFAULT_BIKE],
   fuelLogs: [],
@@ -119,7 +119,7 @@ export function mergeDataSets(localData, cloudData) {
 
   // 5. Merge Settings
   const settings = {
-    lang: localData.settings?.lang || cloudData.settings?.lang || 'bn',
+    lang: localData.settings?.lang || cloudData.settings?.lang || 'en',
     theme: localData.settings?.theme || cloudData.settings?.theme || 'dark'
   };
 
@@ -220,7 +220,7 @@ export async function saveUserData(uid, data) {
 export async function resetUserDataInFirestore(uid) {
   if (!uid) return;
   const resetData = {
-    settings: { lang: 'bn', theme: 'dark' },
+    settings: { lang: 'en', theme: 'dark' },
     activeBikeId: 'bike_1',
     bikes: [DEFAULT_BIKE],
     fuelLogs: [],
