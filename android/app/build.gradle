@@ -37,6 +37,12 @@ android {
         sourceCompatibility JavaVersion.VERSION_21
         targetCompatibility JavaVersion.VERSION_21
     }
+
+    android.applicationVariants.all { variant ->
+        variant.outputs.all {
+            outputFileName = "Ride-Log-BD.apk"
+        }
+    }
 }
 
 repositories {
