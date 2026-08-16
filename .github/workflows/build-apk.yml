@@ -48,11 +48,16 @@ jobs:
           cd android
           ./gradlew assembleRelease --stacktrace
 
+      - name: Rename APK Asset
+        run: |
+          mkdir -p android/app/build/outputs/apk/release/
+          find android/app/build/outputs/apk/ -name "*.apk" -exec cp {} android/app/build/outputs/apk/release/Ride-Log-BD.apk \;
+
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: RideLog-BD-Android-App
-          path: android/app/build/outputs/apk/release/app-release.apk
+          path: android/app/build/outputs/apk/release/Ride-Log-BD.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -60,7 +65,7 @@ jobs:
           tag_name: v1.0.${{ github.run_number }}
           name: "RideLog BD Android App v1.0.${{ github.run_number }}"
           body: "✅ RideLog BD Latest Signed Release Android APK (Build #${{ github.run_number }})"
-          files: android/app/build/outputs/apk/release/app-release.apk
+          files: android/app/build/outputs/apk/release/Ride-Log-BD.apk
           make_latest: true
           target_commitish: ${{ github.sha }}
         env:
