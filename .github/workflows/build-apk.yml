@@ -43,42 +43,24 @@ jobs:
       - name: Make Gradle executable
         run: chmod +x android/gradlew
 
-      - name: Generate fixed debug.keystore & Log SHA-1
-        run: |
-          if [ ! -f android/app/debug.keystore ]; then
-            keytool -genkeypair -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -keystore android/app/debug.keystore -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US"
-          fi
-          echo "=================================================="
-          echo "=== SHA-1 FINGERPRINT OF YOUR APK KEYSTORE ==="
-          keytool -list -v -keystore android/app/debug.keystore -alias androiddebugkey -storepass android -keypass android | grep -i "SHA1:"
-          echo "=================================================="
-
-      - name: Commit Keystore to Repo (if new)
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add -f android/app/debug.keystore || true
-          git commit -m "chore: persist fixed debug.keystore" || true
-          git push origin main || true
-
-      - name: Build Android APK (Debug)
+      - name: Build Android APK (Release)
         run: |
           cd android
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleRelease --stacktrace
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: RideLog-BD-Android-App
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: android/app/build/outputs/apk/release/app-release.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
           name: "RideLog BD Android App v1.0.${{ github.run_number }}"
-          body: "✅ RideLog BD Latest Android APK Build (Build #${{ github.run_number }})"
-          files: android/app/build/outputs/apk/debug/app-debug.apk
+          body: "✅ RideLog BD Latest Signed Release Android APK (Build #${{ github.run_number }})"
+          files: android/app/build/outputs/apk/release/app-release.apk
           make_latest: true
           target_commitish: ${{ github.sha }}
         env:
