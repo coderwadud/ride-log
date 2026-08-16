@@ -5,9 +5,12 @@ import {
   signInWithPopup,
   signInWithCredential,
   signOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail
 } from 'firebase/auth';
-import { initializeFirestore, persistentLocalCache, getFirestore } from 'firebase/firestore';
+import { getFirestore } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 
 const firebaseConfig = {
@@ -22,17 +25,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-
-// Initialize Firestore with persistent offline local cache
-let firestoreDb;
-try {
-  firestoreDb = initializeFirestore(app, {
-    localCache: persistentLocalCache()
-  });
-} catch (e) {
-  firestoreDb = getFirestore(app);
-}
-export const db = firestoreDb;
+export const db = getFirestore(app);
 
 const provider = new GoogleAuthProvider();
 
@@ -84,3 +77,22 @@ export async function signOutUser() {
 export function onAuthChange(callback) {
   return onAuthStateChanged(auth, callback);
 }
+
+// Sign in with Email and Password
+export async function signInWithEmail(email, password) {
+  const userCredential = await signInWithEmailAndPassword(auth, email, password);
+  return userCredential.user;
+}
+
+// Sign up with Email and Password
+export async function signUpWithEmail(email, password) {
+  const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+  return userCredential.user;
+}
+
+// Reset Password
+export async function resetPassword(email) {
+  await sendPasswordResetEmail(auth, email);
+}
+
+

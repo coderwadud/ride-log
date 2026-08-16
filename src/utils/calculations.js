@@ -3,7 +3,7 @@
  */
 
 // Format currency in BDT ৳ with proper digits based on lang ('bn' vs 'en')
-export function formatCurrency(amount, lang = 'en') {
+export function formatCurrency(amount, lang = 'bn') {
   if (isNaN(amount) || amount === null || amount === undefined) return lang === 'bn' ? '৳০' : '৳0';
   const num = Number(amount);
 
@@ -16,7 +16,7 @@ export function formatCurrency(amount, lang = 'en') {
 }
 
 // Format numbers in Bengali or English based on lang
-export function formatNum(num, lang = 'en') {
+export function formatNum(num, lang = 'bn') {
   if (num === null || num === undefined || isNaN(num)) return lang === 'bn' ? '০' : '0';
 
   if (lang === 'en') {

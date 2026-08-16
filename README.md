@@ -1,151 +1,109 @@
-# 🏍️ RideLog BD - Smart Motorcycle Fuel & Service Tracker
+# 🏍️ RideLog BD - বাইক ফুয়েল ও সার্ভিস ট্র্যাকার
 
-[![React](https://img.shields.io/badge/React-19.0-61DAFB?logo=react&logoColor=white)](https://react.dev/)
-[![Vite](https://img.shields.io/badge/Vite-8.2-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
-[![Capacitor](https://img.shields.io/badge/Capacitor-7.6-119EFF?logo=capacitor&logoColor=white)](https://capacitorjs.com/)
-[![Firebase](https://img.shields.io/badge/Firebase-11.10-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com/)
-[![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20Web-green)](https://github.com/coderwadud/ride-log/releases)
-
-**RideLog BD** is a modern, high-performance, offline-capable motorcycle mileage, fuel efficiency, and service history tracking application available as both a **Native Android Mobile App** and a **Web Application**.
-
-Specifically engineered for motorcycle enthusiasts and daily riders in Bangladesh and worldwide, it provides accurate mileage math ($\text{Km/L}$), cost per kilometer ($\text{৳/Km}$), engine oil health percentage indicators, multi-bike management, and real-time cloud data synchronization.
+**RideLog BD** একটি আধুনিক, অফলাইন-সক্ষম এবং অ্যান্ড্রয়েড ফোনে ইনস্টলযোগ্য **Progressive Web Application (PWA)**, যা বিশেষ করে মোটরসাইকেল মালিকদের জন্য তৈরি করা হয়েছে। এর মাধ্যমে খুব সহজেই ১ লিটার তেলে বাইক কত কিলোমিটার চলছে (মাইলেজ Km/L), তেলের মোট খরচ, সার্ভিসিংয়ের হিসেব, ইঞ্জিন অয়েল চেঞ্জের রিমাইন্ডার এবং অফলাইন ডাটা সেভ রাখা যায়।
 
 ---
 
-## 🌟 Key Features
+## 🌟 প্রধান ফিচারসমূহ (Key Features)
 
-### ⛽ 1. Fuel & Mileage Analytics
-- **Precise Mileage ($\text{Km/L}$)**: Calculates accurate fuel consumption based on odometer readings between full-tank refills.
-- **Running Cost ($\text{৳/Km}$)**: Calculates exact operational expense per kilometer driven.
-- **Detailed Fuel Logs**: Keep track of liters purchased, fuel unit prices ($\text{৳/L}$), total expense, and odometer history.
+### ⛽ ১. মাইলেজ ও ফুয়েল ক্যালকুলেটর (Mileage & Fuel Tracker)
+- **সঠিক মাইলেজ (Km/L)**: ফুল ট্যাংক রিফিলের তথ্যের ওপর ভিত্তি করে স্বয়ংক্রিয়ভাবে ১ লিটারে বাইক কত কিমি চলছে তা হিসাব করে।
+- **খরচ ট্র্যাকিং**: কত লিটার তেল নেওয়া হলো, প্রতি লিটারের দাম কত এবং মোট কত টাকা খরচ হলো তার নির্ভুল হিসাব।
+- **প্রতি কিলোমিটার খরচ (৳/Km)**: বাইক চালাতে রিয়েল-টাইমে প্রতি কিলোমিটারে কত টাকা খরচ হচ্ছে তা প্রদর্শন করে।
 
-### 🛠️ 2. Service & Maintenance History
-- **Engine Oil Health Bar**: Visual progress indicator showing remaining oil lifespan ($\text{Km}$) and percentage health before the next oil change.
-- **Maintenance Categories**: Track expenses across key components — Engine Oil, Oil Filter, Air Filter, Spark Plug, Brake Shoes/Pads, Chain Lube, Tires, and General Service.
-- **Mechanics & Parts Cost Breakdown**: Record mechanics labor fees, spare parts cost, service center name, and maintenance notes.
+### 🛠️ ২. সার্ভিস ও মেইনটেন্যান্স হিস্ট্রি (Service History)
+- **ইঞ্জিন অয়েল স্ট্যাটাস বার (Oil Health Alert)**: ইঞ্জিন অয়েল চেঞ্জের কত কিমি বাকি আছে এবং অয়েলের বর্তমান কন্ডিশন পার্সেন্টেজ আকারে দেখায়।
+- **সার্ভিস এন্ট্রি**: মিস্ত্রির মজুরি, স্পেয়ার পার্টসের দাম, গ্যারেজ বা সার্ভিস সেন্টারের নাম এবং কাজের নোট সেভ রাখার সুবিধা।
+- **ক্যাটাগরি ট্যাগসমূহ**: ইঞ্জিন অয়েল, অয়েল ফিল্টার, এয়ার ফিল্টার, স্পার্ক প্লাগ, ব্রেক শু/প্যাড, চেইন লুব, টায়ার ও হাওয়া ইত্যাদি ক্যাটাগরিভিত্তিক ট্র্যাকিং।
 
-### 🏍️ 3. Multi-Bike Profile Management
-- **Multiple Bike Cards**: Add and manage multiple bikes under a single user account.
-- **Custom Bike Specs**: Set custom initial odometers, registration numbers, bike names, and target engine oil change intervals (e.g. 1000 km, 1500 km, 2000 km).
+### 📊 ৩. অ্যানালিটিক্স ও গ্রাফ (Visual Analytics & Charts)
+- **মাইলেজ পারফর্মেন্স ট্রেন্ড (Line Chart)**: সময়ের সাথে বাইকের মাইলেজ বাড়ছে নাকি কমছে তার গ্রাফিকাল চিত্র।
+- **মাসিক খরচের হিসাব (Bar Chart)**: প্রতি মাসে ফুয়েল ও সার্ভিসিংয়ে মোট কত টাকা খরচ হচ্ছে তার চার্ট।
 
-### ☁️ 4. Google Authentication & Firebase Cloud Sync
-- **One-Tap Google Sign-In**: Native Android bottom-sheet login on mobile devices and Google Auth popup on Web.
-- **Firestore Cloud Database**: User data is securely synchronized and backed up to Firebase Firestore (`users/{uid}`).
+### 📱 ৪. অ্যান্ড্রয়েড অ্যাপ হিসেবে ব্যবহার (Native PWA Support)
+- কোনো প্লে-স্টোর ছাড়াই **Google Chrome** বা অন্য যেকোনো মোবাইল ব্রাউজার থেকে সরাসরি **"Add to Home Screen"** বা **"Install app"** চাপলে ফোনের হোম স্ক্রিনে অ্যাপ আকারে ইনস্টল হয়ে যাবে।
+- নেটিভ অ্যান্ড্রয়েড অ্যাপ বার, বটম নেভিগেশন বার, ফ্ল্যাশিং FAB বাটন এবং বটম শিট মোডাল ডিজাইন।
 
-### 📱 5. Platform-Tailored Storage Engine (Offline-First Android App)
-- **Native Android Mobile App (APK)**: Features full **Offline-First** local caching (`localStorage`). Log fuel and service entries seamlessly while offline without network coverage. Automatic 2-way cloud merge uploads missing entries when internet reconnects.
-- **Web Browser App**: Bypasses stale local cache and always fetches live fresh data directly from Firebase Firestore.
+### 🌐 ৫. ১০০% দ্বিভাষিক সাপোর্ট (Bilingual - বাংলা / English)
+- অ্যাপের উপরে থাকা **`বাংলা / ENG`** বাটনে চাপ দিয়ে যেকোনো সময় সমস্ত টেক্সট, ডিজিট, মুদ্রা ও টেবিল বাংলা এবং ইংরেজিতে সুইচ করা যায়।
 
-### 📦 6. Complete Data Backup & Restore
-- **JSON Backup File**: Export all bike profiles, fuel logs, service history, and user preferences into a portable `.json` backup file.
-- **Backup Code Copy/Paste**: Quickly copy or paste encrypted raw JSON backup strings to transfer data across devices.
-
-### 🌐 7. Bilingual UI Support (English & Bengali)
-- **Default Language**: English (`en`) interface out-of-the-box.
-- **Instant Language Toggle**: 1-Click switch between **English** and **Bengali (বাংলা)** in the top header app bar. Automatically translates all UI text, digits, currency symbols, and date formats.
-
-### 🎨 8. Premium Modern Dark & Light Aesthetics
-- **Glassmorphic UI**: Vibrant gradient accent colors, sleek dark mode by default, floating action buttons (FAB), and smooth bottom-sheet modal dialogs.
-- **Interactive Visual Charts**: Powered by Chart.js for tracking mileage performance trends and monthly expenditure breakdowns.
+### 🔒 ৬. অফলাইন ও শতভাগ প্রাইভেসী (Offline & JSON Backup)
+- সমস্ত তথ্য আপনার ফোনের ব্রাউজার **LocalStorage**-এ সুরক্ষিত থাকে। ইন্টারনেট ছাড়াই অফলাইনে সম্পূর্ণ ব্যবহার করা সম্ভব।
+- এক ক্লিকে সম্পূর্ণ ডাটা JSON ফাইল আকারে ব্যাকআপ ও রিস্টোর করার সুবিধা।
 
 ---
 
-## 🛠️ Technology Stack
+## 🛠️ টেকনোলজি স্ট্যাক (Tech Stack)
 
-| Layer | Technology Used |
-| :--- | :--- |
-| **Frontend Framework** | React 19 + Vite 8 |
-| **Native Mobile Framework** | Capacitor 7 (Android Platform) |
-| **Authentication & Cloud DB** | Firebase Auth + Firebase Firestore |
-| **Styling & Theme** | Custom Vanilla CSS (Design System, Dark/Light Mode) |
-| **Icons & UI Components** | Lucide React |
-| **Data Visualization** | Chart.js + React-ChartJS-2 |
-| **CI/CD Build Automation** | GitHub Actions (`build-apk.yml`) |
+- **Frontend Framework**: React 19 + Vite
+- **Styling**: Vanilla CSS (Custom Design System, Glassmorphism UI, Responsive Breakpoints)
+- **Icons**: Lucide React
+- **Charts**: Chart.js & React-ChartJS-2
+- **PWA**: Web App Manifest (`manifest.json`) + Service Worker (`sw.js`)
+- **Data Persistence**: LocalStorage API + JSON Backup Export/Import
 
 ---
 
-## 🚀 Getting Started
+## 🚀 লোকালি প্রজেক্ট রান করার নিয়ম (Getting Started)
 
-### Prerequisites
-- **Node.js**: v18.0.0 or higher
-- **npm**: v9.0.0 or higher
-
-### 1. Installation
-Clone the repository and install project dependencies:
+### ১. ডিপেন্ডেন্সি ইনস্টল করুন:
 ```bash
-git clone https://github.com/coderwadud/ride-log.git
-cd fuel-log
 npm install
 ```
 
-### 2. Run Local Development Server
-Start the Vite development server:
+### ২. ডেভেলপমেন্ট সার্ভার চালু করুন (Port 3000 & Host Access):
 ```bash
 npm run dev
 ```
-Open your browser at `http://localhost:3000/`.
+
+সার্ভার চালু হলে টার্মিনালে নিচের মতো লিঙ্ক দেখতে পাবেন:
+- **Local Access**: `http://localhost:3000/`
+- **Network Access (Mobile)**: `http://<YOUR_IP_ADDRESS>:3000/`
 
 ---
 
-## 📱 Building Native Android APK
+## 📱 অ্যান্ড্রয়েড ফোনে ইনস্টল ও সেটআপ নির্দেশিকা
 
-To build the native Android project locally or compile an APK:
-
-```bash
-# 1. Build web production bundle
-npm run build
-
-# 2. Sync web assets to Capacitor Android project
-npx cap sync android
-
-# 3. Open project in Android Studio (Optional)
-npx cap open android
-```
-
-Or trigger an automated build by pushing commits to `main`. GitHub Actions will automatically generate and attach **`Ride-Log-BD.apk`** to the latest GitHub Release!
+১. আপনার অ্যান্ড্রয়েড ফোন ও পিসিকে **একই Wi-Fi নেটওয়ার্কে** যুক্ত করুন।
+২. ফোনের Google Chrome ব্রাউজারে `http://<YOUR_IP_ADDRESS>:3000/` লিখুন।
+৩. Chrome এর উপরে ডানপাশের **৩-ডট (⋮)** অপশনে চাপ দিন।
+৪. **"Add to Home screen"** অথবা **"Install app"** চাপুন।
+৫. এখন আপনার মোবাইলের অ্যাপ ড্রয়ারে **RideLog BD** অ্যাপটি যুক্ত হয়ে যাবে!
 
 ---
 
-## 📁 Project Directory Structure
+## 📁 প্রজেক্ট ডিরেক্টরি স্ট্রাকচার (Project Structure)
 
 ```text
 fuel-log/
-├── .github/workflows/
-│   └── build-apk.yml          # GitHub Actions workflow for building Android APK
-├── android/                   # Capacitor Native Android project files
 ├── public/
-│   ├── favicon.svg            # App Brand Logo Icon
-│   └── manifest.json          # PWA Web App Manifest
+│   ├── favicon.svg          # অ্যাপ আইকন
+│   ├── manifest.json        # PWA Web App Manifest
+│   └── sw.js                # Offline Service Worker
 ├── src/
 │   ├── components/
-│   │   ├── AnalyticsTab.jsx   # Chart.js visual graphs & stats
-│   │   ├── BikeModal.jsx      # Bike profile management, backup & settings
-│   │   ├── BikeSelector.jsx   # Custom dropdown bike selector
-│   │   ├── Dashboard.jsx      # Summary cards, engine oil health bar
-│   │   ├── FuelLogsTab.jsx    # Fuel log history & trip mileage
-│   │   ├── FuelModal.jsx      # Fuel entry bottom sheet modal
-│   │   ├── Header.jsx         # App header bar, language & theme toggles
-│   │   ├── LoginScreen.jsx    # Google Auth login screen
-│   │   ├── ServiceLogsTab.jsx # Maintenance history & parts cost
-│   │   └── ServiceModal.jsx   # Service entry bottom sheet modal
+│   │   ├── Header.jsx       # টপ অ্যান্ড্রয়েড অ্যাপ বার ও ল্যাঙ্গুয়েজ সুইচ
+│   │   ├── Dashboard.jsx    # সামারি কার্ডস ও অয়েল হেলথ বার
+│   │   ├── FuelLogsTab.jsx  # ফুয়েল রিফিল লিস্ট ও ট্রিপ মাইলেজ
+│   │   ├── ServiceLogsTab.jsx # সার্ভিস হিস্ট্রি ও পার্টস খরচ
+│   │   ├── AnalyticsTab.jsx # Chart.js গ্রাফ ও চার্ট
+│   │   ├── FuelModal.jsx    # ফুয়েল এন্ট্রি ফর্ম (Bottom Sheet)
+│   │   ├── ServiceModal.jsx # সার্ভিস এন্ট্রি ফর্ম (Bottom Sheet)
+│   │   ├── BikeModal.jsx    # বাইক প্রোফাইল এডিটর
+│   │   └── PWAInstallModal.jsx # ইনস্টলেশন নির্দেশিকা পপআপ
 │   ├── utils/
-│   │   ├── calculations.js    # Mileage math and currency/number formatting
-│   │   ├── firebase.js        # Firebase App & Auth initialization
-│   │   ├── firestoreDB.js     # Platform-aware cloud sync & offline cache
-│   │   ├── gdrive.js          # Google OAuth configuration
-│   │   ├── storage.js         # Backup export/import utilities
-│   │   └── translations.js    # English & Bengali language dictionary
-│   ├── App.jsx                # Main application state manager
-│   ├── index.css              # Custom mobile-first responsive design system
-│   └── main.jsx               # React entry point
+│   │   ├── calculations.js  # মাইলেজ ও খরচের গাণিতিক সূত্র
+│   │   ├── storage.js       # LocalStorage ও JSON ব্যাকআপ ম্যানেজার
+│   │   └── translations.js  # বাংলা ও ইংরেজি অনুবাদের ডিকশনারি
+│   ├── App.jsx              # মূল অ্যাপ স্টেট ও ট্যাব ম্যানেজার
+│   ├── index.css            # অ্যান্ড্রয়েড মোবাইল অ্যাপ ডিজাইন সিস্টেম
+│   └── main.jsx             # React Entrypoint & Service Worker Registration
 ├── package.json
 └── vite.config.js
 ```
 
 ---
 
-## 📄 License
+## 📄 লাইসেন্স (License)
 
-Distributed under the MIT License. See `LICENSE` for more information.
-
-Developed with ❤️ for Motorcycle Riders by **[Coder Wadud](https://github.com/coderwadud)**.
+This project is licensed under the MIT License. Open-source and free for all motorbike enthusiasts!

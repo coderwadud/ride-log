@@ -27,7 +27,7 @@ const DEFAULT_FUEL_LOGS = [];
 const DEFAULT_SERVICE_LOGS = [];
 
 const DEFAULT_SETTINGS = {
-  lang: 'en',
+  lang: 'bn',
   theme: 'dark'
 };
 
@@ -313,7 +313,8 @@ export async function exportBackupData(customData) {
 }
 
 /**
- * Import backup and MERGE with existing data (add entries & update profile info)
+ * Import backup and MERGE with existing data (add entries, don't replace)
+ * Duplicate entries (same id) are skipped
  */
 export function mergeImportBackupData(jsonString, currentData) {
   try {
@@ -326,32 +327,30 @@ export function mergeImportBackupData(jsonString, currentData) {
     const existingFuel = (currentData && Array.isArray(currentData.fuelLogs)) ? currentData.fuelLogs : loadFuelLogs();
     const existingService = (currentData && Array.isArray(currentData.serviceLogs)) ? currentData.serviceLogs : loadServiceLogs();
 
-    // 1. Merge & Update Bikes (Update existing bike properties like name, regNumber, initialOdometer + add new bikes)
-    const bikeMap = new Map();
-    existingBikes.forEach(b => { if (b && b.id) bikeMap.set(b.id, { ...b }); });
-
-    if (backup.bikes && Array.isArray(backup.bikes)) {
-      backup.bikes.forEach(b => {
-        if (b && b.id) {
-          const existing = bikeMap.get(b.id) || {};
-          bikeMap.set(b.id, { ...existing, ...b });
-        }
-      });
-    } else if (backup.bikeProfile && backup.bikeProfile.id) {
-      const existing = bikeMap.get(backup.bikeProfile.id) || {};
-      bikeMap.set(backup.bikeProfile.id, { ...existing, ...backup.bikeProfile });
-    }
-
-    let mergedBikes = Array.from(bikeMap.values());
-    if (mergedBikes.length === 0) mergedBikes = DEFAULT_BIKES;
-
-    let mergedActiveBikeId = backup.activeBikeId || (currentData && currentData.activeBikeId) || loadActiveBikeId();
-    if (!mergedBikes.some(b => b.id === mergedActiveBikeId)) {
-      mergedActiveBikeId = mergedBikes[0].id;
-    }
-
-    // 2. Merge Fuel Logs (by ID)
+    let mergedBikes = [...existingBikes];
+    let mergedActiveBikeId = (currentData && currentData.activeBikeId) || loadActiveBikeId();
     let mergedFuelLogs = [...existingFuel];
+    let mergedServiceLogs = [...existingService];
+
+    // Merge bikes list - skip duplicates by id
+    if (backup.bikes && Array.isArray(backup.bikes)) {
+      const existingBikeIds = new Set(mergedBikes.map(b => b.id));
+      const newBikes = backup.bikes.filter(b => b && b.id && !existingBikeIds.has(b.id));
+      if (newBikes.length > 0) {
+        mergedBikes = [...mergedBikes, ...newBikes];
+      }
+    } else if (backup.bikeProfile && backup.bikeProfile.id) {
+      // Legacy single bike merge
+      if (!mergedBikes.some(b => b.id === backup.bikeProfile.id)) {
+        mergedBikes.push(backup.bikeProfile);
+      }
+    }
+
+    if (backup.activeBikeId) {
+      mergedActiveBikeId = backup.activeBikeId;
+    }
+
+    // Merge fuel logs - skip duplicates by id
     if (backup.fuelLogs && Array.isArray(backup.fuelLogs)) {
       const existingIds = new Set(mergedFuelLogs.map(l => l.id));
       const newLogs = backup.fuelLogs
@@ -360,8 +359,7 @@ export function mergeImportBackupData(jsonString, currentData) {
       mergedFuelLogs = [...mergedFuelLogs, ...newLogs];
     }
     
-    // 3. Merge Service Logs (by ID)
-    let mergedServiceLogs = [...existingService];
+    // Merge service logs - skip duplicates by id
     if (backup.serviceLogs && Array.isArray(backup.serviceLogs)) {
       const existingIds = new Set(mergedServiceLogs.map(l => l.id));
       const newLogs = backup.serviceLogs
@@ -370,18 +368,12 @@ export function mergeImportBackupData(jsonString, currentData) {
       mergedServiceLogs = [...mergedServiceLogs, ...newLogs];
     }
 
-    // 4. Settings & Language/Theme
-    const mergedSettings = {
-      ...loadSettings(),
-      ...(backup.settings || {})
-    };
-
     // Save to LocalStorage
     saveBikes(mergedBikes);
     saveActiveBikeId(mergedActiveBikeId);
     saveFuelLogs(mergedFuelLogs);
     saveServiceLogs(mergedServiceLogs);
-    saveSettings(mergedSettings);
+    if (backup.settings) saveSettings(backup.settings);
 
     return {
       success: true,
@@ -391,7 +383,7 @@ export function mergeImportBackupData(jsonString, currentData) {
         activeBikeId: mergedActiveBikeId,
         fuelLogs: mergedFuelLogs,
         serviceLogs: mergedServiceLogs,
-        settings: mergedSettings
+        settings: backup.settings
       }
     };
   } catch (e) {
@@ -410,13 +402,12 @@ export function importBackupData(jsonString) {
     const newActiveId = backup.activeBikeId || newBikes[0]?.id || 'bike_1';
     const newFuel = backup.fuelLogs && Array.isArray(backup.fuelLogs) ? backup.fuelLogs : [];
     const newService = backup.serviceLogs && Array.isArray(backup.serviceLogs) ? backup.serviceLogs : [];
-    const newSettings = backup.settings || loadSettings();
 
     saveBikes(newBikes);
     saveActiveBikeId(newActiveId);
     saveFuelLogs(newFuel);
     saveServiceLogs(newService);
-    saveSettings(newSettings);
+    if (backup.settings) saveSettings(backup.settings);
 
     return {
       success: true,
@@ -425,7 +416,7 @@ export function importBackupData(jsonString) {
         activeBikeId: newActiveId,
         fuelLogs: newFuel,
         serviceLogs: newService,
-        settings: newSettings
+        settings: backup.settings
       }
     };
   } catch (e) {
