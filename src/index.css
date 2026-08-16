@@ -47,63 +47,65 @@
 
 /* ===== COMPLETE LIGHT MODE THEME ===== */
 
-/* --- Root Color Variables --- */
+/* --- Root Color Variables (Ultra-Clean Premium Light Theme) --- */
 [data-theme='light'] {
-  --bg-main: #eef2f7;
-  --bg-card: rgba(255, 255, 255, 0.96);
-  --bg-card-hover: rgba(255, 255, 255, 1);
-  --bg-input: #f8fafc;
-  --border-color: rgba(0, 0, 0, 0.09);
-  --border-highlight: rgba(5, 150, 105, 0.4);
+  --bg-main: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-card-hover: #ffffff;
+  --bg-input: #ffffff;
+  --border-color: #e2e8f0;
+  --border-highlight: #10b981;
 
   --text-main: #0f172a;
   --text-muted: #475569;
   --text-dim: #94a3b8;
 
-  --accent-fuel: #059669;
-  --accent-fuel-glow: rgba(5, 150, 105, 0.18);
+  --accent-fuel: #10b981;
+  --accent-fuel-glow: rgba(16, 185, 129, 0.2);
 
   --accent-mileage: #0284c7;
-  --accent-mileage-glow: rgba(2, 132, 199, 0.18);
+  --accent-mileage-glow: rgba(2, 132, 199, 0.2);
 
-  --accent-service: #7c3aed;
-  --accent-service-glow: rgba(124, 58, 237, 0.18);
+  --accent-service: #8b5cf6;
+  --accent-service-glow: rgba(139, 92, 246, 0.2);
 
-  --accent-amber: #b45309;
-  --accent-danger: #dc2626;
+  --accent-amber: #d97706;
+  --accent-danger: #ef4444;
 }
 
 /* --- Page Background --- */
 [data-theme='light'] body,
 [data-theme='light'] html {
-  background-color: #eef2f7;
+  background-color: #f8fafc;
   background-image:
-    radial-gradient(at 0% 0%, rgba(5, 150, 105, 0.07) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(124, 58, 237, 0.06) 0px, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(2, 132, 199, 0.05) 0px, transparent 50%);
+    radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.08) 0px, transparent 45%),
+    radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.07) 0px, transparent 45%),
+    radial-gradient(at 50% 100%, rgba(16, 185, 129, 0.06) 0px, transparent 50%);
 }
 
 /* --- Cards --- */
 [data-theme='light'] .card {
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(0, 0, 0, 0.07);
-  box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.1), 0 1px 4px rgba(0, 0, 0, 0.05);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+  border-radius: var(--radius-lg);
 }
 
 [data-theme='light'] .card:hover {
-  border-color: rgba(0, 0, 0, 0.12);
-  box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.13);
+  border-color: #cbd5e1;
+  box-shadow: 0 10px 25px -4px rgba(15, 23, 42, 0.08), 0 4px 10px -2px rgba(15, 23, 42, 0.04);
 }
 
 /* --- Header Bar --- */
 [data-theme='light'] .header-bar {
-  background: rgba(238, 242, 247, 0.97) !important;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.09) !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.03) !important;
 }
 
 /* --- Brand Name --- */
 [data-theme='light'] .brand-name {
-  background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -116,49 +118,50 @@
 }
 
 [data-theme='light'] .fuel .stat-icon {
-  background: rgba(5, 150, 105, 0.12);
-  color: #059669;
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
 }
 
 [data-theme='light'] .service .stat-icon {
-  background: rgba(124, 58, 237, 0.12);
-  color: #7c3aed;
+  background: rgba(139, 92, 246, 0.12);
+  color: #8b5cf6;
 }
 
 [data-theme='light'] .cost .stat-icon {
-  background: rgba(180, 83, 9, 0.12);
-  color: #b45309;
+  background: rgba(217, 119, 6, 0.12);
+  color: #d97706;
 }
 
 /* --- Oil Health Card (Engine Oil Status) --- */
 [data-theme='light'] .oil-health-card {
-  background: linear-gradient(135deg, rgba(240, 249, 255, 0.9), rgba(236, 253, 245, 0.9));
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: linear-gradient(135deg, #f0f9ff 0%, #f0fdf4 100%);
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
 }
 
 [data-theme='light'] .oil-health-card.warning {
-  background: linear-gradient(135deg, rgba(255, 251, 235, 0.95), rgba(254, 243, 199, 0.9));
-  border-color: rgba(180, 83, 9, 0.2);
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  border-color: #fde68a;
 }
 
 [data-theme='light'] .oil-health-card.danger {
-  background: linear-gradient(135deg, rgba(255, 241, 242, 0.95), rgba(254, 226, 226, 0.9));
-  border-color: rgba(220, 38, 38, 0.2);
+  background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
+  border-color: #fecdd3;
 }
 
 [data-theme='light'] .oil-progress-bar-bg {
-  background: rgba(0, 0, 0, 0.1);
+  background: #e2e8f0;
 }
 
 /* --- Mobile Bottom Nav Bar --- */
 [data-theme='light'] .mobile-nav-bar {
-  background: rgba(255, 255, 255, 0.98);
-  border-top: 1px solid rgba(0, 0, 0, 0.09);
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.95);
+  border-top: 1px solid #e2e8f0;
+  box-shadow: 0 -4px 20px rgba(15, 23, 42, 0.06);
 }
 
 [data-theme='light'] .mobile-nav-item {
-  color: #94a3b8;
+  color: #64748b;
 }
 
 [data-theme='light'] .mobile-nav-item.active {
@@ -166,13 +169,14 @@
 }
 
 [data-theme='light'] .mobile-nav-item.active svg {
-  filter: drop-shadow(0 0 6px rgba(2, 132, 199, 0.5));
+  filter: drop-shadow(0 2px 6px rgba(2, 132, 199, 0.35));
 }
 
 /* --- Desktop Nav Tabs --- */
 [data-theme='light'] .nav-tabs {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: rgba(0, 0, 0, 0.08);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
 }
 
 [data-theme='light'] .nav-tab-btn {
@@ -182,38 +186,38 @@
 [data-theme='light'] .nav-tab-btn.active {
   background: rgba(2, 132, 199, 0.1);
   color: #0284c7;
-  border-color: rgba(2, 132, 199, 0.25);
+  border-color: rgba(2, 132, 199, 0.3);
 }
 
 /* --- Buttons --- */
 [data-theme='light'] .btn-secondary {
-  background: rgba(0, 0, 0, 0.04);
-  border-color: rgba(0, 0, 0, 0.12);
+  background: #f1f5f9;
+  border-color: #cbd5e1;
   color: #0f172a;
 }
 
 [data-theme='light'] .btn-secondary:hover {
-  background: rgba(0, 0, 0, 0.08);
+  background: #e2e8f0;
 }
 
 [data-theme='light'] .btn-icon {
-  background: rgba(0, 0, 0, 0.04);
-  color: #475569;
-  border-color: rgba(0, 0, 0, 0.1);
+  background: #f1f5f9;
+  color: #334155;
+  border-color: #cbd5e1;
 }
 
 [data-theme='light'] .btn-icon:hover {
-  background: rgba(0, 0, 0, 0.08);
+  background: #e2e8f0;
   color: #0f172a;
 }
 
 /* --- Log Items --- */
 [data-theme='light'] .log-item {
-  border-bottom-color: rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid #f1f5f9;
 }
 
 [data-theme='light'] .log-item:hover {
-  background: rgba(0, 0, 0, 0.025);
+  background: #f8fafc;
 }
 
 [data-theme='light'] .log-date {
@@ -225,46 +229,46 @@
 }
 
 [data-theme='light'] .log-badge.badge-full {
-  background: rgba(5, 150, 105, 0.1);
+  background: rgba(16, 185, 129, 0.12);
   color: #059669;
-  border-color: rgba(5, 150, 105, 0.25);
+  border-color: rgba(16, 185, 129, 0.3);
 }
 
 [data-theme='light'] .log-badge.badge-partial {
-  background: rgba(180, 83, 9, 0.1);
-  color: #b45309;
-  border-color: rgba(180, 83, 9, 0.25);
+  background: rgba(217, 119, 6, 0.12);
+  color: #d97706;
+  border-color: rgba(217, 119, 6, 0.3);
 }
 
 /* --- Modals --- */
 [data-theme='light'] .modal-overlay {
-  background: rgba(15, 23, 42, 0.5);
+  background: rgba(15, 23, 42, 0.6);
 }
 
 [data-theme='light'] .modal-content {
   background: #ffffff;
-  border-color: rgba(0, 0, 0, 0.08);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.2);
+  border-color: #e2e8f0;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
 }
 
 [data-theme='light'] .modal-drag-handle {
-  background: rgba(0, 0, 0, 0.15);
+  background: #cbd5e1;
 }
 
 [data-theme='light'] .modal-header {
-  border-bottom-color: rgba(0, 0, 0, 0.08);
+  border-bottom-color: #e2e8f0;
 }
 
 /* --- Forms --- */
 [data-theme='light'] .form-label {
-  color: #475569;
+  color: #334155;
 }
 
 [data-theme='light'] .form-input,
 [data-theme='light'] .form-select,
 [data-theme='light'] .form-textarea {
-  background: #f8fafc;
-  border-color: rgba(0, 0, 0, 0.12);
+  background: #ffffff;
+  border-color: #cbd5e1;
   color: #0f172a;
 }
 
@@ -278,36 +282,36 @@
 
 /* --- Checkbox Tags --- */
 [data-theme='light'] .tag-checkbox {
-  background: rgba(0, 0, 0, 0.03);
-  border-color: rgba(0, 0, 0, 0.1);
+  background: #f1f5f9;
+  border-color: #cbd5e1;
   color: #475569;
 }
 
 [data-theme='light'] .tag-checkbox.checked {
-  background: rgba(124, 58, 237, 0.08);
-  border-color: rgba(124, 58, 237, 0.35);
+  background: rgba(139, 92, 246, 0.1);
+  border-color: rgba(139, 92, 246, 0.4);
   color: #7c3aed;
 }
 
 /* --- Service Category Badges in Log list --- */
 [data-theme='light'] .service-logs-view span[style] {
-  background: rgba(0, 0, 0, 0.05) !important;
-  color: #475569 !important;
-  border-color: rgba(0, 0, 0, 0.1) !important;
+  background: #f1f5f9 !important;
+  color: #334155 !important;
+  border-color: #cbd5e1 !important;
 }
 
 /* --- Empty State --- */
 [data-theme='light'] .empty-state {
-  color: #94a3b8;
+  color: #64748b;
 }
 
 /* --- Scrollbar --- */
 [data-theme='light'] ::-webkit-scrollbar-track {
-  background: #eef2f7;
+  background: #f1f5f9;
 }
 
 [data-theme='light'] ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.18);
+  background: #cbd5e1;
 }
 
 /* Smooth transition for all theme changes */
@@ -515,7 +519,7 @@ h5 {
 /* Header Navbar - Mobile Android App Bar style */
 .header-bar {
   display: flex;
-  align-items: center;
+  align-items: start;
   justify-content: space-between;
   padding: 10px 0;
   margin-bottom: 16px;
@@ -531,7 +535,7 @@ h5 {
     background: rgba(11, 15, 25, 0.96);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    padding-top: max(22px, calc(14px + env(safe-area-inset-top, 14px)));
+    padding-top: max(12px, calc(14px + env(safe-area-inset-top, 14px)));
     padding-bottom: 12px;
     padding-left: 6px;
     padding-right: 14px;

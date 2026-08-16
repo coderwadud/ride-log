@@ -12,6 +12,7 @@ import ServiceModal from './components/ServiceModal';
 import BikeModal from './components/BikeModal';
 import ProfileModal from './components/ProfileModal';
 import PWAInstallModal from './components/PWAInstallModal';
+import Footer from './components/Footer';
 import BikeSelector from './components/BikeSelector';
 
 import { exportBackupData, mergeImportBackupData } from './utils/storage';
@@ -342,6 +343,9 @@ export default function App() {
             fuelStats={fuelStats}
           />
         )}
+
+        {/* Footer */}
+        <Footer lang={lang} theme={theme} />
       </main>
 
       {/* Native Mobile Floating Action Button */}

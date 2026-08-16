@@ -21,14 +21,16 @@ export default function Header({
   return (
     <header className="header-bar">
       <div className="brand-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <img
-          src={isLight ? lightLogo : darkLogo}
-          alt="RideLog BD"
-          style={{ height: '34px', width: '80px', objectFit: 'contain' }}
-        />
-        <span className="brand-sub" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-          {bikeProfile?.name || 'My Bike'} <br /> {bikeProfile?.regNumber ? `• ${bikeProfile.regNumber}` : ''}
-        </span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', }}>
+          <img
+            src={isLight ? lightLogo : darkLogo}
+            alt="RideLog BD"
+            style={{ height: '34px', width: '80px', objectFit: 'contain', marginTop: '-12px' }}
+          />
+          <span className="brand-sub" style={{ fontSize: '0.75rem', lineHeight: '1', position: 'relative', left: '6px', marginTop: '-2px', color: 'var(--text-muted)' }}>
+            {bikeProfile?.name || 'My Bike'} <br /> {bikeProfile?.regNumber ? `${bikeProfile.regNumber}` : ''}
+          </span>
+        </div>
       </div>
 
       <div className="top-actions flex items-center gap-1.5">

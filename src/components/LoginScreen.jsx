@@ -337,6 +337,15 @@ export default function LoginScreen() {
         <p style={styles.footerNote}>
           Sign in to keep your data safe and synced across devices.
         </p>
+
+        <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.08)', textAlign: 'center', fontSize: '0.78rem', color: '#94a3b8' }}>
+          Developed with ❤️ by <a href="https://www.facebook.com/coder.wadud/" target="_blank" rel="noopener noreferrer" style={{ color: '#10b981', fontWeight: 'bold', textDecoration: 'none' }}>Coder Wadud</a>
+          <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'center', gap: '12px', fontSize: '0.75rem' }}>
+            <a href="https://www.facebook.com/ridelogbd" target="_blank" rel="noopener noreferrer" style={{ color: '#1877f2', textDecoration: 'none' }}>RideLog BD Facebook Page</a>
+            •
+            <a href="https://ride-log-two.vercel.app/" target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8', textDecoration: 'none' }}>Live Web App</a>
+          </div>
+        </div>
       </div>
     </div>
   );
