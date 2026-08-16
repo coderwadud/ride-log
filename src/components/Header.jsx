@@ -1,6 +1,8 @@
 import React from 'react';
-import { Bike, Languages, Sun, Moon, Settings, LogOut } from 'lucide-react';
+import { Languages, Sun, Moon, Settings, LogOut } from 'lucide-react';
 import { translations } from '../utils/translations';
+import lightLogo from '../assets/light-mode-logo.png';
+import darkLogo from '../assets/dark-mode-logo.png';
 
 export default function Header({ 
   lang, 
@@ -17,16 +19,15 @@ export default function Header({
 
   return (
     <header className="header-bar">
-      <div className="brand-title">
-        <div className="brand-logo">
-          <Bike size={22} />
-        </div>
-        <div>
-          <h1 className="brand-name">{t.appName}</h1>
-          <span className="brand-sub">
-            {bikeProfile?.name || 'My Bike'} • {bikeProfile?.regNumber || ''}
-          </span>
-        </div>
+      <div className="brand-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <img
+          src={isLight ? lightLogo : darkLogo}
+          alt="RideLog BD"
+          style={{ height: '34px', width: 'auto', objectFit: 'contain' }}
+        />
+        <span className="brand-sub" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+          {bikeProfile?.name || 'My Bike'} {bikeProfile?.regNumber ? `• ${bikeProfile.regNumber}` : ''}
+        </span>
       </div>
 
       <div className="top-actions flex items-center gap-1.5">
@@ -77,6 +78,7 @@ export default function Header({
                 src={user.photoURL}
                 alt={user.displayName || 'User'}
                 title={user.displayName || user.email}
+                referrerPolicy="no-referrer"
                 style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(56,189,248,0.4)' }}
               />
             ) : (

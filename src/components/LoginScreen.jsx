@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { signInWithGoogle, signInWithEmail, signUpWithEmail, resetPassword } from '../utils/firebase';
 import { Fuel, Wrench, BarChart3, Cloud, Eye, EyeOff, Bike, AlertCircle, ArrowLeft, CheckCircle2 } from 'lucide-react';
 
+import darkLogo from '../assets/dark-mode-logo.png';
+
 const getFriendlyErrorMessage = (code, isSignUp) => {
   switch (code) {
     case 'auth/user-not-found':
@@ -117,15 +119,14 @@ export default function LoginScreen() {
       <div style={styles.blob3} />
 
       <div style={styles.card}>
-        {/* App Logo / Icon */}
+        {/* App Logo / Image */}
         <div style={styles.logoWrap}>
-          <div style={styles.logoIcon}>
-            <Bike size={34} color="#38bdf8" />
-          </div>
+          <img
+            src={darkLogo}
+            alt="RideLog BD"
+            style={{ height: '48px', width: 'auto', objectFit: 'contain' }}
+          />
         </div>
-
-        {/* Title */}
-        <h1 style={styles.title}>Ride Log</h1>
         <p style={styles.subtitle}>Track your bike fuel & service effortlessly</p>
 
         {isForgotPassword ? (
