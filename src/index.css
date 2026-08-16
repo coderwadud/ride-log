@@ -1,7 +1,9 @@
 /* Modern Dark Aesthetics & Native Android App Design System for RideLog BD */
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 
@@ -17,17 +19,22 @@
   --text-muted: #94a3b8;
   --text-dim: #64748b;
 
-  --accent-fuel: #10b981; /* Emerald green */
+  --accent-fuel: #10b981;
+  /* Emerald green */
   --accent-fuel-glow: rgba(16, 185, 129, 0.25);
 
-  --accent-mileage: #38bdf8; /* Sky blue */
+  --accent-mileage: #38bdf8;
+  /* Sky blue */
   --accent-mileage-glow: rgba(56, 189, 248, 0.25);
 
-  --accent-service: #8b5cf6; /* Violet */
+  --accent-service: #8b5cf6;
+  /* Violet */
   --accent-service-glow: rgba(139, 92, 246, 0.25);
 
-  --accent-amber: #f59e0b; /* Warning */
-  --accent-danger: #ef4444; /* Danger */
+  --accent-amber: #f59e0b;
+  /* Warning */
+  --accent-danger: #ef4444;
+  /* Danger */
 
   --font-family: 'Hind Siliguri', 'Plus Jakarta Sans', 'Outfit', sans-serif;
   --radius-sm: 8px;
@@ -107,14 +114,17 @@
   background: rgba(2, 132, 199, 0.12);
   color: #0284c7;
 }
+
 [data-theme='light'] .fuel .stat-icon {
   background: rgba(5, 150, 105, 0.12);
   color: #059669;
 }
+
 [data-theme='light'] .service .stat-icon {
   background: rgba(124, 58, 237, 0.12);
   color: #7c3aed;
 }
+
 [data-theme='light'] .cost .stat-icon {
   background: rgba(180, 83, 9, 0.12);
   color: #b45309;
@@ -125,14 +135,17 @@
   background: linear-gradient(135deg, rgba(240, 249, 255, 0.9), rgba(236, 253, 245, 0.9));
   border: 1px solid rgba(0, 0, 0, 0.08);
 }
+
 [data-theme='light'] .oil-health-card.warning {
   background: linear-gradient(135deg, rgba(255, 251, 235, 0.95), rgba(254, 243, 199, 0.9));
   border-color: rgba(180, 83, 9, 0.2);
 }
+
 [data-theme='light'] .oil-health-card.danger {
   background: linear-gradient(135deg, rgba(255, 241, 242, 0.95), rgba(254, 226, 226, 0.9));
   border-color: rgba(220, 38, 38, 0.2);
 }
+
 [data-theme='light'] .oil-progress-bar-bg {
   background: rgba(0, 0, 0, 0.1);
 }
@@ -143,12 +156,15 @@
   border-top: 1px solid rgba(0, 0, 0, 0.09);
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
 }
+
 [data-theme='light'] .mobile-nav-item {
   color: #94a3b8;
 }
+
 [data-theme='light'] .mobile-nav-item.active {
   color: #0284c7;
 }
+
 [data-theme='light'] .mobile-nav-item.active svg {
   filter: drop-shadow(0 0 6px rgba(2, 132, 199, 0.5));
 }
@@ -158,9 +174,11 @@
   background: rgba(255, 255, 255, 0.9);
   border-color: rgba(0, 0, 0, 0.08);
 }
+
 [data-theme='light'] .nav-tab-btn {
   color: #64748b;
 }
+
 [data-theme='light'] .nav-tab-btn.active {
   background: rgba(2, 132, 199, 0.1);
   color: #0284c7;
@@ -173,14 +191,17 @@
   border-color: rgba(0, 0, 0, 0.12);
   color: #0f172a;
 }
+
 [data-theme='light'] .btn-secondary:hover {
   background: rgba(0, 0, 0, 0.08);
 }
+
 [data-theme='light'] .btn-icon {
   background: rgba(0, 0, 0, 0.04);
   color: #475569;
   border-color: rgba(0, 0, 0, 0.1);
 }
+
 [data-theme='light'] .btn-icon:hover {
   background: rgba(0, 0, 0, 0.08);
   color: #0f172a;
@@ -190,20 +211,25 @@
 [data-theme='light'] .log-item {
   border-bottom-color: rgba(0, 0, 0, 0.06);
 }
+
 [data-theme='light'] .log-item:hover {
   background: rgba(0, 0, 0, 0.025);
 }
+
 [data-theme='light'] .log-date {
   color: #64748b;
 }
+
 [data-theme='light'] .log-main-title {
   color: #0f172a;
 }
+
 [data-theme='light'] .log-badge.badge-full {
   background: rgba(5, 150, 105, 0.1);
   color: #059669;
   border-color: rgba(5, 150, 105, 0.25);
 }
+
 [data-theme='light'] .log-badge.badge-partial {
   background: rgba(180, 83, 9, 0.1);
   color: #b45309;
@@ -214,14 +240,17 @@
 [data-theme='light'] .modal-overlay {
   background: rgba(15, 23, 42, 0.5);
 }
+
 [data-theme='light'] .modal-content {
   background: #ffffff;
   border-color: rgba(0, 0, 0, 0.08);
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.2);
 }
+
 [data-theme='light'] .modal-drag-handle {
   background: rgba(0, 0, 0, 0.15);
 }
+
 [data-theme='light'] .modal-header {
   border-bottom-color: rgba(0, 0, 0, 0.08);
 }
@@ -230,6 +259,7 @@
 [data-theme='light'] .form-label {
   color: #475569;
 }
+
 [data-theme='light'] .form-input,
 [data-theme='light'] .form-select,
 [data-theme='light'] .form-textarea {
@@ -237,6 +267,7 @@
   border-color: rgba(0, 0, 0, 0.12);
   color: #0f172a;
 }
+
 [data-theme='light'] .form-input:focus,
 [data-theme='light'] .form-select:focus,
 [data-theme='light'] .form-textarea:focus {
@@ -251,6 +282,7 @@
   border-color: rgba(0, 0, 0, 0.1);
   color: #475569;
 }
+
 [data-theme='light'] .tag-checkbox.checked {
   background: rgba(124, 58, 237, 0.08);
   border-color: rgba(124, 58, 237, 0.35);
@@ -273,12 +305,15 @@
 [data-theme='light'] ::-webkit-scrollbar-track {
   background: #eef2f7;
 }
+
 [data-theme='light'] ::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.18);
 }
 
 /* Smooth transition for all theme changes */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   transition: background-color 0.25s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
@@ -289,7 +324,8 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-html, body {
+html,
+body {
   width: 100%;
   max-width: 100vw;
   overflow-x: hidden;
@@ -298,7 +334,7 @@ html, body {
   font-family: var(--font-family);
   min-height: 100vh;
   line-height: 1.4;
-  background-image: 
+  background-image:
     radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.08) 0px, transparent 50%),
     radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.08) 0px, transparent 50%),
     radial-gradient(at 50% 100%, rgba(16, 185, 129, 0.05) 0px, transparent 50%);
@@ -312,7 +348,8 @@ html, body {
   margin: 0 auto;
   padding: 12px;
   padding-top: max(12px, env(safe-area-inset-top));
-  padding-bottom: max(95px, calc(95px + env(safe-area-inset-bottom))); /* space for mobile bottom navbar */
+  padding-bottom: max(95px, calc(95px + env(safe-area-inset-bottom)));
+  /* space for mobile bottom navbar */
 }
 
 @media (min-width: 768px) {
@@ -323,7 +360,11 @@ html, body {
 }
 
 /* Typography */
-h1, h2, h3, h4, h5 {
+h1,
+h2,
+h3,
+h4,
+h5 {
   color: var(--text-main);
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -388,10 +429,25 @@ h1, h2, h3, h4, h5 {
   height: 3px;
 }
 
-.stat-card.mileage::after { background: var(--accent-mileage); box-shadow: 0 0 10px var(--accent-mileage); }
-.stat-card.fuel::after { background: var(--accent-fuel); box-shadow: 0 0 10px var(--accent-fuel); }
-.stat-card.service::after { background: var(--accent-service); box-shadow: 0 0 10px var(--accent-service); }
-.stat-card.cost::after { background: var(--accent-amber); box-shadow: 0 0 10px var(--accent-amber); }
+.stat-card.mileage::after {
+  background: var(--accent-mileage);
+  box-shadow: 0 0 10px var(--accent-mileage);
+}
+
+.stat-card.fuel::after {
+  background: var(--accent-fuel);
+  box-shadow: 0 0 10px var(--accent-fuel);
+}
+
+.stat-card.service::after {
+  background: var(--accent-service);
+  box-shadow: 0 0 10px var(--accent-service);
+}
+
+.stat-card.cost::after {
+  background: var(--accent-amber);
+  box-shadow: 0 0 10px var(--accent-amber);
+}
 
 .stat-icon-wrap {
   display: flex;
@@ -409,10 +465,25 @@ h1, h2, h3, h4, h5 {
   justify-content: center;
 }
 
-.mileage .stat-icon { background: rgba(56, 189, 248, 0.15); color: var(--accent-mileage); }
-.fuel .stat-icon { background: rgba(16, 185, 129, 0.15); color: var(--accent-fuel); }
-.service .stat-icon { background: rgba(139, 92, 246, 0.15); color: var(--accent-service); }
-.cost .stat-icon { background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); }
+.mileage .stat-icon {
+  background: rgba(56, 189, 248, 0.15);
+  color: var(--accent-mileage);
+}
+
+.fuel .stat-icon {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--accent-fuel);
+}
+
+.service .stat-icon {
+  background: rgba(139, 92, 246, 0.15);
+  color: var(--accent-service);
+}
+
+.cost .stat-icon {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--accent-amber);
+}
 
 .stat-label {
   font-size: 0.78rem;
@@ -462,7 +533,7 @@ h1, h2, h3, h4, h5 {
     -webkit-backdrop-filter: blur(16px);
     padding-top: max(22px, calc(14px + env(safe-area-inset-top, 14px)));
     padding-bottom: 12px;
-    padding-left: 14px;
+    padding-left: 6px;
     padding-right: 14px;
     margin: -12px -12px 16px -12px;
     width: calc(100% + 24px);
@@ -733,8 +804,13 @@ h1, h2, h3, h4, h5 {
   }
 }
 
-.oil-health-card.warning { border-left-color: var(--accent-amber); }
-.oil-health-card.danger { border-left-color: var(--accent-danger); }
+.oil-health-card.warning {
+  border-left-color: var(--accent-amber);
+}
+
+.oil-health-card.danger {
+  border-left-color: var(--accent-danger);
+}
 
 .oil-info-left {
   display: flex;
@@ -801,8 +877,17 @@ h1, h2, h3, h4, h5 {
   white-space: nowrap;
 }
 
-.badge-full { background: rgba(16, 185, 129, 0.15); color: var(--accent-fuel); border: 1px solid rgba(16, 185, 129, 0.3); }
-.badge-partial { background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); border: 1px solid rgba(245, 158, 11, 0.3); }
+.badge-full {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--accent-fuel);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-partial {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--accent-amber);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
 
 /* Native Android Bottom Sheet Modals */
 .modal-overlay {
@@ -830,8 +915,13 @@ h1, h2, h3, h4, h5 {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 .modal-content {
@@ -857,8 +947,13 @@ h1, h2, h3, h4, h5 {
 }
 
 @keyframes slideUp {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
 }
 
 .modal-drag-handle {
@@ -909,7 +1004,9 @@ h1, h2, h3, h4, h5 {
   margin-bottom: 5px;
 }
 
-.form-input, .form-select, .form-textarea {
+.form-input,
+.form-select,
+.form-textarea {
   width: 100%;
   padding: 11px 14px;
   background: var(--bg-input);
@@ -921,7 +1018,9 @@ h1, h2, h3, h4, h5 {
   transition: var(--transition-fast);
 }
 
-.form-input:focus, .form-select:focus, .form-textarea:focus {
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
   outline: none;
   border-color: var(--accent-mileage);
   box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
@@ -1025,6 +1124,7 @@ h1, h2, h3, h4, h5 {
     display: flex;
     align-items: center;
   }
+
   .mobile-bike-selector {
     display: none !important;
   }
@@ -1105,4 +1205,3 @@ h1, h2, h3, h4, h5 {
   color: var(--accent-fuel);
   font-weight: 700;
 }
-

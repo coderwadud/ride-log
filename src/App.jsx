@@ -10,6 +10,7 @@ import AnalyticsTab from './components/AnalyticsTab';
 import FuelModal from './components/FuelModal';
 import ServiceModal from './components/ServiceModal';
 import BikeModal from './components/BikeModal';
+import ProfileModal from './components/ProfileModal';
 import PWAInstallModal from './components/PWAInstallModal';
 import BikeSelector from './components/BikeSelector';
 
@@ -58,6 +59,7 @@ export default function App() {
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
   const [editingServiceData, setEditingServiceData] = useState(null);
   const [isBikeModalOpen, setIsBikeModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
 
   // PWA Install Event
@@ -262,6 +264,7 @@ export default function App() {
         onToggleTheme={handleToggleTheme}
         user={user}
         onLogout={handleLogout}
+        onOpenProfile={() => setIsProfileModalOpen(true)}
       />
 
       {/* Mobile-Only Custom Bike Selector Bar below Header */}
@@ -433,6 +436,16 @@ export default function App() {
 
           alert(lang === 'bn' ? '✅ শুধু আপনার ডাটা সফলভাবে মুছে ফেলা হয়েছে!' : '✅ Your data has been reset successfully!');
         }}
+        onLogout={handleLogout}
+      />
+      <ProfileModal
+        lang={lang}
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        user={user}
+        bikes={bikes}
+        activeBikeId={activeBikeId}
+        onLogout={handleLogout}
       />
       <PWAInstallModal
         lang={lang}

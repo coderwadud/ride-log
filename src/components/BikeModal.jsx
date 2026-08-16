@@ -20,7 +20,8 @@ export default function BikeModal({
   gdriveSyncing,
   onGoogleLogin,
   onGoogleLogout,
-  onTriggerSync
+  onTriggerSync,
+  onLogout
 }) {
   const t = translations[lang];
   const fileInputRef = useRef(null);
@@ -451,6 +452,37 @@ export default function BikeModal({
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Logout Button Section */}
+          {onLogout && (
+            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  onClose();
+                  onLogout();
+                }}
+                style={{
+                  width: '100%',
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  color: '#f87171',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '10px',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  padding: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                <LogOut size={16} />
+                <span>{lang === 'bn' ? 'অ্যাকাউন্ট লগআউট করুন' : 'Logout Account'}</span>
+              </button>
             </div>
           )}
         </div>
