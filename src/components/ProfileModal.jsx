@@ -2,13 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, User, Shield, Lock, FileText, Upload, Plus, Trash2, Edit3, 
   Eye, LogOut, Check, FileCheck, FileCode2, Image as ImageIcon, 
-  CreditCard, ShieldCheck, AlertCircle, FileSpreadsheet
+  CreditCard, ShieldCheck, AlertCircle, FileSpreadsheet, Download
 } from 'lucide-react';
 import { 
   getPrivateDocuments, 
   addPrivateDocument, 
   updatePrivateDocument, 
-  deletePrivateDocument 
+  deletePrivateDocument,
+  downloadOrShareDocument
 } from '../utils/documentStorage';
 
 const DOC_TYPES = [
@@ -426,6 +427,17 @@ export default function ProfileModal({
                         <Eye size={16} />
                       </button>
 
+                      {/* Download Direct */}
+                      <button
+                        type="button"
+                        className="btn btn-icon"
+                        onClick={() => downloadOrShareDocument(doc)}
+                        title={isBn ? 'ডাউনলোড করুন' : 'Download Document'}
+                        style={{ color: '#10b981', borderColor: 'rgba(16,185,129,0.25)' }}
+                      >
+                        <Download size={16} />
+                      </button>
+
                       {/* Edit / Save */}
                       {isEditing ? (
                         <button
@@ -529,14 +541,29 @@ export default function ProfileModal({
                 </p>
               </div>
 
-              <button
-                type="button"
-                className="btn btn-icon"
-                onClick={() => setPreviewDoc(null)}
-                style={{ background: 'rgba(255,255,255,0.1)', color: '#ffffff' }}
-              >
-                <X size={20} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="btn btn-icon"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    downloadOrShareDocument(previewDoc);
+                  }}
+                  title={isBn ? 'ডাউনলোড করুন' : 'Download Document'}
+                  style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.4)' }}
+                >
+                  <Download size={18} />
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-icon"
+                  onClick={() => setPreviewDoc(null)}
+                  style={{ background: 'rgba(255,255,255,0.1)', color: '#ffffff' }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             <div 

@@ -1,7 +1,59 @@
 import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 import { Capacitor } from '@capacitor/core';
 
 const DOCS_INDEX_KEY = 'ridelog_private_documents';
+
+/**
+ * Trigger direct download on Web and Native Mobile Share/Save sheet on Android
+ */
+export async function downloadOrShareDocument(doc) {
+  if (!doc) return;
+  const fileData = doc.fileData || doc.localUri;
+  if (!fileData) return;
+
+  const extension = doc.fileName ? doc.fileName.split('.').pop() : (doc.fileType?.includes('pdf') ? 'pdf' : 'png');
+  const fileName = doc.fileName || `${doc.title}.${extension}`;
+
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const cleanBase64 = fileData.replace(/^data:.*?;base64,/, '');
+      const tempPath = `downloads/${Date.now()}_${fileName}`;
+
+      const writeResult = await Filesystem.writeFile({
+        path: tempPath,
+        data: cleanBase64,
+        directory: Directory.Cache,
+        recursive: true
+      });
+
+      await Share.share({
+        title: doc.title,
+        text: `RideLog BD Document: ${doc.title}`,
+        url: writeResult.uri,
+        dialogTitle: 'Download / Save Document'
+      });
+    } catch (err) {
+      console.warn('Native share/download fallback:', err);
+      triggerWebDownload(fileData, fileName);
+    }
+  } else {
+    triggerWebDownload(fileData, fileName);
+  }
+}
+
+function triggerWebDownload(fileData, fileName) {
+  try {
+    const link = document.createElement('a');
+    link.href = fileData;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } catch (e) {
+    console.error('Web download error:', e);
+  }
+}
 
 /**
  * Get list of private documents for user
