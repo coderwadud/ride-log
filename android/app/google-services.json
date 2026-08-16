@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "4274608297-release.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ridelog.app",
+            "certificate_hash": "5b44527dea8d6061ed7b8ba0dd9ef83e7d3f4e62"
+          }
+        },
+        {
           "client_id": "4274608297-eu3aq3b2vgurf8a9vvu685ikjdns1gbd.apps.googleusercontent.com",
           "client_type": 3
         }
