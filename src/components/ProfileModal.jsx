@@ -3,7 +3,7 @@ import {
   X, User, Shield, Lock, FileText, Upload, Plus, Trash2, Edit3,
   Eye, LogOut, Check, FileCheck, FileCode2, Image as ImageIcon,
   CreditCard, ShieldCheck, AlertCircle, FileSpreadsheet, Download, UserX,
-  MessageSquare, Calendar, Send, Clock
+  MessageSquare, Calendar, Send, Clock, Ticket, CheckCircle2, Clock3, MessageCircle
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import {
@@ -14,7 +14,7 @@ import {
   downloadOrShareDocument
 } from '../utils/documentStorage';
 import { trackDocumentUploaded, updateLastActiveAt } from '../utils/analytics';
-import { deleteUserAllData, submitUserFeedback } from '../utils/firestoreDB';
+import { deleteUserAllData, submitUserFeedback, listenToUserTickets } from '../utils/firestoreDB';
 import { deleteUserAccount } from '../utils/firebase';
 import { getCurrentAppVersion } from '../utils/appVersion';
 
@@ -56,12 +56,15 @@ export default function ProfileModal({
   const [editType, setEditType] = useState('license');
   const [editExpiryDate, setEditExpiryDate] = useState('');
 
-  // Feedback Form states
+  // Feedback & Ticket states
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackActiveSubTab, setFeedbackActiveSubTab] = useState('new'); // 'new' or 'tickets'
   const [feedbackType, setFeedbackType] = useState('feedback');
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
+  const [submittedTicketInfo, setSubmittedTicketInfo] = useState(null);
+  const [userTickets, setUserTickets] = useState([]);
 
   // Preview Modal state
   const [previewDoc, setPreviewDoc] = useState(null);
@@ -76,6 +79,18 @@ export default function ProfileModal({
       loadDocs();
     }
   }, [isOpen, userId]);
+
+  // Real-time listener for user tickets & status
+  useEffect(() => {
+    if (showFeedbackModal) {
+      const unsub = listenToUserTickets(userId, (tickets) => {
+        setUserTickets(tickets);
+      });
+      return () => {
+        if (typeof unsub === 'function') unsub();
+      };
+    }
+  }, [showFeedbackModal, userId]);
 
   const loadDocs = async () => {
     const docs = await getPrivateDocuments(userId);
@@ -158,25 +173,39 @@ export default function ProfileModal({
     setFeedbackLoading(true);
     const dynamicAppVersion = await getCurrentAppVersion();
 
-    const feedbackPayload = {
-      name: user?.displayName || 'App User',
-      email: user?.email || 'not_provided',
-      type: feedbackType === 'bug' 
-        ? 'Bug / Problem Report (সমস্যা)' 
-        : feedbackType === 'feature_request' 
-          ? 'Feature Request (নতুন ফিচার)' 
-          : 'General Feedback (মতামত)',
-      message: feedbackMessage.trim(),
-      createdAt: new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'medium' }),
-      appVersion: dynamicAppVersion,
-      status: 'pending',
-      _subject: `[RideLog BD] New ${feedbackType.toUpperCase()} from ${user?.displayName || 'User'} (v${dynamicAppVersion})`,
-      _template: 'table',
-      _captcha: 'false'
-    };
-
     try {
-      // 1. Send silent background email directly to your inbox (100% Free, 0 API Key)
+      // 1. Save in Firestore database and generate Ticket ID
+      const res = await submitUserFeedback({
+        uid: user?.uid || 'guest',
+        email: user?.email || 'not_provided',
+        name: user?.displayName || 'App User',
+        type: feedbackType,
+        message: feedbackMessage,
+        appVersion: dynamicAppVersion
+      });
+
+      const assignedTicketId = res?.ticketId || `TKT-${Math.floor(10000 + Math.random() * 90000)}`;
+      setSubmittedTicketInfo(assignedTicketId);
+
+      // 2. Send silent background email with Ticket ID to your inbox
+      const feedbackPayload = {
+        ticketId: `#${assignedTicketId}`,
+        name: user?.displayName || 'App User',
+        email: user?.email || 'not_provided',
+        type: feedbackType === 'bug' 
+          ? 'Bug / Problem Report (সমস্যা)' 
+          : feedbackType === 'feature_request' 
+            ? 'Feature Request (নতুন ফিচার)' 
+            : 'General Feedback (মতামত)',
+        message: feedbackMessage.trim(),
+        createdAt: new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'medium' }),
+        appVersion: dynamicAppVersion,
+        status: 'pending',
+        _subject: `[RideLog BD] Ticket #${assignedTicketId} (${feedbackType.toUpperCase()}) from ${user?.displayName || 'User'}`,
+        _template: 'table',
+        _captcha: 'false'
+      };
+
       fetch('https://formsubmit.co/ajax/waliitsolution@gmail.com', {
         method: 'POST',
         headers: {
@@ -186,30 +215,14 @@ export default function ProfileModal({
         body: JSON.stringify(feedbackPayload)
       }).catch((err) => console.debug('Direct email delivery notice:', err));
 
-      // 2. Also save in Firestore database as secure cloud record
-      await submitUserFeedback({
-        uid: user?.uid || 'guest',
-        email: user?.email || 'not_provided',
-        name: user?.displayName || 'App User',
-        type: feedbackType,
-        message: feedbackMessage,
-        appVersion: dynamicAppVersion
-      });
-
       setFeedbackSuccess(true);
       setFeedbackMessage('');
-      setTimeout(() => {
-        setFeedbackSuccess(false);
-        setShowFeedbackModal(false);
-      }, 2000);
     } catch (err) {
       console.warn('Feedback submit fallback:', err);
+      const fallbackTicket = `TKT-${Math.floor(10000 + Math.random() * 90000)}`;
+      setSubmittedTicketInfo(fallbackTicket);
       setFeedbackSuccess(true);
       setFeedbackMessage('');
-      setTimeout(() => {
-        setFeedbackSuccess(false);
-        setShowFeedbackModal(false);
-      }, 2000);
     } finally {
       setFeedbackLoading(false);
     }
@@ -1039,7 +1052,7 @@ export default function ProfileModal({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <MessageSquare size={20} color="#38bdf8" />
                   <h4 style={{ fontSize: '1.05rem', color: '#ffffff', margin: 0, fontWeight: 700 }}>
-                    {isBn ? 'মতামত বা সমস্যা রিপোর্ট' : 'Feedback & Support'}
+                    {isBn ? 'সাপোর্ট ও ফিডব্যাক টিকিট' : 'Support & Feedback'}
                   </h4>
                 </div>
                 <button
@@ -1052,71 +1065,352 @@ export default function ProfileModal({
                 </button>
               </div>
 
-              {feedbackSuccess ? (
-                <div style={{
-                  padding: '24px 16px',
-                  textAlign: 'center',
-                  background: 'rgba(16, 185, 129, 0.1)',
-                  borderRadius: '12px',
-                  border: '1px solid rgba(16, 185, 129, 0.3)'
-                }}>
-                  <Check size={36} color="#10b981" style={{ margin: '0 auto 10px' }} />
-                  <h5 style={{ color: '#10b981', fontSize: '1rem', margin: '0 0 4px 0', fontWeight: 700 }}>
-                    {isBn ? 'ধন্যবাদ! আপনার মেসেজটি পাঠানো হয়েছে।' : 'Thank you! Your feedback has been sent.'}
-                  </h5>
-                  <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: 0 }}>
-                    {isBn ? 'আমরা দ্রুত এটি পর্যালোচনা করবো।' : 'We will review it promptly.'}
-                  </p>
-                </div>
-              ) : (
-                <form onSubmit={handleFeedbackSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div className="form-group">
-                    <label className="form-label">{isBn ? 'মেসেজের ধরন' : 'Feedback Category'}</label>
-                    <select
-                      className="form-select"
-                      value={feedbackType}
-                      onChange={(e) => setFeedbackType(e.target.value)}
-                    >
-                      <option value="feedback">{isBn ? '💡 সাধারণ মতামত / পরামর্শ' : '💡 General Feedback / Suggestion'}</option>
-                      <option value="bug">{isBn ? '🐛 কোনো সমস্যা / বাগ রিপোর্ট' : '🐛 Bug / Problem Report'}</option>
-                      <option value="feature_request">{isBn ? '✨ নতুন ফিচারের অনুরোধ' : '✨ Feature Request'}</option>
-                    </select>
-                  </div>
+              {/* Sub-Tab Switcher: New vs My Tickets */}
+              <div style={{
+                display: 'flex',
+                background: 'rgba(255, 255, 255, 0.05)',
+                padding: '3px',
+                borderRadius: '12px',
+                gap: '4px'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => { setFeedbackActiveSubTab('new'); setFeedbackSuccess(false); }}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    borderRadius: '9px',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    border: 'none',
+                    cursor: 'pointer',
+                    background: feedbackActiveSubTab === 'new' ? '#0284c7' : 'transparent',
+                    color: feedbackActiveSubTab === 'new' ? '#ffffff' : '#94a3b8',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Send size={14} />
+                  <span>{isBn ? 'নতুন মেসেজ' : 'New Ticket'}</span>
+                </button>
 
-                  <div className="form-group">
-                    <label className="form-label">{isBn ? 'আপনার বার্তা বিস্তারিত লিখুন' : 'Detailed Message'}</label>
-                    <textarea
-                      className="form-input"
-                      rows={4}
-                      placeholder={isBn ? 'আপনার সমস্যা বা মতামত বিস্তারিতভাবে লিখুন...' : 'Type your message or issue details here...'}
-                      value={feedbackMessage}
-                      onChange={(e) => setFeedbackMessage(e.target.value)}
-                      required
-                      style={{ resize: 'vertical', minHeight: '90px' }}
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    disabled={feedbackLoading || !feedbackMessage.trim()}
-                    style={{
-                      padding: '11px',
-                      fontSize: '0.88rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px'
-                    }}
-                  >
-                    <Send size={16} />
-                    <span>
-                      {feedbackLoading
-                        ? (isBn ? 'পাঠানো হচ্ছে...' : 'Sending...')
-                        : (isBn ? 'মেসেজ পাঠান' : 'Submit Feedback')}
+                <button
+                  type="button"
+                  onClick={() => setFeedbackActiveSubTab('tickets')}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    borderRadius: '9px',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    border: 'none',
+                    cursor: 'pointer',
+                    background: feedbackActiveSubTab === 'tickets' ? '#10b981' : 'transparent',
+                    color: feedbackActiveSubTab === 'tickets' ? '#ffffff' : '#94a3b8',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Ticket size={14} />
+                  <span>{isBn ? 'আমার টিকিটসমূহ' : 'My Tickets'}</span>
+                  {userTickets.length > 0 && (
+                    <span style={{
+                      background: 'rgba(0, 0, 0, 0.35)',
+                      padding: '1px 6px',
+                      borderRadius: '10px',
+                      fontSize: '0.72rem',
+                      fontWeight: 800
+                    }}>
+                      {userTickets.length}
                     </span>
-                  </button>
-                </form>
+                  )}
+                </button>
+              </div>
+
+              {/* TAB 1: NEW TICKET FORM */}
+              {feedbackActiveSubTab === 'new' && (
+                <>
+                  {feedbackSuccess ? (
+                    <div style={{
+                      padding: '20px 16px',
+                      textAlign: 'center',
+                      background: 'rgba(16, 185, 129, 0.1)',
+                      borderRadius: '14px',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '10px'
+                    }}>
+                      <CheckCircle2 size={38} color="#10b981" />
+                      <div>
+                        <h5 style={{ color: '#10b981', fontSize: '1.05rem', margin: '0 0 4px 0', fontWeight: 800 }}>
+                          {isBn ? 'সাপোর্ট টিকিট সফলভাবে তৈরি হয়েছে!' : 'Support Ticket Created!'}
+                        </h5>
+                        <div style={{
+                          display: 'inline-block',
+                          background: 'rgba(56, 189, 248, 0.15)',
+                          color: '#38bdf8',
+                          border: '1px solid rgba(56, 189, 248, 0.4)',
+                          padding: '3px 12px',
+                          borderRadius: '20px',
+                          fontSize: '0.86rem',
+                          fontWeight: 800,
+                          margin: '4px 0 8px'
+                        }}>
+                          #{submittedTicketInfo}
+                        </div>
+                        <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: 0, lineHeight: '1.4' }}>
+                          {isBn 
+                            ? 'আপনার টিকিটটি রিভিউ করা হচ্ছে। "আমার টিকিটসমূহ" ট্যাবে যেকোনা সময় অগ্রগতির স্ট্যাটাস দেখতে পারবেন।' 
+                            : 'Your ticket is being reviewed. You can track its progress under "My Tickets" tab anytime.'}
+                        </p>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px', width: '100%', marginTop: '6px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setFeedbackActiveSubTab('tickets')}
+                          style={{
+                            flex: 1,
+                            padding: '10px',
+                            borderRadius: '10px',
+                            background: '#10b981',
+                            color: '#ffffff',
+                            border: 'none',
+                            fontWeight: 700,
+                            fontSize: '0.84rem',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {isBn ? '🎫 টিকিট স্ট্যাটাস দেখুন' : 'View Tickets'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setFeedbackSuccess(false); setSubmittedTicketInfo(null); }}
+                          style={{
+                            flex: 1,
+                            padding: '10px',
+                            borderRadius: '10px',
+                            background: 'rgba(255, 255, 255, 0.08)',
+                            color: '#e2e8f0',
+                            border: 'none',
+                            fontWeight: 600,
+                            fontSize: '0.84rem',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {isBn ? '+ নতুন আরেকটি পাঠান' : '+ Submit Another'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleFeedbackSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div className="form-group">
+                        <label className="form-label">{isBn ? 'মেসেজের ধরন / ক্যাটাগরি' : 'Feedback Category'}</label>
+                        <select
+                          className="form-select"
+                          value={feedbackType}
+                          onChange={(e) => setFeedbackType(e.target.value)}
+                        >
+                          <option value="feedback">{isBn ? '💡 সাধারণ মতামত / পরামর্শ' : '💡 General Feedback / Suggestion'}</option>
+                          <option value="bug">{isBn ? '🐛 কোনো সমস্যা / বাগ রিপোর্ট' : '🐛 Bug / Problem Report'}</option>
+                          <option value="feature_request">{isBn ? '✨ নতুন ফিচারের অনুরোধ' : '✨ Feature Request'}</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label">{isBn ? 'আপনার বার্তা বিস্তারিত লিখুন' : 'Detailed Message'}</label>
+                        <textarea
+                          className="form-input"
+                          rows={4}
+                          placeholder={isBn ? 'আপনার সমস্যা বা মতামত বিস্তারিতভাবে লিখুন...' : 'Type your message or issue details here...'}
+                          value={feedbackMessage}
+                          onChange={(e) => setFeedbackMessage(e.target.value)}
+                          required
+                          style={{ resize: 'vertical', minHeight: '85px' }}
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="btn btn-primary"
+                        disabled={feedbackLoading || !feedbackMessage.trim()}
+                        style={{
+                          padding: '11px',
+                          fontSize: '0.88rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px'
+                        }}
+                      >
+                        <Send size={16} />
+                        <span>
+                          {feedbackLoading
+                            ? (isBn ? 'টিকিট তৈরি হচ্ছে...' : 'Creating Ticket...')
+                            : (isBn ? 'মেসেজ পাঠান' : 'Submit Ticket')}
+                        </span>
+                      </button>
+                    </form>
+                  )}
+                </>
+              )}
+
+              {/* TAB 2: MY TICKETS & STATUS TRACKER */}
+              {feedbackActiveSubTab === 'tickets' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '340px', overflowY: 'auto', paddingRight: '2px' }}>
+                  {userTickets.length === 0 ? (
+                    <div style={{
+                      textAlign: 'center',
+                      padding: '30px 16px',
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      borderRadius: '14px',
+                      border: '1px dashed rgba(255, 255, 255, 0.1)'
+                    }}>
+                      <Ticket size={34} color="#64748b" style={{ margin: '0 auto 8px' }} />
+                      <p style={{ fontSize: '0.85rem', color: '#94a3b8', margin: '0 0 8px 0' }}>
+                        {isBn ? 'আপনার কোনো সাপোর্ট টিকিট পাওয়া যায়নি।' : 'No support tickets found.'}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setFeedbackActiveSubTab('new')}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: '8px',
+                          background: 'rgba(56, 189, 248, 0.15)',
+                          color: '#38bdf8',
+                          border: '1px solid rgba(56, 189, 248, 0.3)',
+                          fontSize: '0.78rem',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {isBn ? '+ নতুন টিকিট তৈরি করুন' : '+ Create New Ticket'}
+                      </button>
+                    </div>
+                  ) : (
+                    userTickets.map((tkt) => {
+                      const status = tkt.status || 'pending';
+                      const isPending = status === 'pending';
+                      const isInProgress = status === 'in_progress';
+                      const isResolved = status === 'resolved';
+
+                      const statusColor = isResolved ? '#10b981' : isInProgress ? '#38bdf8' : isPending ? '#f59e0b' : '#ef4444';
+                      const statusBg = isResolved ? 'rgba(16, 185, 129, 0.15)' : isInProgress ? 'rgba(56, 189, 248, 0.15)' : isPending ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)';
+                      const statusBorder = isResolved ? 'rgba(16, 185, 129, 0.35)' : isInProgress ? 'rgba(56, 189, 248, 0.35)' : isPending ? 'rgba(245, 158, 11, 0.35)' : 'rgba(239, 68, 68, 0.35)';
+                      
+                      const statusLabel = isResolved
+                        ? (isBn ? '✓ সমাধান হয়েছে (Resolved)' : '✓ Resolved')
+                        : isInProgress
+                          ? (isBn ? '⚡ কাজ চলছে (In Progress)' : '⚡ In Progress')
+                          : isPending
+                            ? (isBn ? '⏳ পর্যালোচনায় আছে (Pending)' : '⏳ Pending Review')
+                            : (isBn ? '✕ বন্ধ (Closed)' : '✕ Closed');
+
+                      const typeName = tkt.type === 'bug'
+                        ? (isBn ? '🐛 সমস্যা' : 'Bug')
+                        : tkt.type === 'feature_request'
+                          ? (isBn ? '✨ ফিচার' : 'Feature')
+                          : (isBn ? '💡 মতামত' : 'Feedback');
+
+                      return (
+                        <div
+                          key={tkt.id || tkt.ticketId}
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.03)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '14px',
+                            padding: '12px 14px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px'
+                          }}
+                        >
+                          {/* Ticket Header & Status Badge */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#38bdf8' }}>
+                                #{tkt.ticketId || tkt.id}
+                              </span>
+                              <span style={{
+                                fontSize: '0.68rem',
+                                padding: '2px 6px',
+                                borderRadius: '6px',
+                                background: 'rgba(255, 255, 255, 0.08)',
+                                color: '#cbd5e1',
+                                fontWeight: 600
+                              }}>
+                                {typeName}
+                              </span>
+                            </div>
+
+                            <span style={{
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              padding: '3px 8px',
+                              borderRadius: '12px',
+                              background: statusBg,
+                              color: statusColor,
+                              border: `1px solid ${statusBorder}`,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              {statusLabel}
+                            </span>
+                          </div>
+
+                          {/* User Message */}
+                          <p style={{
+                            fontSize: '0.82rem',
+                            color: '#e2e8f0',
+                            margin: 0,
+                            lineHeight: '1.4',
+                            whiteSpace: 'pre-line',
+                            background: 'rgba(0, 0, 0, 0.2)',
+                            padding: '8px 10px',
+                            borderRadius: '8px'
+                          }}>
+                            {tkt.message}
+                          </p>
+
+                          {/* Admin Reply Box if present */}
+                          {tkt.adminReply && (
+                            <div style={{
+                              background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(16, 185, 129, 0.12))',
+                              border: '1px solid rgba(56, 189, 248, 0.3)',
+                              borderRadius: '10px',
+                              padding: '8px 10px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '3px'
+                            }}>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <MessageCircle size={12} />
+                                <span>{isBn ? 'অ্যাডমিনের উত্তর:' : 'Admin Reply:'}</span>
+                              </span>
+                              <p style={{ fontSize: '0.8rem', color: '#f1f5f9', margin: 0, lineHeight: '1.4' }}>
+                                {tkt.adminReply}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Timestamp */}
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: '0.68rem', color: '#64748b' }}>
+                            <span>{new Date(tkt.createdAt).toLocaleString(isBn ? 'bn-BD' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               )}
             </div>
           </div>

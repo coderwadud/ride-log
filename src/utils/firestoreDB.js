@@ -1,5 +1,5 @@
 import { db } from './firebase';
-import { doc, getDoc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, onSnapshot, collection, query, where } from 'firebase/firestore';
 
 const DEFAULT_BIKE = {
   id: 'bike_1',
@@ -125,7 +125,12 @@ export async function saveUserFCMToken(uid, token) {
 export async function submitUserFeedback({ uid, email, name, type = 'feedback', message, appVersion = '1.1' }) {
   if (!message || !message.trim()) throw new Error('Message is required');
   
+  const ticketShortId = `TKT-${Math.floor(10000 + Math.random() * 90000)}`;
+  const feedbackId = `fb_${Date.now()}_${ticketShortId.toLowerCase()}`;
+
   const feedbackData = {
+    id: feedbackId,
+    ticketId: ticketShortId,
     uid: uid || 'anonymous',
     email: email || 'not_provided',
     name: name || 'User',
@@ -133,16 +138,28 @@ export async function submitUserFeedback({ uid, email, name, type = 'feedback', 
     message: message.trim(),
     appVersion,
     createdAt: new Date().toISOString(),
-    status: 'pending'
+    status: 'pending', // 'pending', 'in_progress', 'resolved', 'rejected'
+    adminReply: ''
   };
-
-  const feedbackId = `fb_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
   try {
     // Primary: Root 'feedbacks' collection
     const feedbackDocRef = doc(db, 'feedbacks', feedbackId);
     await setDoc(feedbackDocRef, feedbackData);
-    return { success: true };
+
+    // Also update inside user document for fast offline/local sync
+    if (uid && uid !== 'guest' && uid !== 'anonymous') {
+      try {
+        const userDocRef = doc(db, 'users', uid);
+        const userSnap = await getDoc(userDocRef);
+        const existingFeedbacks = userSnap.exists() ? (userSnap.data().feedbacks || []) : [];
+        await setDoc(userDocRef, {
+          feedbacks: [feedbackData, ...existingFeedbacks.filter(f => f.id !== feedbackId)]
+        }, { merge: true });
+      } catch (e) {}
+    }
+
+    return { success: true, ticketId: ticketShortId, feedbackData };
   } catch (err) {
     console.warn('Root feedbacks write permission notice, trying user document fallback:', err);
     
@@ -153,9 +170,9 @@ export async function submitUserFeedback({ uid, email, name, type = 'feedback', 
         const userSnap = await getDoc(userDocRef);
         const existingFeedbacks = userSnap.exists() ? (userSnap.data().feedbacks || []) : [];
         await setDoc(userDocRef, {
-          feedbacks: [...existingFeedbacks, { id: feedbackId, ...feedbackData }]
+          feedbacks: [feedbackData, ...existingFeedbacks.filter(f => f.id !== feedbackId)]
         }, { merge: true });
-        return { success: true };
+        return { success: true, ticketId: ticketShortId, feedbackData };
       } catch (fallbackErr) {
         console.error('User doc fallback failed:', fallbackErr);
       }
@@ -165,12 +182,52 @@ export async function submitUserFeedback({ uid, email, name, type = 'feedback', 
     try {
       const lsKey = 'ridelog_offline_feedbacks';
       const stored = JSON.parse(localStorage.getItem(lsKey) || '[]');
-      stored.push({ id: feedbackId, ...feedbackData });
+      stored.unshift(feedbackData);
       localStorage.setItem(lsKey, JSON.stringify(stored));
-      return { success: true };
+      return { success: true, ticketId: ticketShortId, feedbackData };
     } catch (e) {
       throw err;
     }
+  }
+}
+
+/**
+ * Real-time listener for user support tickets & status
+ */
+export function listenToUserTickets(uid, callback) {
+  if (!uid || uid === 'guest' || uid === 'anonymous') {
+    // Read from local storage fallback
+    try {
+      const stored = JSON.parse(localStorage.getItem('ridelog_offline_feedbacks') || '[]');
+      callback(stored);
+    } catch (e) {
+      callback([]);
+    }
+    return () => {};
+  }
+
+  // Listen to user's personal document feedbacks
+  try {
+    const userDocRef = doc(db, 'users', uid);
+    return onSnapshot(userDocRef, (snap) => {
+      if (snap.exists()) {
+        const tickets = snap.data().feedbacks || [];
+        callback(tickets);
+      } else {
+        callback([]);
+      }
+    }, (err) => {
+      console.warn('User tickets listener notice:', err);
+      try {
+        const stored = JSON.parse(localStorage.getItem('ridelog_offline_feedbacks') || '[]');
+        callback(stored);
+      } catch (e) {
+        callback([]);
+      }
+    });
+  } catch (err) {
+    console.debug('Tickets listener setup notice:', err);
+    return () => {};
   }
 }
 
