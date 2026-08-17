@@ -82,7 +82,7 @@ export default function ProfileModal({
 
   // Real-time listener for user tickets & status
   useEffect(() => {
-    if (showFeedbackModal) {
+    if (isOpen) {
       const unsub = listenToUserTickets(userId, (tickets) => {
         setUserTickets(tickets);
       });
@@ -90,7 +90,7 @@ export default function ProfileModal({
         if (typeof unsub === 'function') unsub();
       };
     }
-  }, [showFeedbackModal, userId]);
+  }, [isOpen, userId]);
 
   const loadDocs = async () => {
     const docs = await getPrivateDocuments(userId);
@@ -688,30 +688,78 @@ export default function ProfileModal({
           </div>
         )}
 
-        {/* ===== Send Feedback / Support Button ===== */}
-        <div style={{ marginBottom: '14px' }}>
+        {/* ===== Support & Tickets Action Row ===== */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+          {/* Button 1: Send Feedback */}
           <button
             type="button"
             className="btn"
-            onClick={() => setShowFeedbackModal(true)}
+            onClick={() => {
+              setFeedbackActiveSubTab('new');
+              setFeedbackSuccess(false);
+              setShowFeedbackModal(true);
+            }}
             style={{
-              width: '100%',
+              flex: userTickets.length > 0 ? 1 : 'unset',
+              width: userTickets.length > 0 ? 'auto' : '100%',
               background: 'rgba(56, 189, 248, 0.1)',
               color: '#38bdf8',
               border: '1px solid rgba(56, 189, 248, 0.3)',
               borderRadius: '12px',
-              fontSize: '0.86rem',
+              fontSize: '0.84rem',
               fontWeight: 700,
-              padding: '10px',
+              padding: '11px 12px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '8px'
+              gap: '8px',
+              transition: 'all 0.2s ease'
             }}
           >
-            <MessageSquare size={17} />
-            <span>{isBn ? 'মতামত বা সমস্যা জানান (সাপোর্ট)' : 'Send Feedback or Report Bug'}</span>
+            <MessageSquare size={16} />
+            <span>{isBn ? 'ফিডব্যাক / রিপোর্ট' : 'Send Feedback'}</span>
           </button>
+
+          {/* Button 2: My Support Tickets Button (Visible if user has tickets) */}
+          {userTickets.length > 0 && (
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                setFeedbackActiveSubTab('tickets');
+                setShowFeedbackModal(true);
+              }}
+              style={{
+                flex: 1,
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(5, 150, 105, 0.2))',
+                color: '#10b981',
+                border: '1px solid rgba(16, 185, 129, 0.4)',
+                borderRadius: '12px',
+                fontSize: '0.84rem',
+                fontWeight: 700,
+                padding: '11px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 2px 10px rgba(16, 185, 129, 0.15)'
+              }}
+            >
+              <Ticket size={16} />
+              <span>{isBn ? 'আমার টিকিট' : 'My Tickets'}</span>
+              <span style={{
+                background: '#10b981',
+                color: '#ffffff',
+                padding: '1px 7px',
+                borderRadius: '10px',
+                fontSize: '0.72rem',
+                fontWeight: 800
+              }}>
+                {userTickets.length}
+              </span>
+            </button>
+          )}
         </div>
 
         {/* ===== Logout & Deactivate Section ===== */}
@@ -1384,23 +1432,31 @@ export default function ProfileModal({
                             {tkt.message}
                           </p>
 
-                          {/* Admin Reply Box if present */}
-                          {tkt.adminReply && (
+                          {/* Admin Reply / Admin Note Box if present */}
+                          {(tkt.adminReply || tkt.adminNote || tkt.admin_reply || tkt.admin_note || tkt.reply || tkt.note) && (
                             <div style={{
-                              background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(16, 185, 129, 0.12))',
-                              border: '1px solid rgba(56, 189, 248, 0.3)',
+                              background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(16, 185, 129, 0.15))',
+                              border: '1px solid rgba(56, 189, 248, 0.4)',
                               borderRadius: '10px',
-                              padding: '8px 10px',
+                              padding: '9px 12px',
                               display: 'flex',
                               flexDirection: 'column',
-                              gap: '3px'
+                              gap: '4px',
+                              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
                             }}>
-                              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                <MessageCircle size={12} />
-                                <span>{isBn ? 'অ্যাডমিনের উত্তর:' : 'Admin Reply:'}</span>
-                              </span>
-                              <p style={{ fontSize: '0.8rem', color: '#f1f5f9', margin: 0, lineHeight: '1.4' }}>
-                                {tkt.adminReply}
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                  <MessageCircle size={13} color="#38bdf8" />
+                                  <span>{isBn ? 'অ্যাডমিন নোট / উত্তর:' : 'Admin Note & Reply:'}</span>
+                                </span>
+                                {tkt.updatedAt && (
+                                  <span style={{ fontSize: '0.66rem', color: '#94a3b8' }}>
+                                    {new Date(tkt.updatedAt).toLocaleDateString(isBn ? 'bn-BD' : 'en-US', { month: 'short', day: 'numeric' })}
+                                  </span>
+                                )}
+                              </div>
+                              <p style={{ fontSize: '0.82rem', color: '#f8fafc', margin: 0, lineHeight: '1.45', fontWeight: 500 }}>
+                                {tkt.adminReply || tkt.adminNote || tkt.admin_reply || tkt.admin_note || tkt.reply || tkt.note}
                               </p>
                             </div>
                           )}
