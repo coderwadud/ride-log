@@ -41,7 +41,7 @@ async function commitBatchOperations(operations) {
 }
 
 /**
- * Load user data from Firestore Sub-collections with Auto-Migration from legacy single doc
+ * Load user data from Firestore with Rock-Solid Dual-Safety Fallback
  */
 export async function loadUserData(uid) {
   if (!uid) return DEFAULT_DATA;
@@ -50,59 +50,84 @@ export async function loadUserData(uid) {
     const userSnap = await getDoc(userDocRef);
     const rootData = userSnap.exists() ? userSnap.data() : {};
 
-    // 1. Fetch subcollections
-    const bikesRef = collection(db, 'users', uid, 'bikes');
-    const fuelLogsRef = collection(db, 'users', uid, 'fuel_logs');
-    const serviceLogsRef = collection(db, 'users', uid, 'service_logs');
+    let bikes = (rootData.bikes && rootData.bikes.length > 0) ? rootData.bikes : [DEFAULT_BIKE];
+    let fuelLogs = Array.isArray(rootData.fuelLogs) ? rootData.fuelLogs : [];
+    let serviceLogs = Array.isArray(rootData.serviceLogs) ? rootData.serviceLogs : [];
+    let activeBikeId = rootData.activeBikeId || 'bike_1';
+    let settings = rootData.settings || DEFAULT_DATA.settings;
 
-    const [bikesSnap, fuelLogsSnap, serviceLogsSnap] = await Promise.all([
-      getDocs(bikesRef),
-      getDocs(fuelLogsRef),
-      getDocs(serviceLogsRef)
-    ]);
+    // Try reading subcollections safely (if rules permit)
+    try {
+      const bikesRef = collection(db, 'users', uid, 'bikes');
+      const fuelLogsRef = collection(db, 'users', uid, 'fuel_logs');
+      const serviceLogsRef = collection(db, 'users', uid, 'service_logs');
 
-    const hasSubcollectionData = !bikesSnap.empty || !fuelLogsSnap.empty || !serviceLogsSnap.empty;
+      const [bikesSnap, fuelLogsSnap, serviceLogsSnap] = await Promise.all([
+        getDocs(bikesRef).catch(() => null),
+        getDocs(fuelLogsRef).catch(() => null),
+        getDocs(serviceLogsRef).catch(() => null)
+      ]);
 
-    // 2. If subcollections exist, load directly from subcollections
-    if (hasSubcollectionData) {
-      const bikes = bikesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const fuelLogs = fuelLogsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const serviceLogs = serviceLogsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-      // Sort logs by date descending
-      fuelLogs.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-      serviceLogs.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-
-      // Clean up legacy array fields from root doc if they still linger
-      if (rootData.bikes || rootData.fuelLogs || rootData.serviceLogs) {
-        setDoc(userDocRef, {
-          bikes: deleteField(),
-          fuelLogs: deleteField(),
-          serviceLogs: deleteField(),
-          schemaVersion: '2.0'
-        }, { merge: true }).catch(() => {});
+      if (bikesSnap && !bikesSnap.empty) {
+        bikes = bikesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       }
-
-      return {
-        settings: rootData.settings || DEFAULT_DATA.settings,
-        activeBikeId: rootData.activeBikeId || (bikes[0]?.id || 'bike_1'),
-        bikes: bikes.length > 0 ? bikes : [DEFAULT_BIKE],
-        fuelLogs,
-        serviceLogs
-      };
+      if (fuelLogsSnap && !fuelLogsSnap.empty) {
+        fuelLogs = fuelLogsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      }
+      if (serviceLogsSnap && !serviceLogsSnap.empty) {
+        serviceLogs = serviceLogsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      }
+    } catch (subErr) {
+      console.debug('Subcollection read fallback to root document:', subErr);
     }
 
-    // 3. AUTO-MIGRATION: If subcollections are empty but legacy doc has array data
-    const legacyBikes = rootData.bikes || [];
-    const legacyFuelLogs = rootData.fuelLogs || [];
-    const legacyServiceLogs = rootData.serviceLogs || [];
+    // Sort logs by date descending
+    fuelLogs.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    serviceLogs.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
 
-    if (legacyBikes.length > 0 || legacyFuelLogs.length > 0 || legacyServiceLogs.length > 0) {
-      console.log('⚡ Auto-migrating user data to Firestore sub-collections for:', uid);
+    return {
+      settings,
+      activeBikeId,
+      bikes: bikes.length > 0 ? bikes : [DEFAULT_BIKE],
+      fuelLogs,
+      serviceLogs
+    };
+  } catch (err) {
+    console.error('Error loading Firestore data for user:', uid, err);
+    return { ...DEFAULT_DATA };
+  }
+}
+
+/**
+ * Save user data to Firestore (Dual-Safe: preserves both root document and subcollections)
+ */
+export async function saveUserData(uid, data) {
+  if (!uid || !data) return;
+  try {
+    const userDocRef = doc(db, 'users', uid);
+    const rootUpdates = {
+      settings: data.settings || DEFAULT_DATA.settings,
+      activeBikeId: data.activeBikeId || 'bike_1',
+      bikes: data.bikes || [DEFAULT_BIKE],
+      fuelLogs: data.fuelLogs || [],
+      serviceLogs: data.serviceLogs || [],
+      schemaVersion: '2.0',
+      updatedAt: new Date().toISOString()
+    };
+
+    if (data.email) rootUpdates.email = data.email;
+    if (data.displayName) rootUpdates.displayName = data.displayName;
+    if (data.photoURL) rootUpdates.photoURL = data.photoURL;
+
+    // 1. Primary Save to root user doc (Ensures 100% safety and immediate accessibility)
+    await setDoc(userDocRef, rootUpdates, { merge: true });
+
+    // 2. Secondary Sync to subcollections in background (if rules allow)
+    try {
       const operations = [];
 
-      // Migrate bikes
-      for (const bike of (legacyBikes.length > 0 ? legacyBikes : [DEFAULT_BIKE])) {
+      // Save bikes
+      for (const bike of (data.bikes || [DEFAULT_BIKE])) {
         const bId = bike.id || 'bike_1';
         operations.push({
           type: 'set',
@@ -111,8 +136,8 @@ export async function loadUserData(uid) {
         });
       }
 
-      // Migrate fuel logs
-      for (const fuel of legacyFuelLogs) {
+      // Save fuel logs
+      for (const fuel of (data.fuelLogs || [])) {
         const fId = fuel.id || `fuel_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
         operations.push({
           type: 'set',
@@ -121,8 +146,8 @@ export async function loadUserData(uid) {
         });
       }
 
-      // Migrate service logs
-      for (const service of legacyServiceLogs) {
+      // Save service logs
+      for (const service of (data.serviceLogs || [])) {
         const sId = service.id || `service_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
         operations.push({
           type: 'set',
@@ -131,134 +156,12 @@ export async function loadUserData(uid) {
         });
       }
 
-      // Update root user doc: strip legacy arrays and set schemaVersion 2.0
-      operations.push({
-        type: 'set',
-        ref: userDocRef,
-        data: {
-          settings: rootData.settings || DEFAULT_DATA.settings,
-          activeBikeId: rootData.activeBikeId || 'bike_1',
-          schemaVersion: '2.0',
-          migratedAt: new Date().toISOString(),
-          bikes: deleteField(),
-          fuelLogs: deleteField(),
-          serviceLogs: deleteField()
-        },
-        options: { merge: true }
-      });
-
-      // Execute migration batch
       await commitBatchOperations(operations);
-      console.log('✅ Auto-migration to sub-collections successfully completed!');
-
-      return {
-        settings: rootData.settings || DEFAULT_DATA.settings,
-        activeBikeId: rootData.activeBikeId || 'bike_1',
-        bikes: legacyBikes.length > 0 ? legacyBikes : [DEFAULT_BIKE],
-        fuelLogs: legacyFuelLogs,
-        serviceLogs: legacyServiceLogs
-      };
+    } catch (subErr) {
+      console.debug('Background subcollection write skipped:', subErr);
     }
-
-    // 4. Fresh new user
-    return { ...DEFAULT_DATA };
   } catch (err) {
-    console.error('Error loading Firestore subcollection data for user:', uid, err);
-    return { ...DEFAULT_DATA };
-  }
-}
-
-/**
- * Save user data to Firestore Sub-collections (High Performance & Scalable)
- */
-export async function saveUserData(uid, data) {
-  if (!uid || !data) return;
-  try {
-    const operations = [];
-
-    // 1. Update root user doc (only light metadata, no giant arrays)
-    const userDocRef = doc(db, 'users', uid);
-    operations.push({
-      type: 'set',
-      ref: userDocRef,
-      data: {
-        settings: data.settings || DEFAULT_DATA.settings,
-        activeBikeId: data.activeBikeId || 'bike_1',
-        schemaVersion: '2.0',
-        updatedAt: new Date().toISOString(),
-        bikes: deleteField(),
-        fuelLogs: deleteField(),
-        serviceLogs: deleteField()
-      },
-      options: { merge: true }
-    });
-
-    // 2. Fetch existing subcollection docs to handle updates and clean deletions
-    const [existingBikesSnap, existingFuelsSnap, existingServicesSnap] = await Promise.all([
-      getDocs(collection(db, 'users', uid, 'bikes')),
-      getDocs(collection(db, 'users', uid, 'fuel_logs')),
-      getDocs(collection(db, 'users', uid, 'service_logs'))
-    ]);
-
-    const currentBikeIds = new Set((data.bikes || [DEFAULT_BIKE]).map(b => b.id || 'bike_1'));
-    const currentFuelIds = new Set((data.fuelLogs || []).map(f => f.id));
-    const currentServiceIds = new Set((data.serviceLogs || []).map(s => s.id));
-
-    // Save/Update Bikes
-    for (const bike of (data.bikes || [DEFAULT_BIKE])) {
-      const bId = bike.id || 'bike_1';
-      operations.push({
-        type: 'set',
-        ref: doc(db, 'users', uid, 'bikes', bId),
-        data: { ...bike, id: bId }
-      });
-    }
-
-    // Delete removed bikes
-    for (const d of existingBikesSnap.docs) {
-      if (!currentBikeIds.has(d.id)) {
-        operations.push({ type: 'delete', ref: d.ref });
-      }
-    }
-
-    // Save/Update Fuel Logs
-    for (const fuel of (data.fuelLogs || [])) {
-      const fId = fuel.id || `fuel_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-      operations.push({
-        type: 'set',
-        ref: doc(db, 'users', uid, 'fuel_logs', fId),
-        data: { ...fuel, id: fId }
-      });
-    }
-
-    // Delete removed fuel logs
-    for (const d of existingFuelsSnap.docs) {
-      if (!currentFuelIds.has(d.id)) {
-        operations.push({ type: 'delete', ref: d.ref });
-      }
-    }
-
-    // Save/Update Service Logs
-    for (const service of (data.serviceLogs || [])) {
-      const sId = service.id || `service_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-      operations.push({
-        type: 'set',
-        ref: doc(db, 'users', uid, 'service_logs', sId),
-        data: { ...service, id: sId }
-      });
-    }
-
-    // Delete removed service logs
-    for (const d of existingServicesSnap.docs) {
-      if (!currentServiceIds.has(d.id)) {
-        operations.push({ type: 'delete', ref: d.ref });
-      }
-    }
-
-    // 3. Commit all batch operations
-    await commitBatchOperations(operations);
-  } catch (err) {
-    console.error('Error saving Firestore subcollection data for user:', uid, err);
+    console.error('Error saving Firestore data for user:', uid, err);
   }
 }
 
