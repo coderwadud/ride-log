@@ -63,27 +63,30 @@ jobs:
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: v1.1.${{ github.run_number }}
         run: |
-          NOTES="RideLog BD v1.1 (Build #${{ github.run_number }})
+          APP_VERSION=$(node -p "require('./package.json').version")
+          TAG="v${APP_VERSION}"
+          TITLE="RideLog BD v${APP_VERSION}"
 
-          Updates:
-          - IndexedDB file storage fix
-          - PDF viewer for Android
-          - Language sync fix
-          - Firebase Analytics (DAU/MAU)
-          - Account permanent delete feature
+          NOTES="### 🚀 RideLog BD v${APP_VERSION} Release
+
+          **Latest Features & Improvements:**
+          - Dedicated full-page Support & Ticket Details system
+          - Date & Date Range filtering with quick presets
+          - Search, sorting (Highest & Lowest cost), and pagination
+          - Modular Firestore Sub-collections with zero-data-loss auto-migration
+          - Modernized UI with SVG icons & bilingual support
 
           Commit: ${{ github.sha }}"
 
-          # Delete existing tag/release if it exists
+          # Delete existing tag/release if it exists to allow clean overwrite
           gh release delete "$TAG" --yes 2>/dev/null || true
           git push --delete origin "$TAG" 2>/dev/null || true
 
-          # Retry up to 3 times in case of GitHub 503
+          # Retry up to 3 times in case of temporary network glitches
           for i in 1 2 3; do
             gh release create "$TAG" \
-              --title "RideLog BD v1.1 (Build #${{ github.run_number }})" \
+              --title "$TITLE" \
               --notes "$NOTES" \
               --latest \
               android/app/build/outputs/apk/release/Ride-Log-BD.apk && break
