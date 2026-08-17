@@ -3,7 +3,8 @@ import {
   X, User, Shield, Lock, FileText, Upload, Plus, Trash2, Edit3,
   Eye, LogOut, Check, FileCheck, FileCode2, Image as ImageIcon,
   CreditCard, ShieldCheck, AlertCircle, FileSpreadsheet, Download, UserX,
-  MessageSquare, Calendar, Send, Clock, Ticket, CheckCircle2, Clock3, MessageCircle
+  MessageSquare, Calendar, Send, Clock, Ticket, CheckCircle2, Clock3, MessageCircle,
+  ArrowLeft, ChevronRight
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import {
@@ -34,7 +35,9 @@ export default function ProfileModal({
   user,
   bikes = [],
   activeBikeId,
-  onLogout
+  onLogout,
+  initialFeedbackOpen = false,
+  initialSelectedTicketId = null
 }) {
   const fileInputRef = useRef(null);
   const userId = user?.uid || 'guest';
@@ -57,8 +60,9 @@ export default function ProfileModal({
   const [editExpiryDate, setEditExpiryDate] = useState('');
 
   // Feedback & Ticket states
-  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [feedbackActiveSubTab, setFeedbackActiveSubTab] = useState('new'); // 'new' or 'tickets'
+  const [showFeedbackModal, setShowFeedbackModal] = useState(initialFeedbackOpen);
+  const [feedbackActiveSubTab, setFeedbackActiveSubTab] = useState(initialFeedbackOpen ? 'tickets' : 'new'); // 'new' or 'tickets'
+  const [selectedTicketDetail, setSelectedTicketDetail] = useState(null);
   const [feedbackType, setFeedbackType] = useState('feedback');
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [feedbackLoading, setFeedbackLoading] = useState(false);
@@ -77,20 +81,28 @@ export default function ProfileModal({
   useEffect(() => {
     if (isOpen) {
       loadDocs();
+      if (initialFeedbackOpen) {
+        setShowFeedbackModal(true);
+        setFeedbackActiveSubTab('tickets');
+      }
     }
-  }, [isOpen, userId]);
+  }, [isOpen, userId, initialFeedbackOpen]);
 
   // Real-time listener for user tickets & status
   useEffect(() => {
     if (isOpen) {
       const unsub = listenToUserTickets(userId, (tickets) => {
         setUserTickets(tickets);
+        if (initialSelectedTicketId) {
+          const match = tickets.find(t => t.ticketId === initialSelectedTicketId || t.id === initialSelectedTicketId);
+          if (match) setSelectedTicketDetail(match);
+        }
       });
       return () => {
         if (typeof unsub === 'function') unsub();
       };
     }
-  }, [isOpen, userId]);
+  }, [isOpen, userId, initialSelectedTicketId]);
 
   const loadDocs = async () => {
     const docs = await getPrivateDocuments(userId);
@@ -1346,7 +1358,172 @@ export default function ProfileModal({
                         {isBn ? '+ নতুন টিকিট তৈরি করুন' : '+ Create New Ticket'}
                       </button>
                     </div>
+                  ) : selectedTicketDetail ? (
+                    /* ===== SINGLE TICKET DETAIL VIEW ===== */
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', animation: 'fadeIn 0.2s ease' }}>
+                      {/* Back Button */}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedTicketDetail(null)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#38bdf8',
+                          fontSize: '0.82rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: 0,
+                          width: 'fit-content'
+                        }}
+                      >
+                        <ArrowLeft size={16} />
+                        <span>{isBn ? 'সব টিকিটে ফিরে যান' : 'Back to All Tickets'}</span>
+                      </button>
+
+                      {(() => {
+                        const tkt = selectedTicketDetail;
+                        const s = (tkt.status || 'pending').toLowerCase().trim();
+                        const isResolved = s === 'resolved' || s === 'done' || s === 'fixed' || s === 'completed' || s === 'success';
+                        const isInProgress = s === 'in_progress' || s === 'processing' || s === 'working' || s === 'ongoing';
+                        const isClosed = s === 'closed' || s === 'rejected' || s === 'cancelled';
+                        const isPending = !isResolved && !isInProgress && !isClosed;
+
+                        const statusColor = isResolved ? '#10b981' : isInProgress ? '#38bdf8' : isClosed ? '#ef4444' : '#f59e0b';
+                        const statusBg = isResolved ? 'rgba(16, 185, 129, 0.15)' : isInProgress ? 'rgba(56, 189, 248, 0.15)' : isClosed ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)';
+                        const statusBorder = isResolved ? 'rgba(16, 185, 129, 0.35)' : isInProgress ? 'rgba(56, 189, 248, 0.35)' : isClosed ? 'rgba(239, 68, 68, 0.35)' : 'rgba(245, 158, 11, 0.35)';
+
+                        const statusLabel = isResolved
+                          ? (isBn ? '✓ সমাধান হয়েছে (Done)' : '✓ Resolved')
+                          : isInProgress
+                            ? (isBn ? '⚡ কাজ চলছে (In Progress)' : '⚡ In Progress')
+                            : isClosed
+                              ? (isBn ? '✕ বন্ধ (Closed)' : '✕ Closed')
+                              : (isBn ? '⏳ পর্যালোচনায় আছে (Pending)' : '⏳ Pending Review');
+
+                        const typeName = tkt.type === 'bug'
+                          ? (isBn ? '🐛 সমস্যা' : 'Bug')
+                          : tkt.type === 'feature_request'
+                            ? (isBn ? '✨ ফিচার' : 'Feature')
+                            : (isBn ? '💡 মতামত' : 'Feedback');
+
+                        const adminNote = tkt.adminReply || tkt.adminNote || tkt.admin_reply || tkt.admin_note || tkt.reply || tkt.note;
+
+                        return (
+                          <div style={{
+                            background: 'rgba(255, 255, 255, 0.03)',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '16px',
+                            padding: '16px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '14px'
+                          }}>
+                            {/* Header */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ fontSize: '1rem', fontWeight: 800, color: '#38bdf8' }}>
+                                  #{tkt.ticketId || tkt.id}
+                                </span>
+                                <span style={{
+                                  fontSize: '0.72rem',
+                                  padding: '2px 8px',
+                                  borderRadius: '6px',
+                                  background: 'rgba(255, 255, 255, 0.08)',
+                                  color: '#cbd5e1',
+                                  fontWeight: 600
+                                }}>
+                                  {typeName}
+                                </span>
+                              </div>
+
+                              <span style={{
+                                fontSize: '0.76rem',
+                                fontWeight: 700,
+                                padding: '4px 10px',
+                                borderRadius: '12px',
+                                background: statusBg,
+                                color: statusColor,
+                                border: `1px solid ${statusBorder}`
+                              }}>
+                                {statusLabel}
+                              </span>
+                            </div>
+
+                            {/* User Message Box */}
+                            <div>
+                              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700 }}>
+                                {isBn ? 'আপনার বার্তা / সমস্যা:' : 'Your Message / Bug Report:'}
+                              </span>
+                              <p style={{
+                                fontSize: '0.86rem',
+                                color: '#f1f5f9',
+                                margin: '6px 0 0',
+                                lineHeight: '1.45',
+                                whiteSpace: 'pre-line',
+                                background: 'rgba(0, 0, 0, 0.3)',
+                                padding: '10px 12px',
+                                borderRadius: '10px',
+                                border: '1px solid rgba(255, 255, 255, 0.05)'
+                              }}>
+                                {tkt.message}
+                              </p>
+                            </div>
+
+                            {/* Admin Note Box */}
+                            {adminNote ? (
+                              <div style={{
+                                background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(16, 185, 129, 0.15))',
+                                border: '1px solid rgba(56, 189, 248, 0.4)',
+                                borderRadius: '12px',
+                                padding: '12px 14px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '6px',
+                                boxShadow: '0 4px 14px rgba(0, 0, 0, 0.25)'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <span style={{ fontSize: '0.76rem', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <MessageCircle size={14} color="#38bdf8" />
+                                    <span>{isBn ? '💬 অ্যাডমিন নোট ও উত্তর:' : '💬 Admin Reply & Note:'}</span>
+                                  </span>
+                                  {tkt.updatedAt && (
+                                    <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
+                                      {new Date(tkt.updatedAt).toLocaleDateString(isBn ? 'bn-BD' : 'en-US', { month: 'short', day: 'numeric' })}
+                                    </span>
+                                  )}
+                                </div>
+                                <p style={{ fontSize: '0.88rem', color: '#ffffff', margin: 0, lineHeight: '1.45', fontWeight: 600 }}>
+                                  {adminNote}
+                                </p>
+                              </div>
+                            ) : (
+                              <div style={{
+                                background: 'rgba(255, 255, 255, 0.02)',
+                                border: '1px dashed rgba(255, 255, 255, 0.1)',
+                                borderRadius: '10px',
+                                padding: '10px 12px',
+                                textAlign: 'center'
+                              }}>
+                                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                                  {isBn ? 'অ্যাডমিন টিম পর্যালোচনায় রেখেছে। শীঘ্রই উত্তর পাওয়া যাবে।' : 'Admin team is reviewing your ticket. Reply will appear here.'}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Meta footer */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem', color: '#64748b', paddingTop: '4px', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                              <span>{isBn ? 'অ্যাপ ভার্সন:' : 'Version:'} {tkt.appVersion || '1.2.0'}</span>
+                              <span>{new Date(tkt.createdAt).toLocaleString(isBn ? 'bn-BD' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
                   ) : (
+                    /* ===== TICKETS LIST VIEW ===== */
                     userTickets.map((tkt) => {
                       const s = (tkt.status || 'pending').toLowerCase().trim();
                       const isResolved = s === 'resolved' || s === 'done' || s === 'fixed' || s === 'completed' || s === 'success';
@@ -1372,9 +1549,12 @@ export default function ProfileModal({
                           ? (isBn ? '✨ ফিচার' : 'Feature')
                           : (isBn ? '💡 মতামত' : 'Feedback');
 
+                      const adminNote = tkt.adminReply || tkt.adminNote || tkt.admin_reply || tkt.admin_note || tkt.reply || tkt.note;
+
                       return (
                         <div
                           key={tkt.id || tkt.ticketId}
+                          onClick={() => setSelectedTicketDetail(tkt)}
                           style={{
                             background: 'rgba(255, 255, 255, 0.03)',
                             border: '1px solid var(--border-color)',
@@ -1382,7 +1562,9 @@ export default function ProfileModal({
                             padding: '12px 14px',
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: '8px'
+                            gap: '8px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
                           }}
                         >
                           {/* Ticket Header & Status Badge */}
@@ -1419,13 +1601,15 @@ export default function ProfileModal({
                             </span>
                           </div>
 
-                          {/* User Message */}
+                          {/* User Message Preview */}
                           <p style={{
                             fontSize: '0.82rem',
                             color: '#e2e8f0',
                             margin: 0,
                             lineHeight: '1.4',
-                            whiteSpace: 'pre-line',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
                             background: 'rgba(0, 0, 0, 0.2)',
                             padding: '8px 10px',
                             borderRadius: '8px'
@@ -1433,38 +1617,32 @@ export default function ProfileModal({
                             {tkt.message}
                           </p>
 
-                          {/* Admin Reply / Admin Note Box if present */}
-                          {(tkt.adminReply || tkt.adminNote || tkt.admin_reply || tkt.admin_note || tkt.reply || tkt.note) && (
+                          {/* Admin Reply preview if present */}
+                          {adminNote && (
                             <div style={{
                               background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(16, 185, 129, 0.15))',
                               border: '1px solid rgba(56, 189, 248, 0.4)',
                               borderRadius: '10px',
-                              padding: '9px 12px',
+                              padding: '8px 10px',
                               display: 'flex',
-                              flexDirection: 'column',
-                              gap: '4px',
-                              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: '6px'
                             }}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                  <MessageCircle size={13} color="#38bdf8" />
-                                  <span>{isBn ? 'অ্যাডমিন নোট / উত্তর:' : 'Admin Note & Reply:'}</span>
-                                </span>
-                                {tkt.updatedAt && (
-                                  <span style={{ fontSize: '0.66rem', color: '#94a3b8' }}>
-                                    {new Date(tkt.updatedAt).toLocaleDateString(isBn ? 'bn-BD' : 'en-US', { month: 'short', day: 'numeric' })}
-                                  </span>
-                                )}
-                              </div>
-                              <p style={{ fontSize: '0.82rem', color: '#f8fafc', margin: 0, lineHeight: '1.45', fontWeight: 500 }}>
-                                {tkt.adminReply || tkt.adminNote || tkt.admin_reply || tkt.admin_note || tkt.reply || tkt.note}
-                              </p>
+                              <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <MessageCircle size={13} color="#38bdf8" />
+                                <span>{isBn ? 'উত্তর:' : 'Reply:'} {adminNote}</span>
+                              </span>
                             </div>
                           )}
 
-                          {/* Timestamp */}
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: '0.68rem', color: '#64748b' }}>
+                          {/* Footer with view details CTA */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', color: '#64748b' }}>
                             <span>{new Date(tkt.createdAt).toLocaleString(isBn ? 'bn-BD' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                            <span style={{ color: '#38bdf8', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '2px' }}>
+                              <span>{isBn ? 'বিস্তারিত' : 'Details'}</span>
+                              <ChevronRight size={13} />
+                            </span>
                           </div>
                         </div>
                       );

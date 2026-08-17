@@ -15,6 +15,7 @@ import ProfileModal from './components/ProfileModal';
 import PWAInstallModal from './components/PWAInstallModal';
 import UpdateModal from './components/UpdateModal';
 import CampaignModal from './components/CampaignModal';
+import TicketUpdateModal from './components/TicketUpdateModal';
 import Footer from './components/Footer';
 import BikeSelector from './components/BikeSelector';
 
@@ -32,7 +33,7 @@ import {
   trackLanguageChanged
 } from './utils/analytics';
 import { initPushNotifications, syncFCMTokenWithUser } from './utils/pushNotifications';
-import { checkAppUpdate, listenToAppUpdates, listenToActiveCampaign } from './utils/firestoreDB';
+import { checkAppUpdate, listenToAppUpdates, listenToActiveCampaign, listenToUserTickets } from './utils/firestoreDB';
 import { getCurrentAppVersion } from './utils/appVersion';
 
 const DEFAULT_BIKE = {
@@ -194,6 +195,61 @@ export default function App() {
       } catch (e) {}
     }
     setIsCampaignModalOpen(false);
+  };
+
+  // Ticket Update Notification Alert State
+  const [ticketUpdateModalInfo, setTicketUpdateModalInfo] = useState({ isOpen: false, ticket: null, updateKey: '' });
+  const [profileInitialFeedbackOpen, setProfileInitialFeedbackOpen] = useState(false);
+  const [profileInitialTicketId, setProfileInitialTicketId] = useState(null);
+
+  // Real-time listener for user support ticket updates / admin replies
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const unsubscribe = listenToUserTickets(user.uid, (tickets) => {
+      if (!tickets || tickets.length === 0) return;
+
+      // Find the most recent updated ticket that user hasn't seen yet
+      for (const tkt of tickets) {
+        const s = (tkt.status || 'pending').toLowerCase().trim();
+        const hasReply = Boolean(tkt.adminReply || tkt.adminNote || tkt.reply || tkt.note);
+        const isNotPending = s !== 'pending' && s !== 'new' && s !== 'open';
+
+        if (hasReply || isNotPending) {
+          const updateKey = `ridelog_seen_tkt_${tkt.ticketId || tkt.id}_${s}_${tkt.adminReply || tkt.adminNote || tkt.reply || ''}`;
+          try {
+            const seen = localStorage.getItem(updateKey);
+            if (!seen) {
+              setTicketUpdateModalInfo({ isOpen: true, ticket: tkt, updateKey });
+              break;
+            }
+          } catch (e) {}
+        }
+      }
+    });
+
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, [user?.uid]);
+
+  const handleDismissTicketUpdate = () => {
+    if (ticketUpdateModalInfo.updateKey) {
+      try {
+        localStorage.setItem(ticketUpdateModalInfo.updateKey, 'true');
+      } catch (e) {}
+    }
+    setTicketUpdateModalInfo({ isOpen: false, ticket: null, updateKey: '' });
+  };
+
+  const handleViewTicketDetails = () => {
+    const tkt = ticketUpdateModalInfo.ticket;
+    handleDismissTicketUpdate();
+    if (tkt) {
+      setProfileInitialFeedbackOpen(true);
+      setProfileInitialTicketId(tkt.ticketId || tkt.id);
+      setIsProfileModalOpen(true);
+    }
   };
 
   // PWA Install Event
@@ -614,11 +670,17 @@ export default function App() {
       <ProfileModal
         lang={lang}
         isOpen={isProfileModalOpen}
-        onClose={() => setIsProfileModalOpen(false)}
+        onClose={() => {
+          setIsProfileModalOpen(false);
+          setProfileInitialFeedbackOpen(false);
+          setProfileInitialTicketId(null);
+        }}
         user={user}
         bikes={bikes}
         activeBikeId={activeBikeId}
         onLogout={handleLogout}
+        initialFeedbackOpen={profileInitialFeedbackOpen}
+        initialSelectedTicketId={profileInitialTicketId}
       />
       <PWAInstallModal
         lang={lang}
@@ -638,6 +700,13 @@ export default function App() {
         isOpen={isCampaignModalOpen}
         campaign={campaignInfo}
         onClose={handleDismissCampaign}
+      />
+      <TicketUpdateModal
+        lang={lang}
+        isOpen={ticketUpdateModalInfo.isOpen}
+        ticket={ticketUpdateModalInfo.ticket}
+        onViewDetails={handleViewTicketDetails}
+        onClose={handleDismissTicketUpdate}
       />
     </div>
   );
