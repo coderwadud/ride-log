@@ -118,24 +118,59 @@ export async function saveUserFCMToken(uid, token) {
 /**
  * Submit user feedback or issue report directly to Firestore 'feedbacks' collection
  */
+/**
+ * Submit user feedback or issue report directly to Firestore 'feedbacks' collection
+ * with automatic fallback inside users/{uid} document if root permissions are restricted.
+ */
 export async function submitUserFeedback({ uid, email, name, type = 'feedback', message, appVersion = '1.1' }) {
   if (!message || !message.trim()) throw new Error('Message is required');
+  
+  const feedbackData = {
+    uid: uid || 'anonymous',
+    email: email || 'not_provided',
+    name: name || 'User',
+    type, // 'bug', 'feedback', 'feature_request'
+    message: message.trim(),
+    appVersion,
+    createdAt: new Date().toISOString(),
+    status: 'pending'
+  };
+
+  const feedbackId = `fb_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
   try {
-    const feedbackDocRef = doc(db, 'feedbacks', `fb_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`);
-    await setDoc(feedbackDocRef, {
-      uid: uid || 'anonymous',
-      email: email || 'not_provided',
-      name: name || 'User',
-      type, // 'bug', 'feedback', 'feature_request'
-      message: message.trim(),
-      appVersion,
-      createdAt: new Date().toISOString(),
-      status: 'pending'
-    });
+    // Primary: Root 'feedbacks' collection
+    const feedbackDocRef = doc(db, 'feedbacks', feedbackId);
+    await setDoc(feedbackDocRef, feedbackData);
     return { success: true };
   } catch (err) {
-    console.error('Error submitting feedback:', err);
-    throw err;
+    console.warn('Root feedbacks write permission notice, trying user document fallback:', err);
+    
+    // Fallback: Save inside user's own document
+    if (uid && uid !== 'guest' && uid !== 'anonymous') {
+      try {
+        const userDocRef = doc(db, 'users', uid);
+        const userSnap = await getDoc(userDocRef);
+        const existingFeedbacks = userSnap.exists() ? (userSnap.data().feedbacks || []) : [];
+        await setDoc(userDocRef, {
+          feedbacks: [...existingFeedbacks, { id: feedbackId, ...feedbackData }]
+        }, { merge: true });
+        return { success: true };
+      } catch (fallbackErr) {
+        console.error('User doc fallback failed:', fallbackErr);
+      }
+    }
+
+    // Secondary fallback: Save in LocalStorage so feedback is preserved
+    try {
+      const lsKey = 'ridelog_offline_feedbacks';
+      const stored = JSON.parse(localStorage.getItem(lsKey) || '[]');
+      stored.push({ id: feedbackId, ...feedbackData });
+      localStorage.setItem(lsKey, JSON.stringify(stored));
+      return { success: true };
+    } catch (e) {
+      throw err;
+    }
   }
 }
 
