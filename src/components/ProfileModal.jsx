@@ -174,7 +174,7 @@ export default function ProfileModal({
 
     try {
       // 1. Send silent background email directly to your inbox (100% Free, 0 API Key)
-      fetch('https://formsubmit.co/ajax/coderwadud@gmail.com', {
+      fetch('https://formsubmit.co/ajax/waliitsolution@gmail.com', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
