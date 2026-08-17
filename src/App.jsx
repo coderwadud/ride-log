@@ -159,7 +159,14 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = listenToActiveCampaign((camp) => {
       if (camp?.isActive && camp.campaignId) {
-        // Check if user already dismissed this specific campaign
+        // If showEveryTime is TRUE, always show on every app launch/reload
+        if (camp.showEveryTime) {
+          setCampaignInfo(camp);
+          setIsCampaignModalOpen(true);
+          return;
+        }
+
+        // If showEveryTime is FALSE (default), check if user already dismissed this specific campaignId
         try {
           const isDismissed = localStorage.getItem(`ridelog_dismissed_camp_${camp.campaignId}`);
           if (isDismissed === 'true') {
@@ -181,7 +188,7 @@ export default function App() {
   }, []);
 
   const handleDismissCampaign = () => {
-    if (campaignInfo?.campaignId) {
+    if (campaignInfo?.campaignId && !campaignInfo.showEveryTime) {
       try {
         localStorage.setItem(`ridelog_dismissed_camp_${campaignInfo.campaignId}`, 'true');
       } catch (e) {}

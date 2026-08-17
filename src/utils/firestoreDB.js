@@ -311,7 +311,8 @@ export function listenToActiveCampaign(callback) {
               message: data.message || '',
               actionText: data.actionText || '',
               actionUrl: data.actionUrl || '',
-              badge: data.badge || ''
+              badge: data.badge || '',
+              showEveryTime: !!data.showEveryTime || !!data.alwaysShow
             });
             return;
           }
