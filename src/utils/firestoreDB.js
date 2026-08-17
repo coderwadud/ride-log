@@ -192,7 +192,7 @@ export async function submitUserFeedback({ uid, email, name, type = 'feedback', 
 }
 
 /**
- * Real-time listener for user support tickets & status
+ * Real-time listener for user support tickets & status directly from root 'feedbacks' collection
  */
 export function listenToUserTickets(uid, callback) {
   if (!uid || uid === 'guest' || uid === 'anonymous') {
@@ -206,24 +206,48 @@ export function listenToUserTickets(uid, callback) {
     return () => {};
   }
 
-  // Listen to user's personal document feedbacks
   try {
-    const userDocRef = doc(db, 'users', uid);
-    return onSnapshot(userDocRef, (snap) => {
-      if (snap.exists()) {
-        const tickets = snap.data().feedbacks || [];
+    // Primary: Query the root 'feedbacks' collection in real-time
+    const q = query(collection(db, 'feedbacks'), where('uid', '==', uid));
+    return onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const tickets = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        // Sort newest first
+        tickets.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
         callback(tickets);
       } else {
-        callback([]);
+        // Fallback: check user document if root collection is empty
+        const userDocRef = doc(db, 'users', uid);
+        getDoc(userDocRef).then((snap) => {
+          if (snap.exists() && snap.data().feedbacks?.length) {
+            callback(snap.data().feedbacks);
+          } else {
+            try {
+              const stored = JSON.parse(localStorage.getItem('ridelog_offline_feedbacks') || '[]');
+              callback(stored);
+            } catch (e) {
+              callback([]);
+            }
+          }
+        }).catch(() => callback([]));
       }
     }, (err) => {
-      console.warn('User tickets listener notice:', err);
-      try {
-        const stored = JSON.parse(localStorage.getItem('ridelog_offline_feedbacks') || '[]');
-        callback(stored);
-      } catch (e) {
-        callback([]);
-      }
+      console.warn('Root feedbacks query notice, falling back to user document listener:', err);
+      // Fallback: Listen to user's personal document feedbacks
+      const userDocRef = doc(db, 'users', uid);
+      return onSnapshot(userDocRef, (snap) => {
+        if (snap.exists()) {
+          const tickets = snap.data().feedbacks || [];
+          callback(tickets);
+        } else {
+          try {
+            const stored = JSON.parse(localStorage.getItem('ridelog_offline_feedbacks') || '[]');
+            callback(stored);
+          } catch (e) {
+            callback([]);
+          }
+        }
+      });
     });
   } catch (err) {
     console.debug('Tickets listener setup notice:', err);
