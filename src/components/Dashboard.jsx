@@ -1,5 +1,5 @@
 import React from 'react';
-import { Gauge, Fuel, Wrench, Coins, Droplets } from 'lucide-react';
+import { Gauge, Fuel, Wrench, Coins, Droplets, ChevronRight } from 'lucide-react';
 import { translations } from '../utils/translations';
 import { formatCurrency, formatNum } from '../utils/calculations';
 
@@ -10,7 +10,8 @@ export default function Dashboard({
   bikeProfile,
   onOpenAddFuel,
   onOpenAddService,
-  recentLogs
+  recentLogs,
+  onNavigateTab
 }) {
   const t = translations[lang] || translations.bn;
   const { 
@@ -214,47 +215,106 @@ export default function Dashboard({
             <p style={{ fontSize: '0.85rem' }}>{t.noDataSub}</p>
           </div>
         ) : (
-          <div className="log-list">
-            {recentLogs.slice(0, 6).map((log) => (
-              <div key={log.id} className="log-item">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                  <div style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '10px',
-                    background: log.isFuel ? 'rgba(16, 185, 129, 0.12)' : 'rgba(139, 92, 246, 0.12)',
-                    color: log.isFuel ? 'var(--accent-fuel)' : 'var(--accent-service)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                  }}>
-                    {log.isFuel ? <Fuel size={18} /> : <Wrench size={18} />}
-                  </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div className="log-main-title">
-                      {log.isFuel 
-                        ? `${formatNum(log.liters, lang)} ${t.liter} ${t.fuelRefillLabel}` 
-                        : (log.notes || t.bikeServiceLabel)}
+          <div>
+            <div className="log-list">
+              {recentLogs.slice(0, 5).map((log) => (
+                <div key={log.id} className="log-item">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                    <div style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: '10px',
+                      background: log.isFuel ? 'rgba(16, 185, 129, 0.12)' : 'rgba(139, 92, 246, 0.12)',
+                      color: log.isFuel ? 'var(--accent-fuel)' : 'var(--accent-service)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      {log.isFuel ? <Fuel size={18} /> : <Wrench size={18} />}
                     </div>
-                    <div className="log-date">
-                      {log.date} • {formatNum(log.odometer, lang)} {t.km}
+                    <div style={{ minWidth: 0 }}>
+                      <div className="log-main-title">
+                        {log.isFuel 
+                          ? `${formatNum(log.liters, lang)} ${t.liter} ${t.fuelRefillLabel}` 
+                          : (log.notes || t.bikeServiceLabel)}
+                      </div>
+                      <div className="log-date">
+                        {log.date} • {formatNum(log.odometer, lang)} {t.km}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>
-                    {formatCurrency(log.totalAmount || (log.serviceCost + log.partsCost), lang)}
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>
+                      {formatCurrency(log.totalAmount || (log.serviceCost + log.partsCost), lang)}
+                    </div>
+                    {log.isFuel && log.calculatedMileage && (
+                      <span className="log-badge badge-full">
+                        {formatNum(log.calculatedMileage, lang)} {t.kmPerLiter}
+                      </span>
+                    )}
                   </div>
-                  {log.isFuel && log.calculatedMileage && (
-                    <span className="log-badge badge-full">
-                      {formatNum(log.calculatedMileage, lang)} {t.kmPerLiter}
-                    </span>
-                  )}
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+
+            {/* Quick Navigation to Full Log Pages */}
+            <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => onNavigateTab?.('fuel')}
+                style={{
+                  flex: 1,
+                  minWidth: '130px',
+                  padding: '9px 12px',
+                  borderRadius: '10px',
+                  background: 'rgba(16, 185, 129, 0.1)',
+                  color: 'var(--accent-fuel)',
+                  border: '1px solid rgba(16, 185, 129, 0.25)',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <Fuel size={14} />
+                <span>{lang === 'bn' ? 'সব ফুয়েল লগ' : 'All Fuel Logs'}</span>
+                <ChevronRight size={14} />
+              </button>
+
+              <button
+                type="button"
+                className="btn"
+                onClick={() => onNavigateTab?.('service')}
+                style={{
+                  flex: 1,
+                  minWidth: '130px',
+                  padding: '9px 12px',
+                  borderRadius: '10px',
+                  background: 'rgba(139, 92, 246, 0.1)',
+                  color: 'var(--accent-service)',
+                  border: '1px solid rgba(139, 92, 246, 0.25)',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <Wrench size={14} />
+                <span>{lang === 'bn' ? 'সব সার্ভিস লগ' : 'All Service Logs'}</span>
+                <ChevronRight size={14} />
+              </button>
+            </div>
           </div>
         )}
       </div>

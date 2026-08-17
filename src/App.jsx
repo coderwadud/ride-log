@@ -540,6 +540,7 @@ export default function App() {
                 onOpenAddFuel={() => { setEditingFuelData(null); setIsFuelModalOpen(true); }}
                 onOpenAddService={() => { setEditingServiceData(null); setIsServiceModalOpen(true); }}
                 recentLogs={recentLogs}
+                onNavigateTab={(tab) => { setIsFeedbackPageOpen(false); setActiveTab(tab); }}
               />
             )}
             {activeTab === 'fuel' && (
