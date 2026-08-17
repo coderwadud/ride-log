@@ -292,6 +292,43 @@ export function listenToAppUpdates(currentVersion = '1.1', callback) {
   }
 }
 
+/**
+ * Real-time listener for in-app text campaign & announcement from Firestore 'app_config/campaign'
+ */
+export function listenToActiveCampaign(callback) {
+  try {
+    const docRef = doc(db, 'app_config', 'campaign');
+    return onSnapshot(
+      docRef,
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.isActive) {
+            callback({
+              isActive: true,
+              campaignId: data.campaignId ? `${data.campaignId}` : `camp_${data.updatedAt || 'active'}`,
+              title: data.title || '',
+              message: data.message || '',
+              actionText: data.actionText || '',
+              actionUrl: data.actionUrl || '',
+              badge: data.badge || ''
+            });
+            return;
+          }
+        }
+        callback({ isActive: false });
+      },
+      (err) => {
+        console.warn('Active campaign listener notice:', err);
+        callback({ isActive: false });
+      }
+    );
+  } catch (err) {
+    console.debug('Active campaign listener setup skipped:', err);
+    return () => {};
+  }
+}
+
 function compareVersions(v1, v2) {
   const parts1 = v1.split('.').map(Number);
   const parts2 = v2.split('.').map(Number);

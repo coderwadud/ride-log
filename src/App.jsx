@@ -14,6 +14,7 @@ import BikeModal from './components/BikeModal';
 import ProfileModal from './components/ProfileModal';
 import PWAInstallModal from './components/PWAInstallModal';
 import UpdateModal from './components/UpdateModal';
+import CampaignModal from './components/CampaignModal';
 import Footer from './components/Footer';
 import BikeSelector from './components/BikeSelector';
 
@@ -31,7 +32,7 @@ import {
   trackLanguageChanged
 } from './utils/analytics';
 import { initPushNotifications, syncFCMTokenWithUser } from './utils/pushNotifications';
-import { checkAppUpdate, listenToAppUpdates } from './utils/firestoreDB';
+import { checkAppUpdate, listenToAppUpdates, listenToActiveCampaign } from './utils/firestoreDB';
 import { getCurrentAppVersion } from './utils/appVersion';
 
 const DEFAULT_BIKE = {
@@ -148,6 +149,44 @@ export default function App() {
       } catch (e) {}
     }
     setIsUpdateModalOpen(false);
+  };
+
+  // Campaign & In-App Announcement State
+  const [campaignInfo, setCampaignInfo] = useState(null);
+  const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
+
+  // Listen for real-time in-app campaign & announcements from Firestore
+  useEffect(() => {
+    const unsubscribe = listenToActiveCampaign((camp) => {
+      if (camp?.isActive && camp.campaignId) {
+        // Check if user already dismissed this specific campaign
+        try {
+          const isDismissed = localStorage.getItem(`ridelog_dismissed_camp_${camp.campaignId}`);
+          if (isDismissed === 'true') {
+            setIsCampaignModalOpen(false);
+            return;
+          }
+        } catch (e) {}
+
+        setCampaignInfo(camp);
+        setIsCampaignModalOpen(true);
+      } else {
+        setIsCampaignModalOpen(false);
+      }
+    });
+
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, []);
+
+  const handleDismissCampaign = () => {
+    if (campaignInfo?.campaignId) {
+      try {
+        localStorage.setItem(`ridelog_dismissed_camp_${campaignInfo.campaignId}`, 'true');
+      } catch (e) {}
+    }
+    setIsCampaignModalOpen(false);
   };
 
   // PWA Install Event
@@ -586,6 +625,12 @@ export default function App() {
         isOpen={isUpdateModalOpen}
         updateInfo={updateInfo}
         onClose={handleDismissUpdateModal}
+      />
+      <CampaignModal
+        lang={lang}
+        isOpen={isCampaignModalOpen}
+        campaign={campaignInfo}
+        onClose={handleDismissCampaign}
       />
     </div>
   );
