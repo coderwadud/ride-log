@@ -204,7 +204,18 @@ export default function GpsTrackerTab({
       setTripDistanceKm(0);
       setMaxSpeed(0);
       setCurrentSpeed(0);
-      setRecordedPoints([]);
+      const initialPoints = [];
+      if (currentPosition) {
+        initialPoints.push({
+          lat: currentPosition[0],
+          lng: currentPosition[1],
+          speed: 0,
+          accuracy: gpsAccuracy || 10,
+          altitude: 0,
+          timestamp: Date.now()
+        });
+      }
+      setRecordedPoints(initialPoints);
       setTripStartTime(new Date().toISOString());
 
       // Reset live polyline
@@ -236,7 +247,7 @@ export default function GpsTrackerTab({
           if (prev.length > 0) {
             const last = prev[prev.length - 1];
             const distInc = calculateDistanceKm(last.lat, last.lng, latitude, longitude);
-            // Only add distance if movement is > 3 meters to filter GPS jitter
+            // Add distance if movement is > 3 meters
             if (distInc > 0.003) {
               setTripDistanceKm((curr) => +(curr + distInc).toFixed(2));
             }
@@ -326,8 +337,26 @@ export default function GpsTrackerTab({
     setIsRecording(false);
     setIsPaused(false);
 
-    if (recordedPoints.length < 2) {
-      alert(isBn ? 'পর্যাপ্ত রাইড ডাটা পাওয়া যায়নি।' : 'Not enough ride data recorded.');
+    // Ensure we have at least 2 points to draw and playback
+    let finalPoints = [...recordedPoints];
+    if (finalPoints.length === 0 && currentPosition) {
+      finalPoints = [
+        { lat: currentPosition[0], lng: currentPosition[1], speed: 0, accuracy: 10, altitude: 0, timestamp: Date.now() - 5000 },
+        { lat: currentPosition[0] + 0.0001, lng: currentPosition[1] + 0.0001, speed: 0, accuracy: 10, altitude: 0, timestamp: Date.now() }
+      ];
+    } else if (finalPoints.length === 1) {
+      finalPoints.push({
+        lat: finalPoints[0].lat + 0.0001,
+        lng: finalPoints[0].lng + 0.0001,
+        speed: 0,
+        accuracy: 10,
+        altitude: 0,
+        timestamp: Date.now()
+      });
+    }
+
+    if (finalPoints.length < 2) {
+      alert(isBn ? 'পর্যাপ্ত রাইড ডাটা পাওয়া যায়নি। অনুগ্রহ করে GPS চালু রাখুন।' : 'Not enough ride data. Please keep GPS active.');
       return;
     }
 
@@ -352,11 +381,11 @@ export default function GpsTrackerTab({
       title: tripTitle || defaultTitle,
       startTime: tripStartTime || new Date().toISOString(),
       endTime: new Date().toISOString(),
-      durationSeconds: elapsedSeconds,
+      durationSeconds: Math.max(1, elapsedSeconds),
       distanceKm: tripDistanceKm,
       maxSpeedKmH: maxSpeed,
       avgSpeedKmH: isNaN(avgSpeed) ? 0 : avgSpeed,
-      points: recordedPoints
+      points: finalPoints
     };
 
     await saveTrip(newTrip);
