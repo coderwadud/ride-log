@@ -1,5 +1,8 @@
 import { db } from './firebase';
-import { doc, getDoc, setDoc, deleteDoc, onSnapshot, collection, query, where } from 'firebase/firestore';
+import {
+  doc, getDoc, setDoc, deleteDoc, onSnapshot, collection, query, where,
+  getDocs, writeBatch
+} from 'firebase/firestore';
 
 const DEFAULT_BIKE = {
   id: 'bike_1',
@@ -19,83 +22,299 @@ const DEFAULT_DATA = {
 };
 
 /**
- * Load user data from Firestore document `users/{uid}`
+ * Helper to execute Firestore batches safely (handles >500 ops limit)
+ */
+async function commitBatchOperations(operations) {
+  const CHUNK_SIZE = 450;
+  for (let i = 0; i < operations.length; i += CHUNK_SIZE) {
+    const chunk = operations.slice(i, i + CHUNK_SIZE);
+    const batch = writeBatch(db);
+    for (const op of chunk) {
+      if (op.type === 'set') {
+        batch.set(op.ref, op.data, op.options || {});
+      } else if (op.type === 'delete') {
+        batch.delete(op.ref);
+      }
+    }
+    await batch.commit();
+  }
+}
+
+/**
+ * Load user data from Firestore Sub-collections with Auto-Migration from legacy single doc
  */
 export async function loadUserData(uid) {
   if (!uid) return DEFAULT_DATA;
   try {
-    const docRef = doc(db, 'users', uid);
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      const data = snap.data();
+    const userDocRef = doc(db, 'users', uid);
+    const userSnap = await getDoc(userDocRef);
+    const rootData = userSnap.exists() ? userSnap.data() : {};
+
+    // 1. Fetch subcollections
+    const bikesRef = collection(db, 'users', uid, 'bikes');
+    const fuelLogsRef = collection(db, 'users', uid, 'fuel_logs');
+    const serviceLogsRef = collection(db, 'users', uid, 'service_logs');
+
+    const [bikesSnap, fuelLogsSnap, serviceLogsSnap] = await Promise.all([
+      getDocs(bikesRef),
+      getDocs(fuelLogsRef),
+      getDocs(serviceLogsRef)
+    ]);
+
+    const hasSubcollectionData = !bikesSnap.empty || !fuelLogsSnap.empty || !serviceLogsSnap.empty;
+
+    // 2. If subcollections exist, load directly from subcollections
+    if (hasSubcollectionData) {
+      const bikes = bikesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const fuelLogs = fuelLogsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const serviceLogs = serviceLogsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // Sort logs by date descending
+      fuelLogs.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+      serviceLogs.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+
       return {
-        settings: data.settings || DEFAULT_DATA.settings,
-        activeBikeId: data.activeBikeId || DEFAULT_DATA.activeBikeId,
-        bikes: (data.bikes && data.bikes.length > 0) ? data.bikes : DEFAULT_DATA.bikes,
-        fuelLogs: data.fuelLogs || [],
-        serviceLogs: data.serviceLogs || []
+        settings: rootData.settings || DEFAULT_DATA.settings,
+        activeBikeId: rootData.activeBikeId || (bikes[0]?.id || 'bike_1'),
+        bikes: bikes.length > 0 ? bikes : [DEFAULT_BIKE],
+        fuelLogs,
+        serviceLogs
       };
-    } else {
-      // New user - return default fresh data
-      return { ...DEFAULT_DATA };
     }
+
+    // 3. AUTO-MIGRATION: If subcollections are empty but legacy doc has array data
+    const legacyBikes = rootData.bikes || [];
+    const legacyFuelLogs = rootData.fuelLogs || [];
+    const legacyServiceLogs = rootData.serviceLogs || [];
+
+    if (legacyBikes.length > 0 || legacyFuelLogs.length > 0 || legacyServiceLogs.length > 0) {
+      console.log('⚡ Auto-migrating user data to Firestore sub-collections for:', uid);
+      const operations = [];
+
+      // Migrate bikes
+      for (const bike of (legacyBikes.length > 0 ? legacyBikes : [DEFAULT_BIKE])) {
+        const bId = bike.id || 'bike_1';
+        operations.push({
+          type: 'set',
+          ref: doc(db, 'users', uid, 'bikes', bId),
+          data: { ...bike, id: bId }
+        });
+      }
+
+      // Migrate fuel logs
+      for (const fuel of legacyFuelLogs) {
+        const fId = fuel.id || `fuel_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+        operations.push({
+          type: 'set',
+          ref: doc(db, 'users', uid, 'fuel_logs', fId),
+          data: { ...fuel, id: fId }
+        });
+      }
+
+      // Migrate service logs
+      for (const service of legacyServiceLogs) {
+        const sId = service.id || `service_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+        operations.push({
+          type: 'set',
+          ref: doc(db, 'users', uid, 'service_logs', sId),
+          data: { ...service, id: sId }
+        });
+      }
+
+      // Update root user doc to mark migrated and keep root light
+      operations.push({
+        type: 'set',
+        ref: userDocRef,
+        data: {
+          settings: rootData.settings || DEFAULT_DATA.settings,
+          activeBikeId: rootData.activeBikeId || 'bike_1',
+          schemaVersion: '2.0',
+          migratedAt: new Date().toISOString()
+        },
+        options: { merge: true }
+      });
+
+      // Execute migration batch
+      await commitBatchOperations(operations);
+      console.log('✅ Auto-migration to sub-collections successfully completed!');
+
+      return {
+        settings: rootData.settings || DEFAULT_DATA.settings,
+        activeBikeId: rootData.activeBikeId || 'bike_1',
+        bikes: legacyBikes.length > 0 ? legacyBikes : [DEFAULT_BIKE],
+        fuelLogs: legacyFuelLogs,
+        serviceLogs: legacyServiceLogs
+      };
+    }
+
+    // 4. Fresh new user
+    return { ...DEFAULT_DATA };
   } catch (err) {
-    console.error('Error loading Firestore data for user:', uid, err);
+    console.error('Error loading Firestore subcollection data for user:', uid, err);
     return { ...DEFAULT_DATA };
   }
 }
 
 /**
- * Save user data to Firestore document `users/{uid}`
+ * Save user data to Firestore Sub-collections (High Performance & Scalable)
  */
 export async function saveUserData(uid, data) {
-  if (!uid) return;
+  if (!uid || !data) return;
   try {
-    const docRef = doc(db, 'users', uid);
-    await setDoc(docRef, {
-      settings: data.settings || DEFAULT_DATA.settings,
-      activeBikeId: data.activeBikeId || 'bike_1',
-      bikes: data.bikes || [DEFAULT_BIKE],
-      fuelLogs: data.fuelLogs || [],
-      serviceLogs: data.serviceLogs || [],
-      updatedAt: new Date().toISOString()
-    }, { merge: true });
+    const operations = [];
+
+    // 1. Update root user doc (only light metadata, no giant arrays)
+    const userDocRef = doc(db, 'users', uid);
+    operations.push({
+      type: 'set',
+      ref: userDocRef,
+      data: {
+        settings: data.settings || DEFAULT_DATA.settings,
+        activeBikeId: data.activeBikeId || 'bike_1',
+        schemaVersion: '2.0',
+        updatedAt: new Date().toISOString()
+      },
+      options: { merge: true }
+    });
+
+    // 2. Fetch existing subcollection docs to handle updates and clean deletions
+    const [existingBikesSnap, existingFuelsSnap, existingServicesSnap] = await Promise.all([
+      getDocs(collection(db, 'users', uid, 'bikes')),
+      getDocs(collection(db, 'users', uid, 'fuel_logs')),
+      getDocs(collection(db, 'users', uid, 'service_logs'))
+    ]);
+
+    const currentBikeIds = new Set((data.bikes || [DEFAULT_BIKE]).map(b => b.id || 'bike_1'));
+    const currentFuelIds = new Set((data.fuelLogs || []).map(f => f.id));
+    const currentServiceIds = new Set((data.serviceLogs || []).map(s => s.id));
+
+    // Save/Update Bikes
+    for (const bike of (data.bikes || [DEFAULT_BIKE])) {
+      const bId = bike.id || 'bike_1';
+      operations.push({
+        type: 'set',
+        ref: doc(db, 'users', uid, 'bikes', bId),
+        data: { ...bike, id: bId }
+      });
+    }
+
+    // Delete removed bikes
+    for (const d of existingBikesSnap.docs) {
+      if (!currentBikeIds.has(d.id)) {
+        operations.push({ type: 'delete', ref: d.ref });
+      }
+    }
+
+    // Save/Update Fuel Logs
+    for (const fuel of (data.fuelLogs || [])) {
+      const fId = fuel.id || `fuel_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+      operations.push({
+        type: 'set',
+        ref: doc(db, 'users', uid, 'fuel_logs', fId),
+        data: { ...fuel, id: fId }
+      });
+    }
+
+    // Delete removed fuel logs
+    for (const d of existingFuelsSnap.docs) {
+      if (!currentFuelIds.has(d.id)) {
+        operations.push({ type: 'delete', ref: d.ref });
+      }
+    }
+
+    // Save/Update Service Logs
+    for (const service of (data.serviceLogs || [])) {
+      const sId = service.id || `service_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+      operations.push({
+        type: 'set',
+        ref: doc(db, 'users', uid, 'service_logs', sId),
+        data: { ...service, id: sId }
+      });
+    }
+
+    // Delete removed service logs
+    for (const d of existingServicesSnap.docs) {
+      if (!currentServiceIds.has(d.id)) {
+        operations.push({ type: 'delete', ref: d.ref });
+      }
+    }
+
+    // 3. Commit all batch operations
+    await commitBatchOperations(operations);
   } catch (err) {
-    console.error('Error saving Firestore data for user:', uid, err);
+    console.error('Error saving Firestore subcollection data for user:', uid, err);
   }
 }
 
 /**
- * Clear user data in Firestore for the current user (Reset user data only)
+ * Clear user data in Firestore subcollections (Reset user data only)
  */
 export async function resetUserDataInFirestore(uid) {
   if (!uid) return;
   try {
-    const docRef = doc(db, 'users', uid);
-    await setDoc(docRef, {
-      settings: { lang: 'bn', theme: 'dark' },
-      activeBikeId: 'bike_1',
-      bikes: [DEFAULT_BIKE],
-      fuelLogs: [],
-      serviceLogs: [],
-      updatedAt: new Date().toISOString()
+    const operations = [];
+
+    // Delete all bikes, fuel logs, service logs in subcollections
+    const [bikesSnap, fuelLogsSnap, serviceLogsSnap] = await Promise.all([
+      getDocs(collection(db, 'users', uid, 'bikes')),
+      getDocs(collection(db, 'users', uid, 'fuel_logs')),
+      getDocs(collection(db, 'users', uid, 'service_logs'))
+    ]);
+
+    bikesSnap.forEach(d => operations.push({ type: 'delete', ref: d.ref }));
+    fuelLogsSnap.forEach(d => operations.push({ type: 'delete', ref: d.ref }));
+    serviceLogsSnap.forEach(d => operations.push({ type: 'delete', ref: d.ref }));
+
+    // Reset default bike in subcollection
+    operations.push({
+      type: 'set',
+      ref: doc(db, 'users', uid, 'bikes', 'bike_1'),
+      data: DEFAULT_BIKE
     });
+
+    // Reset root user doc
+    operations.push({
+      type: 'set',
+      ref: doc(db, 'users', uid),
+      data: {
+        settings: { lang: 'bn', theme: 'dark' },
+        activeBikeId: 'bike_1',
+        schemaVersion: '2.0',
+        updatedAt: new Date().toISOString()
+      }
+    });
+
+    await commitBatchOperations(operations);
   } catch (err) {
-    console.error('Error resetting user data in Firestore:', uid, err);
+    console.error('Error resetting user Firestore subcollection data:', uid, err);
   }
 }
 
 /**
- * Permanently delete the user's Firestore document `users/{uid}`
+ * Permanently delete the user's Firestore document `users/{uid}` and all subcollections
  * Called before deleting Firebase Auth account.
  */
 export async function deleteUserAllData(uid) {
   if (!uid) return;
   try {
-    const docRef = doc(db, 'users', uid);
-    await deleteDoc(docRef);
+    const operations = [];
+
+    const [bikesSnap, fuelLogsSnap, serviceLogsSnap] = await Promise.all([
+      getDocs(collection(db, 'users', uid, 'bikes')),
+      getDocs(collection(db, 'users', uid, 'fuel_logs')),
+      getDocs(collection(db, 'users', uid, 'service_logs'))
+    ]);
+
+    bikesSnap.forEach(d => operations.push({ type: 'delete', ref: d.ref }));
+    fuelLogsSnap.forEach(d => operations.push({ type: 'delete', ref: d.ref }));
+    serviceLogsSnap.forEach(d => operations.push({ type: 'delete', ref: d.ref }));
+
+    // Delete root doc
+    operations.push({ type: 'delete', ref: doc(db, 'users', uid) });
+
+    await commitBatchOperations(operations);
   } catch (err) {
-    console.error('Error deleting user Firestore data:', uid, err);
+    console.error('Error deleting user Firestore subcollections:', uid, err);
   }
 }
 
