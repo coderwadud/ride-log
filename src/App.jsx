@@ -15,7 +15,7 @@ import PWAInstallModal from './components/PWAInstallModal';
 import Footer from './components/Footer';
 import BikeSelector from './components/BikeSelector';
 
-import { exportBackupData, mergeImportBackupData } from './utils/storage';
+import { exportBackupData, mergeImportBackupData, loadSettings, saveSettings } from './utils/storage';
 import { calculateFuelLogStats, calculateServiceStats } from './utils/calculations';
 import { translations } from './utils/translations';
 import { LayoutDashboard, Fuel, Wrench, BarChart3 } from 'lucide-react';
@@ -30,8 +30,23 @@ const DEFAULT_BIKE = {
 };
 
 export default function App() {
-  const [lang, setLang] = useState('bn');
-  const [theme, setTheme] = useState('dark');
+  const [lang, setLang] = useState(() => {
+    try {
+      const saved = loadSettings();
+      return saved?.lang || 'bn';
+    } catch (e) {
+      return 'bn';
+    }
+  });
+
+  const [theme, setTheme] = useState(() => {
+    try {
+      const saved = loadSettings();
+      return saved?.theme || 'dark';
+    } catch (e) {
+      return 'dark';
+    }
+  });
   const [activeTab, setActiveTab] = useState('dashboard');
 
   // Firebase Auth State
@@ -49,10 +64,11 @@ export default function App() {
   const isLoadedRef = useRef(false);
   const saveTimerRef = useRef(null);
 
-  // Apply theme to document root
+  // Apply theme to document root and persist settings for instant initial render
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
+    saveSettings({ lang, theme });
+  }, [lang, theme]);
 
   // Modal States
   const [isFuelModalOpen, setIsFuelModalOpen] = useState(false);

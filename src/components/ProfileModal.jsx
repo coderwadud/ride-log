@@ -4,6 +4,7 @@ import {
   Eye, LogOut, Check, FileCheck, FileCode2, Image as ImageIcon, 
   CreditCard, ShieldCheck, AlertCircle, FileSpreadsheet, Download
 } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { 
   getPrivateDocuments, 
   addPrivateDocument, 
@@ -572,7 +573,8 @@ export default function ProfileModal({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                width: '100%'
               }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -583,11 +585,72 @@ export default function ProfileModal({
                   style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px' }}
                 />
               ) : (
-                <iframe
-                  src={previewDoc.fileData || previewDoc.localUri}
-                  title={previewDoc.title}
-                  style={{ width: '100%', height: '100%', border: 'none', background: '#ffffff', borderRadius: '8px' }}
-                />
+                <div style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '16px',
+                  background: 'rgba(15, 23, 42, 0.8)',
+                  borderRadius: '12px',
+                  padding: '24px',
+                  border: '1px solid var(--border-color)'
+                }}>
+                  <div style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: '16px',
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#ef4444'
+                  }}>
+                    <FileText size={36} />
+                  </div>
+
+                  <div style={{ textAlign: 'center', maxWidth: '320px' }}>
+                    <h4 style={{ fontSize: '1.05rem', color: '#ffffff', margin: '0 0 6px 0', fontWeight: 700 }}>
+                      {previewDoc.title}
+                    </h4>
+                    <p style={{ fontSize: '0.82rem', color: '#94a3b8', margin: 0 }}>
+                      📄 {isBn ? 'এটি একটি PDF ডকুমেন্ট' : 'This is a PDF Document'} ({formatFileSize(previewDoc.fileSize)})
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => downloadOrShareDocument(previewDoc)}
+                    style={{
+                      padding: '12px 24px',
+                      fontSize: '0.9rem',
+                      fontWeight: 700,
+                      borderRadius: '12px',
+                      background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                      color: '#ffffff',
+                      boxShadow: '0 4px 14px rgba(239, 68, 68, 0.4)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      border: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Download size={18} />
+                    <span>{isBn ? 'PDF রিডার দিয়ে খুলুন / সেভ করুন' : 'Open / Save PDF'}</span>
+                  </button>
+
+                  {!Capacitor.isNativePlatform() && (
+                    <iframe
+                      src={previewDoc.fileData || previewDoc.localUri}
+                      title={previewDoc.title}
+                      style={{ width: '100%', height: '350px', border: 'none', background: '#ffffff', borderRadius: '8px', marginTop: '12px' }}
+                    />
+                  )}
+                </div>
               )}
             </div>
           </div>
