@@ -16,6 +16,7 @@ import PWAInstallModal from './components/PWAInstallModal';
 import UpdateModal from './components/UpdateModal';
 import CampaignModal from './components/CampaignModal';
 import TicketUpdateModal from './components/TicketUpdateModal';
+import FeedbackPage from './components/FeedbackPage';
 import Footer from './components/Footer';
 import BikeSelector from './components/BikeSelector';
 
@@ -199,8 +200,9 @@ export default function App() {
 
   // Ticket Update Notification Alert State
   const [ticketUpdateModalInfo, setTicketUpdateModalInfo] = useState({ isOpen: false, ticket: null, updateKey: '' });
-  const [profileInitialFeedbackOpen, setProfileInitialFeedbackOpen] = useState(false);
-  const [profileInitialTicketId, setProfileInitialTicketId] = useState(null);
+  const [isFeedbackPageOpen, setIsFeedbackPageOpen] = useState(false);
+  const [feedbackPageInitialTicketId, setFeedbackPageInitialTicketId] = useState(null);
+  const [feedbackPageInitialViewMode, setFeedbackPageInitialViewMode] = useState('list');
 
   // Real-time listener for user support ticket updates / admin replies
   useEffect(() => {
@@ -246,9 +248,9 @@ export default function App() {
     const tkt = ticketUpdateModalInfo.ticket;
     handleDismissTicketUpdate();
     if (tkt) {
-      setProfileInitialFeedbackOpen(true);
-      setProfileInitialTicketId(tkt.ticketId || tkt.id);
-      setIsProfileModalOpen(true);
+      setFeedbackPageInitialTicketId(tkt.ticketId || tkt.id);
+      setFeedbackPageInitialViewMode('details');
+      setIsFeedbackPageOpen(true);
     }
   };
 
@@ -670,17 +672,17 @@ export default function App() {
       <ProfileModal
         lang={lang}
         isOpen={isProfileModalOpen}
-        onClose={() => {
-          setIsProfileModalOpen(false);
-          setProfileInitialFeedbackOpen(false);
-          setProfileInitialTicketId(null);
-        }}
+        onClose={() => setIsProfileModalOpen(false)}
         user={user}
         bikes={bikes}
         activeBikeId={activeBikeId}
         onLogout={handleLogout}
-        initialFeedbackOpen={profileInitialFeedbackOpen}
-        initialSelectedTicketId={profileInitialTicketId}
+        onOpenFeedbackPage={(mode) => {
+          setIsProfileModalOpen(false);
+          setFeedbackPageInitialTicketId(null);
+          setFeedbackPageInitialViewMode(mode || 'list');
+          setIsFeedbackPageOpen(true);
+        }}
       />
       <PWAInstallModal
         lang={lang}
@@ -708,6 +710,29 @@ export default function App() {
         onViewDetails={handleViewTicketDetails}
         onClose={handleDismissTicketUpdate}
       />
+
+      {/* ── FULL-PAGE FEEDBACK & TICKET DETAILS VIEW ── */}
+      {isFeedbackPageOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 999990,
+          background: 'var(--bg-main)',
+          overflowY: 'auto',
+          animation: 'fadeIn 0.2s ease'
+        }}>
+          <FeedbackPage
+            lang={lang}
+            user={user}
+            initialTicketId={feedbackPageInitialTicketId}
+            initialViewMode={feedbackPageInitialViewMode}
+            onBack={() => setIsFeedbackPageOpen(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }
