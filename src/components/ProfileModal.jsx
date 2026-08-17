@@ -16,6 +16,7 @@ import {
 import { trackDocumentUploaded, updateLastActiveAt } from '../utils/analytics';
 import { deleteUserAllData, submitUserFeedback } from '../utils/firestoreDB';
 import { deleteUserAccount } from '../utils/firebase';
+import { getCurrentAppVersion } from '../utils/appVersion';
 
 const DOC_TYPES = [
   { key: 'license', label: 'ড্রাইভিং লাইসেন্স', labelEn: 'Driving License', icon: CreditCard, color: '#38bdf8' },
@@ -155,6 +156,8 @@ export default function ProfileModal({
     if (!feedbackMessage.trim()) return;
 
     setFeedbackLoading(true);
+    const dynamicAppVersion = await getCurrentAppVersion();
+
     const feedbackPayload = {
       name: user?.displayName || 'App User',
       email: user?.email || 'not_provided',
@@ -165,9 +168,9 @@ export default function ProfileModal({
           : 'General Feedback (মতামত)',
       message: feedbackMessage.trim(),
       createdAt: new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'medium' }),
-      appVersion: '1.2.0',
+      appVersion: dynamicAppVersion,
       status: 'pending',
-      _subject: `[RideLog BD] New ${feedbackType.toUpperCase()} from ${user?.displayName || 'User'}`,
+      _subject: `[RideLog BD] New ${feedbackType.toUpperCase()} from ${user?.displayName || 'User'} (v${dynamicAppVersion})`,
       _template: 'table',
       _captcha: 'false'
     };
@@ -190,7 +193,7 @@ export default function ProfileModal({
         name: user?.displayName || 'App User',
         type: feedbackType,
         message: feedbackMessage,
-        appVersion: '1.2.0'
+        appVersion: dynamicAppVersion
       });
 
       setFeedbackSuccess(true);

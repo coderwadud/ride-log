@@ -32,6 +32,7 @@ import {
 } from './utils/analytics';
 import { initPushNotifications, syncFCMTokenWithUser } from './utils/pushNotifications';
 import { checkAppUpdate, listenToAppUpdates } from './utils/firestoreDB';
+import { getCurrentAppVersion } from './utils/appVersion';
 
 const DEFAULT_BIKE = {
   id: 'bike_1',
@@ -103,32 +104,36 @@ export default function App() {
 
   // Listen for real-time app updates from Firestore (with 24h snooze memory on dismiss)
   useEffect(() => {
-    const unsubscribe = listenToAppUpdates('1.1', (update) => {
-      if (update?.isUpdateAvailable) {
-        // If update is mandatory, show every time without snooze
-        if (update.isMandatory) {
+    let unsubscribe = () => {};
+
+    getCurrentAppVersion().then((currentVer) => {
+      unsubscribe = listenToAppUpdates(currentVer, (update) => {
+        if (update?.isUpdateAvailable) {
+          // If update is mandatory, show every time without snooze
+          if (update.isMandatory) {
+            setUpdateInfo(update);
+            setIsUpdateModalOpen(true);
+            return;
+          }
+
+          // Check if user dismissed this version within the last 24 hours
+          try {
+            const dismissedTimestamp = localStorage.getItem(`ridelog_dismissed_update_${update.latestVersion}`);
+            if (dismissedTimestamp) {
+              const hoursPassed = (Date.now() - parseInt(dismissedTimestamp, 10)) / (1000 * 60 * 60);
+              if (hoursPassed < 24) {
+                // Snooze active: user already dismissed this version recently
+                return;
+              }
+            }
+          } catch (e) {}
+
           setUpdateInfo(update);
           setIsUpdateModalOpen(true);
-          return;
+        } else {
+          setIsUpdateModalOpen(false);
         }
-
-        // Check if user dismissed this version within the last 24 hours
-        try {
-          const dismissedTimestamp = localStorage.getItem(`ridelog_dismissed_update_${update.latestVersion}`);
-          if (dismissedTimestamp) {
-            const hoursPassed = (Date.now() - parseInt(dismissedTimestamp, 10)) / (1000 * 60 * 60);
-            if (hoursPassed < 24) {
-              // Snooze active: user already dismissed this version recently
-              return;
-            }
-          }
-        } catch (e) {}
-
-        setUpdateInfo(update);
-        setIsUpdateModalOpen(true);
-      } else {
-        setIsUpdateModalOpen(false);
-      }
+      });
     });
 
     return () => {
