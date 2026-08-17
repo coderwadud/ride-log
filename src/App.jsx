@@ -578,6 +578,7 @@ export default function App() {
             {activeTab === 'fuel' && (
               <FuelLogsTab
                 lang={lang}
+                fuelLogs={activeFuelLogs}
                 fuelLogsStats={fuelStats}
                 onOpenAddFuel={() => { setEditingFuelData(null); setIsFuelModalOpen(true); }}
                 onEditFuel={(data) => { setEditingFuelData(data); setIsFuelModalOpen(true); }}
