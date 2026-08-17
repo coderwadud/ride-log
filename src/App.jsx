@@ -270,8 +270,9 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthChange(async (firebaseUser) => {
       setUser(firebaseUser);
+      setAuthLoading(false);
+
       if (firebaseUser) {
-        setDataLoading(true);
         isLoadedRef.current = false;
 
         try {
@@ -305,7 +306,6 @@ export default function App() {
         } catch (e) {
           console.error('Error loading user data from cloud:', e);
         } finally {
-          setDataLoading(false);
           isLoadedRef.current = true;
         }
 
@@ -323,7 +323,6 @@ export default function App() {
         setServiceLogs([]);
         isLoadedRef.current = false;
       }
-      setAuthLoading(false);
     });
     return () => unsubscribe();
   }, []);
@@ -482,7 +481,7 @@ export default function App() {
   };
 
   // ── Auth & Loading Guard ──
-  if (authLoading || dataLoading) {
+  if (authLoading) {
     return (
       <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-main)', gap: '16px' }}>
         <div style={{ width: 44, height: 44, border: '3px solid rgba(56,189,248,0.2)', borderTopColor: '#38bdf8', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
