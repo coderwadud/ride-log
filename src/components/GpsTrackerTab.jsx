@@ -4,18 +4,22 @@ import { Geolocation } from '@capacitor/geolocation';
 import { Capacitor } from '@capacitor/core';
 import { 
   Play, Pause, Square, Navigation, RotateCcw, 
-  Trash2, Calendar, Compass, History, Layers, Check
+  Trash2, Calendar, Compass, History, Layers, Check,
+  Map, Globe, Bike, Mountain, Moon, Activity, Film,
+  Gauge, Clock, Flag, MapPin, Zap
 } from 'lucide-react';
 import { saveTrip, getTripsLast3Days, deleteTrip, calculateDistanceKm } from '../utils/tripStorage';
 
-// 5 100% Free Map Modes / Layers
+// 5 100% Free Map Modes / Layers with Lucide SVG Icons
 const MAP_LAYERS = {
   street: {
     id: 'street',
     nameBn: 'স্ট্যান্ডার্ড রোড',
     nameEn: 'Street Map',
-    icon: '🗺️',
+    iconComponent: Map,
+    color: '#38bdf8',
     descBn: 'রাস্তাঘাট, মোড় ও ল্যান্ডমার্ক',
+    descEn: 'Roads, turns & local landmarks',
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     maxZoom: 19,
     subdomains: 'abc'
@@ -24,8 +28,10 @@ const MAP_LAYERS = {
     id: 'satellite',
     nameBn: 'স্যাটেলাইট ছবি',
     nameEn: 'Satellite HD',
-    icon: '🛰️',
+    iconComponent: Globe,
+    color: '#10b981',
     descBn: 'আকাশ থেকে পরিষ্কার উপগ্রহ দৃশ্য',
+    descEn: 'High-res aerial satellite view',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     maxZoom: 19,
     subdomains: 'abc'
@@ -34,8 +40,10 @@ const MAP_LAYERS = {
     id: 'bike',
     nameBn: 'বাইক ও সাইকেল',
     nameEn: 'Bike & Cycle',
-    icon: '🚲',
+    iconComponent: Bike,
+    color: '#f59e0b',
     descBn: 'বাইক রুট, সার্ভিস রোড ও লেন',
+    descEn: 'Cycling infrastructure & bike tracks',
     url: 'https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
     maxZoom: 19,
     subdomains: 'abc'
@@ -44,8 +52,10 @@ const MAP_LAYERS = {
     id: 'terrain',
     nameBn: 'ভূপ্রকৃতি ও পাহাড়',
     nameEn: 'Terrain & Topo',
-    icon: '🏔️',
+    iconComponent: Mountain,
+    color: '#8b5cf6',
     descBn: 'উচ্চতা, পাহাড় ও পাহাড়ি রাস্তা',
+    descEn: 'Elevation contours & hills',
     url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
     maxZoom: 17,
     subdomains: 'abc'
@@ -54,8 +64,10 @@ const MAP_LAYERS = {
     id: 'dark',
     nameBn: 'নাইট / ডার্ক মোড',
     nameEn: 'Dark Night',
-    icon: '🌙',
+    iconComponent: Moon,
+    color: '#94a3b8',
     descBn: 'রাতের চোখের আরামদায়ক ডার্ক ম্যাপ',
+    descEn: 'Eye-friendly night dark theme',
     url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
     maxZoom: 19,
     subdomains: 'abcd'
@@ -738,8 +750,8 @@ export default function GpsTrackerTab({
               animation: 'fadeIn 0.2s ease'
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '4px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Layers size={14} color="#38bdf8" />
                 <span>{isBn ? 'ম্যাপ লেয়ার নির্বাচন' : 'Select Map Layer'}</span>
               </span>
@@ -761,6 +773,7 @@ export default function GpsTrackerTab({
 
             {Object.values(MAP_LAYERS).map((layer) => {
               const isSelected = selectedLayerKey === layer.id;
+              const IconComp = layer.iconComponent;
               return (
                 <button
                   key={layer.id}
@@ -775,26 +788,38 @@ export default function GpsTrackerTab({
                     justifyContent: 'space-between',
                     padding: '8px 10px',
                     borderRadius: '10px',
-                    border: isSelected ? '1px solid #0284c7' : '1px solid transparent',
-                    background: isSelected ? 'rgba(2, 132, 199, 0.2)' : 'rgba(255, 255, 255, 0.03)',
+                    border: isSelected ? `1px solid ${layer.color}` : '1px solid transparent',
+                    background: isSelected ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.03)',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
                     textAlign: 'left',
                     width: '100%'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '1.2rem' }}>{layer.icon}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: layer.color,
+                      flexShrink: 0
+                    }}>
+                      <IconComp size={18} />
+                    </div>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '0.82rem', fontWeight: isSelected ? 800 : 600, color: isSelected ? '#38bdf8' : '#f1f5f9' }}>
+                      <span style={{ fontSize: '0.82rem', fontWeight: isSelected ? 800 : 600, color: isSelected ? '#ffffff' : '#f1f5f9' }}>
                         {isBn ? layer.nameBn : layer.nameEn}
                       </span>
                       <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
-                        {layer.descBn}
+                        {isBn ? layer.descBn : layer.descEn}
                       </span>
                     </div>
                   </div>
-                  {isSelected && <Check size={16} color="#38bdf8" />}
+                  {isSelected && <Check size={16} color={layer.color} />}
                 </button>
               );
             })}
@@ -1119,12 +1144,23 @@ export default function GpsTrackerTab({
 
               {/* Playback Timeline Slider */}
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: 'var(--text-dim)', marginBottom: '4px' }}>
-                  <span>🟢 {isBn ? 'শুরু' : 'Start'}</span>
-                  <span style={{ color: '#38bdf8', fontWeight: 700 }}>
-                    {currentPlaybackPoint ? `⚡ ${currentPlaybackPoint.speed} km/h` : ''}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem', color: 'var(--text-dim)', marginBottom: '4px' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#10b981', fontWeight: 600 }}>
+                    <MapPin size={13} color="#10b981" />
+                    <span>{isBn ? 'শুরু' : 'Start'}</span>
                   </span>
-                  <span>🏁 {isBn ? 'গন্তব্য' : 'Finish'}</span>
+                  <span style={{ color: '#38bdf8', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                    {currentPlaybackPoint && (
+                      <>
+                        <Zap size={13} color="#38bdf8" />
+                        <span>{currentPlaybackPoint.speed} km/h</span>
+                      </>
+                    )}
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#ef4444', fontWeight: 600 }}>
+                    <Flag size={13} color="#ef4444" />
+                    <span>{isBn ? 'গন্তব্য' : 'Finish'}</span>
+                  </span>
                 </div>
                 <input
                   type="range"

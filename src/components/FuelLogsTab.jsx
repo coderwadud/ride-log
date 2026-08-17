@@ -1,5 +1,5 @@
 import React from 'react';
-import { Fuel, Plus, Edit2, Trash2, MapPin } from 'lucide-react';
+import { Fuel, Plus, Edit2, Trash2, MapPin, Calendar, Gauge } from 'lucide-react';
 import { translations } from '../utils/translations';
 import { formatCurrency, formatNum } from '../utils/calculations';
 
@@ -57,9 +57,17 @@ export default function FuelLogsTab({ lang, fuelLogsStats, onOpenAddFuel, onEdit
                       </span>
                     </div>
 
-                    <div className="log-date" style={{ marginTop: '2px' }}>
-                      📅 {log.date} • 🛣️ {formatNum(log.odometer, lang)} {t.km}
-                      {log.tripDistance > 0 && ` (+${formatNum(log.tripDistance, lang)} ${t.km})`}
+                    <div className="log-date" style={{ marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                        <Calendar size={12} color="var(--text-dim)" />
+                        <span>{log.date}</span>
+                      </span>
+                      <span>•</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                        <Gauge size={12} color="var(--text-dim)" />
+                        <span>{formatNum(log.odometer, lang)} {t.km}</span>
+                      </span>
+                      {log.tripDistance > 0 && <span>(+{formatNum(log.tripDistance, lang)} {t.km})</span>}
                     </div>
 
                     {log.stationName && (

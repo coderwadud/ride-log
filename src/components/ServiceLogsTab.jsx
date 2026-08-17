@@ -1,5 +1,5 @@
 import React from 'react';
-import { Wrench, Plus, Edit2, Trash2 } from 'lucide-react';
+import { Wrench, Plus, Edit2, Trash2, Calendar, Gauge, FileText } from 'lucide-react';
 import { translations } from '../utils/translations';
 import { formatCurrency, formatNum } from '../utils/calculations';
 
@@ -53,8 +53,16 @@ export default function ServiceLogsTab({ lang, serviceLogs, serviceStats, onOpen
                       <div className="log-main-title" style={{ fontSize: '0.88rem' }}>
                         {log.garageName || t.bikeServiceLabel}
                       </div>
-                      <div className="log-date" style={{ marginTop: '2px' }}>
-                        📅 {log.date} • 🛣️ {formatNum(log.odometer, lang)} {t.km}
+                      <div className="log-date" style={{ marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          <Calendar size={12} color="var(--text-dim)" />
+                          <span>{log.date}</span>
+                        </span>
+                        <span>•</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          <Gauge size={12} color="var(--text-dim)" />
+                          <span>{formatNum(log.odometer, lang)} {t.km}</span>
+                        </span>
                       </div>
 
                       {/* Service Category Badges */}
@@ -74,8 +82,9 @@ export default function ServiceLogsTab({ lang, serviceLogs, serviceStats, onOpen
                       </div>
 
                       {log.notes && (
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '3px' }}>
-                          📝 {log.notes}
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <FileText size={12} />
+                          <span>{log.notes}</span>
                         </p>
                       )}
                     </div>

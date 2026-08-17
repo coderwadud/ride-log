@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Bike, Check, Download, Upload, Plus, Trash2, Edit2, CloudCheck, CloudOff, RefreshCw, LogOut } from 'lucide-react';
+import { X, Bike, Check, Download, Upload, Plus, Trash2, Edit2, CloudCheck, CloudOff, RefreshCw, LogOut, Copy, ClipboardPaste, AlertTriangle } from 'lucide-react';
 import { translations } from '../utils/translations';
 
 export default function BikeModal({ 
@@ -355,11 +355,12 @@ export default function BikeModal({
                   } catch (e) {
                     console.error('Clipboard copy error:', e);
                   }
-                  alert(lang === 'bn' ? '📋 ব্যাকআপ কোড ক্লিপবোর্ডে কপি করা হয়েছে!' : '📋 Backup code copied to clipboard!');
+                  alert(lang === 'bn' ? 'ব্যাকআপ কোড ক্লিপবোর্ডে কপি করা হয়েছে!' : 'Backup code copied to clipboard!');
                 }
               }}
             >
-              📋 {lang === 'bn' ? 'কোড কপি করুন' : 'Copy Code'}
+              <Copy size={14} />
+              <span>{lang === 'bn' ? 'কোড কপি করুন' : 'Copy Code'}</span>
             </button>
 
             <button
@@ -371,22 +372,27 @@ export default function BikeModal({
                 padding: '6px 8px', 
                 background: 'rgba(56, 189, 248, 0.08)', 
                 border: '1px solid rgba(56, 189, 248, 0.25)',
-                color: 'var(--accent-mileage)'
+                color: 'var(--accent-mileage)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '5px'
               }}
               onClick={() => {
                 const pasted = prompt(lang === 'bn' ? 'আপনার ব্যাকআপ কোড পেস্ট করুন:' : 'Paste your backup JSON code:');
                 if (pasted) {
                   const result = onImportData(pasted);
                   if (result?.success === false) {
-                    alert(lang === 'bn' ? '❌ কোডটি সঠিক নয়!' : '❌ Invalid backup code!');
+                    alert(lang === 'bn' ? 'কোডটি সঠিক নয়!' : 'Invalid backup code!');
                   } else {
-                    alert(lang === 'bn' ? '✅ ডাটা সফলভাবে যুক্ত হয়েছে!' : '✅ Data imported successfully!');
+                    alert(lang === 'bn' ? 'ডাটা সফলভাবে যুক্ত হয়েছে!' : 'Data imported successfully!');
                     onClose();
                   }
                 }
               }}
             >
-              📋 {lang === 'bn' ? 'কোড পেস্ট করুন' : 'Paste Code'}
+              <ClipboardPaste size={14} />
+              <span>{lang === 'bn' ? 'কোড পেস্ট করুন' : 'Paste Code'}</span>
             </button>
           </div>
 
@@ -405,10 +411,15 @@ export default function BikeModal({
                     border: '1px solid rgba(239, 68, 68, 0.22)',
                     fontSize: '0.8rem',
                     padding: '9px',
-                    fontWeight: 600
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
                   }}
                 >
-                  {lang === 'bn' ? '🗑️ সমস্ত ডাটা রিসেট করুন' : '🗑️ Reset / Clear All Data'}
+                  <Trash2 size={15} />
+                  <span>{lang === 'bn' ? 'সমস্ত ডাটা রিসেট করুন' : 'Reset / Clear All Data'}</span>
                 </button>
               ) : (
                 <div style={{
@@ -418,8 +429,9 @@ export default function BikeModal({
                   padding: '12px',
                   textAlign: 'center'
                 }}>
-                  <p style={{ fontSize: '0.82rem', color: 'var(--accent-danger)', fontWeight: 700, marginBottom: '10px' }}>
-                    {lang === 'bn' ? '⚠️ আপনি কি নিশ্চিত যে সমস্ত ডাটা মুছে ফেলবেন?' : '⚠️ Confirm clearing all stored data?'}
+                  <p style={{ fontSize: '0.82rem', color: 'var(--accent-danger)', fontWeight: 700, marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                    <AlertTriangle size={16} color="#ef4444" />
+                    <span>{lang === 'bn' ? 'আপনি কি নিশ্চিত যে সমস্ত ডাটা মুছে ফেলবেন?' : 'Confirm clearing all stored data?'}</span>
                   </p>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button 

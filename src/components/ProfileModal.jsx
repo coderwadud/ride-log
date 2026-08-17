@@ -388,8 +388,9 @@ export default function ProfileModal({
         }}>
           <Shield size={20} color="#10b981" style={{ flexShrink: 0, marginTop: '2px' }} />
           <div>
-            <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#10b981', margin: 0 }}>
-              🔒 {isBn ? '১০০% প্রাইভেট অ্যাপ মেমোরি স্টোরেজ (ROM)' : '🔒 100% Private App ROM Storage'}
+            <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#10b981', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Lock size={14} color="#10b981" />
+              <span>{isBn ? '১০০% প্রাইভেট অ্যাপ মেমোরি স্টোরেজ (ROM)' : '100% Private App ROM Storage'}</span>
             </p>
             <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '3px 0 0', lineHeight: '1.4' }}>
               {isBn
@@ -402,8 +403,9 @@ export default function ProfileModal({
         {/* ===== Bike Selector Filter & Add Button Header ===== */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
           <div>
-            <h4 style={{ fontSize: '0.95rem', margin: 0, color: 'var(--text-main)', fontWeight: 700 }}>
-              📄 {isBn ? 'বাইক ডকুমেন্টস' : 'Bike Documents'} ({filteredDocs.length})
+            <h4 style={{ fontSize: '0.95rem', margin: 0, color: 'var(--text-main)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <FileText size={16} color="var(--accent-mileage)" />
+              <span>{isBn ? 'বাইক ডকুমেন্টস' : 'Bike Documents'} ({filteredDocs.length})</span>
             </h4>
           </div>
 
@@ -430,8 +432,9 @@ export default function ProfileModal({
               marginBottom: '18px'
             }}
           >
-            <h5 style={{ fontSize: '0.88rem', margin: '0 0 12px 0', color: 'var(--accent-mileage)' }}>
-              ➕ {isBn ? 'নতুন ডকুমেন্ট আপলোড করুন' : 'Upload New Document'}
+            <h5 style={{ fontSize: '0.88rem', margin: '0 0 12px 0', color: 'var(--accent-mileage)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Plus size={15} color="var(--accent-mileage)" />
+              <span>{isBn ? 'নতুন ডকুমেন্ট আপলোড করুন' : 'Upload New Document'}</span>
             </h5>
 
             <div className="form-group" style={{ marginBottom: '10px' }}>
@@ -707,7 +710,7 @@ export default function ProfileModal({
             }}
           >
             <MessageSquare size={17} />
-            <span>{isBn ? '💡 মতামত বা সমস্যা জানান (Support)' : '💡 Send Feedback or Report Bug'}</span>
+            <span>{isBn ? 'মতামত বা সমস্যা জানান (সাপোর্ট)' : 'Send Feedback or Report Bug'}</span>
           </button>
         </div>
 
