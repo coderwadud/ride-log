@@ -1,7 +1,7 @@
 import { db } from './firebase';
 import {
   doc, getDoc, setDoc, deleteDoc, onSnapshot, collection, query, where,
-  getDocs, writeBatch
+  getDocs, writeBatch, deleteField
 } from 'firebase/firestore';
 
 const DEFAULT_BIKE = {
@@ -73,6 +73,16 @@ export async function loadUserData(uid) {
       fuelLogs.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
       serviceLogs.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
 
+      // Clean up legacy array fields from root doc if they still linger
+      if (rootData.bikes || rootData.fuelLogs || rootData.serviceLogs) {
+        setDoc(userDocRef, {
+          bikes: deleteField(),
+          fuelLogs: deleteField(),
+          serviceLogs: deleteField(),
+          schemaVersion: '2.0'
+        }, { merge: true }).catch(() => {});
+      }
+
       return {
         settings: rootData.settings || DEFAULT_DATA.settings,
         activeBikeId: rootData.activeBikeId || (bikes[0]?.id || 'bike_1'),
@@ -121,7 +131,7 @@ export async function loadUserData(uid) {
         });
       }
 
-      // Update root user doc to mark migrated and keep root light
+      // Update root user doc: strip legacy arrays and set schemaVersion 2.0
       operations.push({
         type: 'set',
         ref: userDocRef,
@@ -129,7 +139,10 @@ export async function loadUserData(uid) {
           settings: rootData.settings || DEFAULT_DATA.settings,
           activeBikeId: rootData.activeBikeId || 'bike_1',
           schemaVersion: '2.0',
-          migratedAt: new Date().toISOString()
+          migratedAt: new Date().toISOString(),
+          bikes: deleteField(),
+          fuelLogs: deleteField(),
+          serviceLogs: deleteField()
         },
         options: { merge: true }
       });
@@ -172,7 +185,10 @@ export async function saveUserData(uid, data) {
         settings: data.settings || DEFAULT_DATA.settings,
         activeBikeId: data.activeBikeId || 'bike_1',
         schemaVersion: '2.0',
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        bikes: deleteField(),
+        fuelLogs: deleteField(),
+        serviceLogs: deleteField()
       },
       options: { merge: true }
     });
