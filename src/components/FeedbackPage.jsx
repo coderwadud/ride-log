@@ -6,9 +6,11 @@ import {
 } from 'lucide-react';
 import { submitUserFeedback, listenToUserTickets } from '../utils/firestoreDB';
 import { getCurrentAppVersion } from '../utils/appVersion';
+import Footer from './Footer';
 
 export default function FeedbackPage({
   lang,
+  theme,
   user,
   onBack,
   initialTicketId = null,
@@ -845,6 +847,11 @@ export default function FeedbackPage({
             )}
           </div>
         )}
+
+        {/* Branding Footer */}
+        <div style={{ marginTop: '20px' }}>
+          <Footer lang={lang} theme={theme} />
+        </div>
       </div>
     </div>
   );

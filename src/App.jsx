@@ -496,23 +496,23 @@ export default function App() {
 
       {/* Main Tab Navigation for Desktop */}
       <nav className="nav-tabs">
-        <button className={`nav-tab-btn ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
+        <button className={`nav-tab-btn ${!isFeedbackPageOpen && activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => { setIsFeedbackPageOpen(false); setActiveTab('dashboard'); }}>
           <LayoutDashboard size={18} />
           <span>{t.dashboard}</span>
         </button>
-        <button className={`nav-tab-btn ${activeTab === 'fuel' ? 'active' : ''}`} onClick={() => setActiveTab('fuel')}>
+        <button className={`nav-tab-btn ${!isFeedbackPageOpen && activeTab === 'fuel' ? 'active' : ''}`} onClick={() => { setIsFeedbackPageOpen(false); setActiveTab('fuel'); }}>
           <Fuel size={18} />
           <span>{t.fuelLogs}</span>
         </button>
-        <button className={`nav-tab-btn ${activeTab === 'gps' ? 'active' : ''}`} onClick={() => setActiveTab('gps')}>
+        <button className={`nav-tab-btn ${!isFeedbackPageOpen && activeTab === 'gps' ? 'active' : ''}`} onClick={() => { setIsFeedbackPageOpen(false); setActiveTab('gps'); }}>
           <Navigation size={18} />
           <span>{t.gpsTrack || 'GPS ট্র্যাক'}</span>
         </button>
-        <button className={`nav-tab-btn ${activeTab === 'service' ? 'active' : ''}`} onClick={() => setActiveTab('service')}>
+        <button className={`nav-tab-btn ${!isFeedbackPageOpen && activeTab === 'service' ? 'active' : ''}`} onClick={() => { setIsFeedbackPageOpen(false); setActiveTab('service'); }}>
           <Wrench size={18} />
           <span>{t.serviceLogs}</span>
         </button>
-        <button className={`nav-tab-btn ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => setActiveTab('analytics')}>
+        <button className={`nav-tab-btn ${!isFeedbackPageOpen && activeTab === 'analytics' ? 'active' : ''}`} onClick={() => { setIsFeedbackPageOpen(false); setActiveTab('analytics'); }}>
           <BarChart3 size={18} />
           <span>{t.analytics}</span>
         </button>
@@ -520,83 +520,98 @@ export default function App() {
 
       {/* Tab View Contents */}
       <main>
-        {activeTab === 'dashboard' && (
-          <Dashboard
-            lang={lang}
-            fuelStats={fuelStats}
-            serviceStats={serviceStats}
-            bikeProfile={activeBike}
-            onOpenAddFuel={() => { setEditingFuelData(null); setIsFuelModalOpen(true); }}
-            onOpenAddService={() => { setEditingServiceData(null); setIsServiceModalOpen(true); }}
-            recentLogs={recentLogs}
-          />
-        )}
-        {activeTab === 'fuel' && (
-          <FuelLogsTab
-            lang={lang}
-            fuelLogsStats={fuelStats}
-            onOpenAddFuel={() => { setEditingFuelData(null); setIsFuelModalOpen(true); }}
-            onEditFuel={(data) => { setEditingFuelData(data); setIsFuelModalOpen(true); }}
-            onDeleteFuel={handleDeleteFuel}
-          />
-        )}
-        {activeTab === 'gps' && (
-          <GpsTrackerTab
+        {isFeedbackPageOpen ? (
+          <FeedbackPage
             lang={lang}
             theme={theme}
             user={user}
-            activeBike={activeBike}
+            initialTicketId={feedbackPageInitialTicketId}
+            initialViewMode={feedbackPageInitialViewMode}
+            onBack={() => setIsFeedbackPageOpen(false)}
           />
-        )}
-        {activeTab === 'service' && (
-          <ServiceLogsTab
-            lang={lang}
-            serviceLogs={activeServiceLogs}
-            serviceStats={serviceStats}
-            onOpenAddService={() => { setEditingServiceData(null); setIsServiceModalOpen(true); }}
-            onEditService={(data) => { setEditingServiceData(data); setIsServiceModalOpen(true); }}
-            onDeleteService={handleDeleteService}
-          />
-        )}
-        {activeTab === 'analytics' && (
-          <AnalyticsTab
-            lang={lang}
-            fuelLogs={activeFuelLogs}
-            serviceLogs={activeServiceLogs}
-            fuelStats={fuelStats}
-          />
-        )}
+        ) : (
+          <>
+            {activeTab === 'dashboard' && (
+              <Dashboard
+                lang={lang}
+                fuelStats={fuelStats}
+                serviceStats={serviceStats}
+                bikeProfile={activeBike}
+                onOpenAddFuel={() => { setEditingFuelData(null); setIsFuelModalOpen(true); }}
+                onOpenAddService={() => { setEditingServiceData(null); setIsServiceModalOpen(true); }}
+                recentLogs={recentLogs}
+              />
+            )}
+            {activeTab === 'fuel' && (
+              <FuelLogsTab
+                lang={lang}
+                fuelLogsStats={fuelStats}
+                onOpenAddFuel={() => { setEditingFuelData(null); setIsFuelModalOpen(true); }}
+                onEditFuel={(data) => { setEditingFuelData(data); setIsFuelModalOpen(true); }}
+                onDeleteFuel={handleDeleteFuel}
+              />
+            )}
+            {activeTab === 'gps' && (
+              <GpsTrackerTab
+                lang={lang}
+                theme={theme}
+                user={user}
+                activeBike={activeBike}
+              />
+            )}
+            {activeTab === 'service' && (
+              <ServiceLogsTab
+                lang={lang}
+                serviceLogs={activeServiceLogs}
+                serviceStats={serviceStats}
+                onOpenAddService={() => { setEditingServiceData(null); setIsServiceModalOpen(true); }}
+                onEditService={(data) => { setEditingServiceData(data); setIsServiceModalOpen(true); }}
+                onDeleteService={handleDeleteService}
+              />
+            )}
+            {activeTab === 'analytics' && (
+              <AnalyticsTab
+                lang={lang}
+                fuelLogs={activeFuelLogs}
+                serviceLogs={activeServiceLogs}
+                fuelStats={fuelStats}
+              />
+            )}
 
-        {/* Footer */}
-        <Footer lang={lang} theme={theme} />
+            {/* Footer */}
+            <Footer lang={lang} theme={theme} />
+          </>
+        )}
       </main>
 
       {/* Native Mobile Floating Action Button */}
-      <div className="fab-container">
-        <button className="fab-btn fab-fuel" onClick={() => { setEditingFuelData(null); setIsFuelModalOpen(true); }} title={t.addFuel}>
-          <Fuel size={22} />
-        </button>
-      </div>
+      {!isFeedbackPageOpen && (
+        <div className="fab-container">
+          <button className="fab-btn fab-fuel" onClick={() => { setEditingFuelData(null); setIsFuelModalOpen(true); }} title={t.addFuel}>
+            <Fuel size={22} />
+          </button>
+        </div>
+      )}
 
-      {/* Mobile Bottom Navigation */}
+      {/* Mobile Bottom Navigation Bar (Always Visible & Interactive) */}
       <nav className="mobile-nav-bar">
-        <button className={`mobile-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
+        <button className={`mobile-nav-item ${!isFeedbackPageOpen && activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => { setIsFeedbackPageOpen(false); setActiveTab('dashboard'); }}>
           <LayoutDashboard size={19} />
           <span>{t.dashboard}</span>
         </button>
-        <button className={`mobile-nav-item ${activeTab === 'fuel' ? 'active' : ''}`} onClick={() => setActiveTab('fuel')}>
+        <button className={`mobile-nav-item ${!isFeedbackPageOpen && activeTab === 'fuel' ? 'active' : ''}`} onClick={() => { setIsFeedbackPageOpen(false); setActiveTab('fuel'); }}>
           <Fuel size={19} />
           <span>{t.fuelLogs}</span>
         </button>
-        <button className={`mobile-nav-item ${activeTab === 'gps' ? 'active' : ''}`} onClick={() => setActiveTab('gps')}>
+        <button className={`mobile-nav-item ${!isFeedbackPageOpen && activeTab === 'gps' ? 'active' : ''}`} onClick={() => { setIsFeedbackPageOpen(false); setActiveTab('gps'); }}>
           <Navigation size={19} />
           <span>{t.gpsTrack || 'GPS'}</span>
         </button>
-        <button className={`mobile-nav-item ${activeTab === 'service' ? 'active' : ''}`} onClick={() => setActiveTab('service')}>
+        <button className={`mobile-nav-item ${!isFeedbackPageOpen && activeTab === 'service' ? 'active' : ''}`} onClick={() => { setIsFeedbackPageOpen(false); setActiveTab('service'); }}>
           <Wrench size={19} />
           <span>{t.serviceLogs}</span>
         </button>
-        <button className={`mobile-nav-item ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => setActiveTab('analytics')}>
+        <button className={`mobile-nav-item ${!isFeedbackPageOpen && activeTab === 'analytics' ? 'active' : ''}`} onClick={() => { setIsFeedbackPageOpen(false); setActiveTab('analytics'); }}>
           <BarChart3 size={19} />
           <span>{t.analytics}</span>
         </button>
@@ -710,29 +725,6 @@ export default function App() {
         onViewDetails={handleViewTicketDetails}
         onClose={handleDismissTicketUpdate}
       />
-
-      {/* ── FULL-PAGE FEEDBACK & TICKET DETAILS VIEW ── */}
-      {isFeedbackPageOpen && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 999990,
-          background: 'var(--bg-main)',
-          overflowY: 'auto',
-          animation: 'fadeIn 0.2s ease'
-        }}>
-          <FeedbackPage
-            lang={lang}
-            user={user}
-            initialTicketId={feedbackPageInitialTicketId}
-            initialViewMode={feedbackPageInitialViewMode}
-            onBack={() => setIsFeedbackPageOpen(false)}
-          />
-        </div>
-      )}
     </div>
   );
 }
