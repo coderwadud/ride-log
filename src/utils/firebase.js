@@ -8,7 +8,8 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  deleteUser
 } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
@@ -95,4 +96,26 @@ export async function resetPassword(email) {
   await sendPasswordResetEmail(auth, email);
 }
 
+/**
+ * Permanently delete the current user's Firebase Auth account.
+ * Also signs out from native platform (Android/iOS) if applicable.
+ * Note: Firebase requires recent login for account deletion.
+ * If it fails with 'auth/requires-recent-login', user must re-authenticate.
+ */
+export async function deleteUserAccount() {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error('No authenticated user found');
 
+  // Sign out from native platform first
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
+      await FirebaseAuthentication.signOut();
+    } catch (e) {
+      console.warn('Native sign out before delete error:', e);
+    }
+  }
+
+  // Delete the Firebase Auth account permanently
+  await deleteUser(currentUser);
+}

@@ -1,5 +1,5 @@
 import { db } from './firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 
 const DEFAULT_BIKE = {
   id: 'bike_1',
@@ -82,5 +82,20 @@ export async function resetUserDataInFirestore(uid) {
     });
   } catch (err) {
     console.error('Error resetting user data in Firestore:', uid, err);
+  }
+}
+
+/**
+ * Permanently delete the user's Firestore document `users/{uid}`
+ * Called before deleting Firebase Auth account.
+ */
+export async function deleteUserAllData(uid) {
+  if (!uid) return;
+  try {
+    const docRef = doc(db, 'users', uid);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.error('Error deleting user Firestore data:', uid, err);
+    // Still continue with account deletion even if Firestore delete fails
   }
 }

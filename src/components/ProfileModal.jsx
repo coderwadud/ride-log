@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, User, Shield, Lock, FileText, Upload, Plus, Trash2, Edit3, 
   Eye, LogOut, Check, FileCheck, FileCode2, Image as ImageIcon, 
-  CreditCard, ShieldCheck, AlertCircle, FileSpreadsheet, Download
+  CreditCard, ShieldCheck, AlertCircle, FileSpreadsheet, Download, UserX
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { 
@@ -13,6 +13,8 @@ import {
   downloadOrShareDocument
 } from '../utils/documentStorage';
 import { trackDocumentUploaded, updateLastActiveAt } from '../utils/analytics';
+import { deleteUserAllData } from '../utils/firestoreDB';
+import { deleteUserAccount } from '../utils/firebase';
 
 const DOC_TYPES = [
   { key: 'license', label: 'ড্রাইভিং লাইসেন্স', labelEn: 'Driving License', icon: CreditCard, color: '#38bdf8' },
@@ -52,6 +54,11 @@ export default function ProfileModal({
 
   // Preview Modal state
   const [previewDoc, setPreviewDoc] = useState(null);
+
+  // Account Deactivation states
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
+  const [deactivateLoading, setDeactivateLoading] = useState(false);
+  const [deactivateStep, setDeactivateStep] = useState(1); // 1 = warning, 2 = final confirm
 
   useEffect(() => {
     if (isOpen) {
@@ -134,6 +141,35 @@ export default function ProfileModal({
     if (confirm(isBn ? 'আপনি কি নিশ্চিত যে এই ডকুমেন্টটি মুছে ফেলবেন?' : 'Are you sure to delete this document?')) {
       const updated = await deletePrivateDocument(userId, docId);
       setDocuments(updated);
+    }
+  };
+
+  const handleDeactivateAccount = async () => {
+    if (deactivateStep === 1) {
+      setDeactivateStep(2);
+      return;
+    }
+
+    setDeactivateLoading(true);
+    try {
+      // Step 1: Delete all Firestore user data
+      await deleteUserAllData(userId);
+      // Step 2: Delete Firebase Auth account
+      await deleteUserAccount();
+      // onAuthChange in App.jsx will auto-detect logout and navigate to login screen
+    } catch (err) {
+      console.error('Account deletion error:', err);
+      if (err?.code === 'auth/requires-recent-login') {
+        alert(isBn
+          ? '⚠️ নিরাপত্তার জন্য, অনুগ্রহ করে লগআউট করে আবার লগইন করুন, তারপর আবার চেষ্টা করুন।'
+          : '⚠️ For security, please logout and login again, then retry account deletion.');
+        setShowDeactivateConfirm(false);
+        setDeactivateStep(1);
+      } else {
+        alert(isBn ? '❌ একাউন্ট ডিলিট ব্যর্থ হয়েছে। আবার চেষ্টা করুন।' : '❌ Account deletion failed. Please try again.');
+      }
+    } finally {
+      setDeactivateLoading(false);
     }
   };
 
@@ -487,16 +523,14 @@ export default function ProfileModal({
           </div>
         )}
 
-        {/* ===== Logout Button Section ===== */}
+        {/* ===== Logout & Deactivate Section ===== */}
         {onLogout && (
-          <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
+          <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {/* Logout Button */}
             <button
               type="button"
               className="btn"
-              onClick={() => {
-                onClose();
-                onLogout();
-              }}
+              onClick={() => { onClose(); onLogout(); }}
               style={{
                 width: '100%',
                 background: 'rgba(239, 68, 68, 0.12)',
@@ -516,6 +550,140 @@ export default function ProfileModal({
               <LogOut size={17} />
               <span>{isBn ? 'অ্যাকাউন্ট লগআউট করুন' : 'Logout Account'}</span>
             </button>
+
+            {/* Deactivate Account Button */}
+            {user && (
+              <button
+                type="button"
+                className="btn"
+                onClick={() => { setShowDeactivateConfirm(true); setDeactivateStep(1); }}
+                style={{
+                  width: '100%',
+                  background: 'transparent',
+                  color: '#6b7280',
+                  border: '1px solid rgba(107, 114, 128, 0.25)',
+                  borderRadius: '12px',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  padding: '9px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '7px',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <UserX size={15} />
+                <span>{isBn ? 'একাউন্ট স্থায়ীভাবে মুছে ফেলুন' : 'Permanently Delete Account'}</span>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ===== Account Deactivation Confirm Modal ===== */}
+        {showDeactivateConfirm && (
+          <div
+            style={{
+              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(0,0,0,0.85)', zIndex: 99999,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '20px'
+            }}
+            onClick={() => { setShowDeactivateConfirm(false); setDeactivateStep(1); }}
+          >
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #1e293b, #0f172a)',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                borderRadius: '20px',
+                padding: '28px 24px',
+                maxWidth: '380px',
+                width: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Icon */}
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <div style={{
+                  width: 64, height: 64, borderRadius: '50%',
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                  <UserX size={32} color="#ef4444" />
+                </div>
+              </div>
+
+              {/* Title */}
+              <div style={{ textAlign: 'center' }}>
+                <h4 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f87171', margin: '0 0 8px 0' }}>
+                  {deactivateStep === 1
+                    ? (isBn ? '⚠️ একাউন্ট ডিলিট করবেন?' : '⚠️ Delete Account?')
+                    : (isBn ? '🚨 শেষ সুযোগ!' : '🚨 Last Warning!')
+                  }
+                </h4>
+                <p style={{ fontSize: '0.82rem', color: '#94a3b8', margin: 0, lineHeight: '1.6' }}>
+                  {deactivateStep === 1
+                    ? (isBn
+                        ? 'এই অ্যাকশনটি সম্পূর্ণ অপরিবর্তনীয়। আপনার সমস্ত বাইক ডাটা, ফুয়েল লগ, সার্ভিস লগ ও ডকুমেন্ট চিরতরে মুছে যাবে।'
+                        : 'This action is completely irreversible. All your bike data, fuel logs, service logs, and documents will be permanently erased.')
+                    : (isBn
+                        ? 'আপনি কি সত্যিই নিশ্চিত? "হ্যাঁ, ডিলিট করুন" চাপলে আর ফিরিয়ে আনা সম্ভব হবে না।'
+                        : 'Are you absolutely sure? Pressing "Yes, Delete" cannot be undone. Ever.')
+                  }
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <button
+                  type="button"
+                  disabled={deactivateLoading}
+                  onClick={handleDeactivateAccount}
+                  style={{
+                    padding: '12px',
+                    borderRadius: '12px',
+                    background: 'linear-gradient(135deg, #ef4444, #b91c1c)',
+                    color: '#ffffff',
+                    fontWeight: 800,
+                    fontSize: '0.88rem',
+                    border: 'none',
+                    cursor: deactivateLoading ? 'not-allowed' : 'pointer',
+                    opacity: deactivateLoading ? 0.7 : 1,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                  }}
+                >
+                  <UserX size={17} />
+                  <span>
+                    {deactivateLoading
+                      ? (isBn ? 'মুছে ফেলা হচ্ছে...' : 'Deleting...')
+                      : deactivateStep === 1
+                        ? (isBn ? 'পরের ধাপ →' : 'Next Step →')
+                        : (isBn ? 'হ্যাঁ, চিরতরে ডিলিট করুন' : 'Yes, Permanently Delete')
+                    }
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setShowDeactivateConfirm(false); setDeactivateStep(1); }}
+                  style={{
+                    padding: '11px',
+                    borderRadius: '12px',
+                    background: 'rgba(255,255,255,0.06)',
+                    color: '#94a3b8',
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {isBn ? 'বাতিল করুন' : 'Cancel'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
