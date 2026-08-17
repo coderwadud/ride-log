@@ -60,27 +60,34 @@ jobs:
           path: android/app/build/outputs/apk/release/Ride-Log-BD.apk
 
       - name: Create GitHub Release
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: v1.1.${{ github.run_number }}
         run: |
-          NOTES="## 🚀 RideLog BD v1.1 — Latest Signed Release APK
+          NOTES="RideLog BD v1.1 (Build #${{ github.run_number }})
 
-          ### ✅ এই বিল্ডে যা যা আপডেট হয়েছে:
-          - 🗄️ IndexedDB ফাইল স্টোরেজ — ফাইল আপলোড কোটা বাগ সম্পূর্ণ ঠিক
-          - 📄 PDF ভিউয়ার — Android-এ PDF নেটিভ রিডারে খোলার সাপোর্ট
-          - 🌐 ভাষা সিঙ্ক — লোডিং স্ক্রিন ইউজারের সিলেক্ট করা ভাষায় দেখাবে
-          - 📊 Firebase Analytics — DAU/MAU ট্র্যাকিং ও কাস্টম ইভেন্ট
-          - 🗑️ Account Delete — ২ ধাপের নিশ্চিতকরণ সহ স্থায়ী একাউন্ট ডিলিট
+          Updates:
+          - IndexedDB file storage fix
+          - PDF viewer for Android
+          - Language sync fix
+          - Firebase Analytics (DAU/MAU)
+          - Account permanent delete feature
 
-          Build: #${{ github.run_number }} | Commit: ${{ github.sha }}"
+          Commit: ${{ github.sha }}"
 
-          # Delete existing tag/release if it exists, then recreate
+          # Delete existing tag/release if it exists
           gh release delete "$TAG" --yes 2>/dev/null || true
           git push --delete origin "$TAG" 2>/dev/null || true
 
-          gh release create "$TAG" \
-            --title "RideLog BD v1.1 (Build #${{ github.run_number }})" \
-            --notes "$NOTES" \
-            --latest \
-            android/app/build/outputs/apk/release/Ride-Log-BD.apk
+          # Retry up to 3 times in case of GitHub 503
+          for i in 1 2 3; do
+            gh release create "$TAG" \
+              --title "RideLog BD v1.1 (Build #${{ github.run_number }})" \
+              --notes "$NOTES" \
+              --latest \
+              android/app/build/outputs/apk/release/Ride-Log-BD.apk && break
+            echo "Attempt $i failed, retrying in 15s..."
+            sleep 15
+          done
+
