@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, User, Shield, Lock, FileText, Upload, Plus, Trash2, Edit3, 
   Eye, LogOut, Check, FileCheck, FileCode2, Image as ImageIcon, 
-  CreditCard, ShieldCheck, AlertCircle, FileSpreadsheet, Download, UserX
+  CreditCard, ShieldCheck, AlertCircle, FileSpreadsheet, Download, UserX,
+  MessageSquare, Calendar, Send, Clock
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { 
@@ -13,7 +14,7 @@ import {
   downloadOrShareDocument
 } from '../utils/documentStorage';
 import { trackDocumentUploaded, updateLastActiveAt } from '../utils/analytics';
-import { deleteUserAllData } from '../utils/firestoreDB';
+import { deleteUserAllData, submitUserFeedback } from '../utils/firestoreDB';
 import { deleteUserAccount } from '../utils/firebase';
 
 const DOC_TYPES = [
@@ -45,12 +46,21 @@ export default function ProfileModal({
   // Form states
   const [title, setTitle] = useState('');
   const [docType, setDocType] = useState('license');
+  const [expiryDate, setExpiryDate] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
 
   // Edit states
   const [editingDocId, setEditingDocId] = useState(null);
   const [editTitle, setEditTitle] = useState('');
   const [editType, setEditType] = useState('license');
+  const [editExpiryDate, setEditExpiryDate] = useState('');
+
+  // Feedback Form states
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackType, setFeedbackType] = useState('feedback');
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [feedbackSuccess, setFeedbackSuccess] = useState(false);
 
   // Preview Modal state
   const [previewDoc, setPreviewDoc] = useState(null);
@@ -110,11 +120,13 @@ export default function ProfileModal({
         bikeId: selectedBikeId === 'all' ? (activeBikeId || 'bike_1') : selectedBikeId,
         title: title || selectedFile.name,
         docType,
+        expiryDate,
         file: selectedFile
       });
       setDocuments(updatedList);
       setShowUploadForm(false);
       setTitle('');
+      setExpiryDate('');
       setSelectedFile(null);
       setDocType('license');
       // Analytics: track document upload
@@ -131,10 +143,70 @@ export default function ProfileModal({
   const handleSaveEdit = async (docId) => {
     const updated = await updatePrivateDocument(userId, docId, {
       title: editTitle,
-      docType: editType
+      docType: editType,
+      expiryDate: editExpiryDate
     });
     setDocuments(updated);
     setEditingDocId(null);
+  };
+
+  const handleFeedbackSubmit = async (e) => {
+    e.preventDefault();
+    if (!feedbackMessage.trim()) return;
+
+    setFeedbackLoading(true);
+    try {
+      await submitUserFeedback({
+        uid: user?.uid || 'guest',
+        email: user?.email || 'not_provided',
+        name: user?.displayName || 'App User',
+        type: feedbackType,
+        message: feedbackMessage,
+        appVersion: '1.1'
+      });
+      setFeedbackSuccess(true);
+      setFeedbackMessage('');
+      setTimeout(() => {
+        setFeedbackSuccess(false);
+        setShowFeedbackModal(false);
+      }, 2000);
+    } catch (err) {
+      alert(isBn ? '❌ ফিডব্যাক পাঠাতে সমস্যা হয়েছে। ইন্টারনেট চেক করুন।' : '❌ Failed to submit feedback. Check internet.');
+    } finally {
+      setFeedbackLoading(false);
+    }
+  };
+
+  const getExpiryBadge = (expStr) => {
+    if (!expStr) return null;
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const exp = new Date(expStr);
+    exp.setHours(0, 0, 0, 0);
+    const diffDays = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) {
+      return {
+        bg: 'rgba(239, 68, 68, 0.18)',
+        color: '#ef4444',
+        border: 'rgba(239, 68, 68, 0.35)',
+        label: isBn ? `⚠️ মেয়াদ শেষ (${Math.abs(diffDays)} দিন আগে)` : `⚠️ Expired (${Math.abs(diffDays)}d ago)`
+      };
+    } else if (diffDays <= 15) {
+      return {
+        bg: 'rgba(245, 158, 11, 0.18)',
+        color: '#f59e0b',
+        border: 'rgba(245, 158, 11, 0.35)',
+        label: isBn ? `⏳ মেয়াদ শেষ হবে ${diffDays} দিনে` : `⏳ Expires in ${diffDays}d`
+      };
+    } else {
+      return {
+        bg: 'rgba(16, 185, 129, 0.15)',
+        color: '#10b981',
+        border: 'rgba(16, 185, 129, 0.3)',
+        label: isBn ? `✓ মেয়াদ: ${expStr}` : `✓ Valid till: ${expStr}`
+      };
+    }
   };
 
   const handleDelete = async (docId) => {
@@ -338,6 +410,19 @@ export default function ProfileModal({
               </select>
             </div>
 
+            <div className="form-group" style={{ marginBottom: '10px' }}>
+              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Calendar size={14} color="var(--accent-mileage)" />
+                <span>{isBn ? 'মেয়াদ উত্তীর্ণের তারিখ (ঐচ্ছিক)' : 'Expiry Date (Optional)'}</span>
+              </label>
+              <input
+                type="date"
+                className="form-input"
+                value={expiryDate}
+                onChange={(e) => setExpiryDate(e.target.value)}
+              />
+            </div>
+
             <div className="form-group" style={{ marginBottom: '14px' }}>
               <label className="form-label">{isBn ? 'ফাইল সিলেক্ট করুন (ছবি/PDF)' : 'Select File (Image/PDF)'}</label>
               <input
@@ -391,6 +476,7 @@ export default function ProfileModal({
               const IconComp = categoryInfo.icon;
               const isImage = doc.fileType?.startsWith('image/') || doc.fileData?.startsWith('data:image/');
               const isEditing = editingDocId === doc.id;
+              const expBadge = getExpiryBadge(doc.expiryDate);
 
               return (
                 <div
@@ -424,20 +510,29 @@ export default function ProfileModal({
 
                       <div style={{ flex: 1, minWidth: 0 }}>
                         {isEditing ? (
-                          <input
-                            type="text"
-                            className="form-input"
-                            style={{ padding: '4px 8px', fontSize: '0.85rem' }}
-                            value={editTitle}
-                            onChange={(e) => setEditTitle(e.target.value)}
-                          />
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '4px' }}>
+                            <input
+                              type="text"
+                              className="form-input"
+                              style={{ padding: '4px 8px', fontSize: '0.85rem' }}
+                              value={editTitle}
+                              onChange={(e) => setEditTitle(e.target.value)}
+                            />
+                            <input
+                              type="date"
+                              className="form-input"
+                              style={{ padding: '4px 8px', fontSize: '0.78rem' }}
+                              value={editExpiryDate}
+                              onChange={(e) => setEditExpiryDate(e.target.value)}
+                            />
+                          </div>
                         ) : (
                           <h5 style={{ fontSize: '0.88rem', fontWeight: 700, margin: 0, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {doc.title}
                           </h5>
                         )}
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px', marginTop: '2px' }}>
                           <span style={{
                             fontSize: '0.68rem',
                             fontWeight: 700,
@@ -451,6 +546,21 @@ export default function ProfileModal({
                           <span style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>
                             {formatFileSize(doc.fileSize)}
                           </span>
+
+                          {/* Expiry Badge */}
+                          {expBadge && !isEditing && (
+                            <span style={{
+                              fontSize: '0.68rem',
+                              fontWeight: 700,
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              background: expBadge.bg,
+                              color: expBadge.color,
+                              border: `1px solid ${expBadge.border}`
+                            }}>
+                              {expBadge.label}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -498,6 +608,7 @@ export default function ProfileModal({
                             setEditingDocId(doc.id);
                             setEditTitle(doc.title);
                             setEditType(doc.docType);
+                            setEditExpiryDate(doc.expiryDate || '');
                           }}
                           title={isBn ? 'এডিট করুন' : 'Edit Document'}
                         >
@@ -522,6 +633,32 @@ export default function ProfileModal({
             })}
           </div>
         )}
+
+        {/* ===== Send Feedback / Support Button ===== */}
+        <div style={{ marginBottom: '14px' }}>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => setShowFeedbackModal(true)}
+            style={{
+              width: '100%',
+              background: 'rgba(56, 189, 248, 0.1)',
+              color: '#38bdf8',
+              border: '1px solid rgba(56, 189, 248, 0.3)',
+              borderRadius: '12px',
+              fontSize: '0.86rem',
+              fontWeight: 700,
+              padding: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}
+          >
+            <MessageSquare size={17} />
+            <span>{isBn ? '💡 মতামত বা সমস্যা জানান (Support)' : '💡 Send Feedback or Report Bug'}</span>
+          </button>
+        </div>
 
         {/* ===== Logout & Deactivate Section ===== */}
         {onLogout && (
@@ -823,6 +960,125 @@ export default function ProfileModal({
                     />
                   )}
                 </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ===== Feedback & Support Modal ===== */}
+        {showFeedbackModal && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.85)',
+              zIndex: 999999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '20px'
+            }}
+            onClick={() => setShowFeedbackModal(false)}
+          >
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #1e293b, #0f172a)',
+                border: '1px solid rgba(56, 189, 248, 0.4)',
+                borderRadius: '20px',
+                padding: '24px',
+                maxWidth: '420px',
+                width: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '14px'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <MessageSquare size={20} color="#38bdf8" />
+                  <h4 style={{ fontSize: '1.05rem', color: '#ffffff', margin: 0, fontWeight: 700 }}>
+                    {isBn ? 'মতামত বা সমস্যা রিপোর্ট' : 'Feedback & Support'}
+                  </h4>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-icon"
+                  onClick={() => setShowFeedbackModal(false)}
+                  style={{ color: '#94a3b8' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {feedbackSuccess ? (
+                <div style={{
+                  padding: '24px 16px',
+                  textAlign: 'center',
+                  background: 'rgba(16, 185, 129, 0.1)',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(16, 185, 129, 0.3)'
+                }}>
+                  <Check size={36} color="#10b981" style={{ margin: '0 auto 10px' }} />
+                  <h5 style={{ color: '#10b981', fontSize: '1rem', margin: '0 0 4px 0', fontWeight: 700 }}>
+                    {isBn ? 'ধন্যবাদ! আপনার মেসেজটি পাঠানো হয়েছে।' : 'Thank you! Your feedback has been sent.'}
+                  </h5>
+                  <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: 0 }}>
+                    {isBn ? 'আমরা দ্রুত এটি পর্যালোচনা করবো।' : 'We will review it promptly.'}
+                  </p>
+                </div>
+              ) : (
+                <form onSubmit={handleFeedbackSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div className="form-group">
+                    <label className="form-label">{isBn ? 'মেসেজের ধরন' : 'Feedback Category'}</label>
+                    <select
+                      className="form-select"
+                      value={feedbackType}
+                      onChange={(e) => setFeedbackType(e.target.value)}
+                    >
+                      <option value="feedback">{isBn ? '💡 সাধারণ মতামত / পরামর্শ' : '💡 General Feedback / Suggestion'}</option>
+                      <option value="bug">{isBn ? '🐛 কোনো সমস্যা / বাগ রিপোর্ট' : '🐛 Bug / Problem Report'}</option>
+                      <option value="feature_request">{isBn ? '✨ নতুন ফিচারের অনুরোধ' : '✨ Feature Request'}</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">{isBn ? 'আপনার বার্তা বিস্তারিত লিখুন' : 'Detailed Message'}</label>
+                    <textarea
+                      className="form-input"
+                      rows={4}
+                      placeholder={isBn ? 'আপনার সমস্যা বা মতামত বিস্তারিতভাবে লিখুন...' : 'Type your message or issue details here...'}
+                      value={feedbackMessage}
+                      onChange={(e) => setFeedbackMessage(e.target.value)}
+                      required
+                      style={{ resize: 'vertical', minHeight: '90px' }}
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={feedbackLoading || !feedbackMessage.trim()}
+                    style={{
+                      padding: '11px',
+                      fontSize: '0.88rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <Send size={16} />
+                    <span>
+                      {feedbackLoading
+                        ? (isBn ? 'পাঠানো হচ্ছে...' : 'Sending...')
+                        : (isBn ? 'মেসেজ পাঠান' : 'Submit Feedback')}
+                    </span>
+                  </button>
+                </form>
               )}
             </div>
           </div>

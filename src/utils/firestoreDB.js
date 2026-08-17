@@ -96,6 +96,84 @@ export async function deleteUserAllData(uid) {
     await deleteDoc(docRef);
   } catch (err) {
     console.error('Error deleting user Firestore data:', uid, err);
-    // Still continue with account deletion even if Firestore delete fails
   }
 }
+
+/**
+ * Save or update user FCM Token in Firestore for targeted push notifications
+ */
+export async function saveUserFCMToken(uid, token) {
+  if (!uid || !token) return;
+  try {
+    const docRef = doc(db, 'users', uid);
+    await setDoc(docRef, {
+      fcmToken: token,
+      lastTokenAt: new Date().toISOString()
+    }, { merge: true });
+  } catch (err) {
+    console.debug('Failed to save FCM token to Firestore:', err);
+  }
+}
+
+/**
+ * Submit user feedback or issue report directly to Firestore 'feedbacks' collection
+ */
+export async function submitUserFeedback({ uid, email, name, type = 'feedback', message, appVersion = '1.1' }) {
+  if (!message || !message.trim()) throw new Error('Message is required');
+  try {
+    const feedbackDocRef = doc(db, 'feedbacks', `fb_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`);
+    await setDoc(feedbackDocRef, {
+      uid: uid || 'anonymous',
+      email: email || 'not_provided',
+      name: name || 'User',
+      type, // 'bug', 'feedback', 'feature_request'
+      message: message.trim(),
+      appVersion,
+      createdAt: new Date().toISOString(),
+      status: 'pending'
+    });
+    return { success: true };
+  } catch (err) {
+    console.error('Error submitting feedback:', err);
+    throw err;
+  }
+}
+
+/**
+ * Check if a newer version of the app is available in Firestore 'app_config/version'
+ */
+export async function checkAppUpdate(currentVersion = '1.1') {
+  try {
+    const docRef = doc(db, 'app_config', 'version');
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const config = snap.data();
+      const latestVersion = config.latestVersion || currentVersion;
+      const isUpdateAvailable = compareVersions(latestVersion, currentVersion) > 0;
+      return {
+        isUpdateAvailable,
+        latestVersion,
+        updateUrl: config.updateUrl || '',
+        releaseNotes: config.releaseNotes || '',
+        isMandatory: !!config.isMandatory
+      };
+    }
+    return { isUpdateAvailable: false };
+  } catch (err) {
+    console.debug('App version check skipped:', err);
+    return { isUpdateAvailable: false };
+  }
+}
+
+function compareVersions(v1, v2) {
+  const parts1 = v1.split('.').map(Number);
+  const parts2 = v2.split('.').map(Number);
+  for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+    const p1 = parts1[i] || 0;
+    const p2 = parts2[i] || 0;
+    if (p1 > p2) return 1;
+    if (p1 < p2) return -1;
+  }
+  return 0;
+}
+

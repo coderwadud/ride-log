@@ -12,6 +12,7 @@ import ServiceModal from './components/ServiceModal';
 import BikeModal from './components/BikeModal';
 import ProfileModal from './components/ProfileModal';
 import PWAInstallModal from './components/PWAInstallModal';
+import UpdateModal from './components/UpdateModal';
 import Footer from './components/Footer';
 import BikeSelector from './components/BikeSelector';
 
@@ -19,6 +20,7 @@ import { exportBackupData, mergeImportBackupData, loadSettings, saveSettings } f
 import { calculateFuelLogStats, calculateServiceStats } from './utils/calculations';
 import { translations } from './utils/translations';
 import { LayoutDashboard, Fuel, Wrench, BarChart3 } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import {
   updateLastActiveAt,
   trackUserLogin,
@@ -27,6 +29,8 @@ import {
   trackBikeAdded,
   trackLanguageChanged
 } from './utils/analytics';
+import { initPushNotifications, syncFCMTokenWithUser } from './utils/pushNotifications';
+import { checkAppUpdate } from './utils/firestoreDB';
 
 const DEFAULT_BIKE = {
   id: 'bike_1',
@@ -78,6 +82,11 @@ export default function App() {
     saveSettings({ lang, theme });
   }, [lang, theme]);
 
+  // Initialize push notifications on native device
+  useEffect(() => {
+    initPushNotifications();
+  }, []);
+
   // Modal States
   const [isFuelModalOpen, setIsFuelModalOpen] = useState(false);
   const [editingFuelData, setEditingFuelData] = useState(null);
@@ -86,6 +95,24 @@ export default function App() {
   const [isBikeModalOpen, setIsBikeModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+
+  // App Update State
+  const [updateInfo, setUpdateInfo] = useState(null);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+
+  // Check for app updates on mount (Native Android app only)
+  useEffect(() => {
+    const runVersionCheck = async () => {
+      if (!Capacitor.isNativePlatform()) return;
+
+      const update = await checkAppUpdate('1.1');
+      if (update?.isUpdateAvailable) {
+        setUpdateInfo(update);
+        setIsUpdateModalOpen(true);
+      }
+    };
+    runVersionCheck();
+  }, []);
 
   // PWA Install Event
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -119,6 +146,9 @@ export default function App() {
         // ── Analytics: track login & update lastActiveAt ──
         trackUserLogin(firebaseUser.providerData?.[0]?.providerId || 'unknown');
         updateLastActiveAt(firebaseUser.uid);
+
+        // ── FCM Token sync with user ID ──
+        syncFCMTokenWithUser(firebaseUser.uid);
       } else {
         // Logged out — clear user data from memory
         setBikes([DEFAULT_BIKE]);
@@ -498,6 +528,12 @@ export default function App() {
         onClose={() => setIsInstallModalOpen(false)}
         deferredPrompt={deferredPrompt}
         onTriggerInstall={handleTriggerInstall}
+      />
+      <UpdateModal
+        lang={lang}
+        isOpen={isUpdateModalOpen}
+        updateInfo={updateInfo}
+        onClose={() => setIsUpdateModalOpen(false)}
       />
     </div>
   );

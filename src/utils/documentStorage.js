@@ -208,7 +208,7 @@ export async function getPrivateDocuments(userId) {
 /**
  * Save file privately in App Internal Sandboxed Storage / IndexedDB
  */
-export async function addPrivateDocument({ userId, bikeId, title, docType, file }) {
+export async function addPrivateDocument({ userId, bikeId, title, docType, expiryDate = '', file }) {
   const docId = `doc_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
   const base64Data = await compressImageIfNeeded(file);
   const fileExt = file.name.split('.').pop() || 'png';
@@ -236,6 +236,7 @@ export async function addPrivateDocument({ userId, bikeId, title, docType, file 
     bikeId: bikeId || 'bike_1',
     title: title || file.name,
     docType: docType || 'other',
+    expiryDate: expiryDate || '',
     fileName: file.name,
     fileType: file.type,
     fileSize: file.size,
@@ -249,7 +250,7 @@ export async function addPrivateDocument({ userId, bikeId, title, docType, file 
 }
 
 /**
- * Update document title/type
+ * Update document title/type/expiryDate
  */
 export async function updatePrivateDocument(userId, docId, updates) {
   const targetUserId = userId || 'guest';
