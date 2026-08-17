@@ -22,7 +22,8 @@ import BikeSelector from './components/BikeSelector';
 
 import {
   exportBackupData, mergeImportBackupData, loadSettings, saveSettings,
-  saveBikes, saveFuelLogs, saveServiceLogs, saveActiveBikeId
+  saveBikes, saveFuelLogs, saveServiceLogs, saveActiveBikeId,
+  loadBikes, loadFuelLogs, loadServiceLogs, loadActiveBikeId
 } from './utils/storage';
 import { calculateFuelLogStats, calculateServiceStats } from './utils/calculations';
 import { translations } from './utils/translations';
@@ -74,11 +75,11 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
 
-  // Core App Data States (User-isolated via Firestore)
-  const [bikes, setBikes] = useState([DEFAULT_BIKE]);
-  const [activeBikeId, setActiveBikeId] = useState('bike_1');
-  const [fuelLogs, setFuelLogs] = useState([]);
-  const [serviceLogs, setServiceLogs] = useState([]);
+  // Core App Data States (Loaded immediately from localStorage on startup)
+  const [bikes, setBikes] = useState(() => loadBikes());
+  const [activeBikeId, setActiveBikeId] = useState(() => loadActiveBikeId());
+  const [fuelLogs, setFuelLogs] = useState(() => loadFuelLogs());
+  const [serviceLogs, setServiceLogs] = useState(() => loadServiceLogs());
 
   // Flag to avoid saving initial empty state over Firestore before loading finishes
   const isLoadedRef = useRef(false);
@@ -278,23 +279,29 @@ export default function App() {
           const data = await loadUserData(firebaseUser.uid);
 
           // Safety check: if cloud has logs, use cloud; if cloud is empty but local has logs, preserve local logs!
-          const localFuel = storage.getFuelLogs() || [];
-          const localService = storage.getServiceLogs() || [];
-          const localBikes = storage.getBikes() || [DEFAULT_BIKE];
+          const localFuel = loadFuelLogs() || [];
+          const localService = loadServiceLogs() || [];
+          const localBikes = loadBikes() || [DEFAULT_BIKE];
 
-          const finalBikes = (data.bikes && data.bikes.length > 0 && data.bikes[0]?.name !== 'My Bike')
+          const finalBikes = (Array.isArray(data.bikes) && data.bikes.length > 0 && (data.bikes.length > 1 || data.bikes[0]?.name !== 'My Bike'))
             ? data.bikes
-            : (localBikes.length > 0 && localBikes[0]?.name !== 'My Bike' ? localBikes : data.bikes || [DEFAULT_BIKE]);
+            : (localBikes.length > 0 && (localBikes.length > 1 || localBikes[0]?.name !== 'My Bike') ? localBikes : data.bikes || [DEFAULT_BIKE]);
 
-          const finalFuel = (data.fuelLogs && data.fuelLogs.length > 0) ? data.fuelLogs : localFuel;
-          const finalService = (data.serviceLogs && data.serviceLogs.length > 0) ? data.serviceLogs : localService;
+          const finalFuel = (Array.isArray(data.fuelLogs) && data.fuelLogs.length > 0) ? data.fuelLogs : localFuel;
+          const finalService = (Array.isArray(data.serviceLogs) && data.serviceLogs.length > 0) ? data.serviceLogs : localService;
 
           setBikes(finalBikes);
-          setActiveBikeId(data.activeBikeId || storage.getActiveBikeId() || 'bike_1');
+          setActiveBikeId(data.activeBikeId || loadActiveBikeId() || 'bike_1');
           setFuelLogs(finalFuel);
           setServiceLogs(finalService);
           if (data.settings?.lang) setLang(data.settings.lang);
           if (data.settings?.theme) setTheme(data.settings.theme);
+
+          // Save to local storage immediately
+          saveBikes(finalBikes);
+          saveFuelLogs(finalFuel);
+          saveServiceLogs(finalService);
+          saveActiveBikeId(data.activeBikeId || loadActiveBikeId() || 'bike_1');
         } catch (e) {
           console.error('Error loading user data from cloud:', e);
         } finally {
