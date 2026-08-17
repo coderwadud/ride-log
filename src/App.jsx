@@ -270,30 +270,34 @@ export default function App() {
         setDataLoading(true);
         isLoadedRef.current = false;
 
-        // Fetch user data from Firestore document users/{uid}
-        const data = await loadUserData(firebaseUser.uid);
+        try {
+          // Fetch user data from Firestore document users/{uid}
+          const data = await loadUserData(firebaseUser.uid);
 
-        // Safety check: if cloud has logs, use cloud; if cloud is empty but local has logs, preserve local logs!
-        const localFuel = storage.getFuelLogs() || [];
-        const localService = storage.getServiceLogs() || [];
-        const localBikes = storage.getBikes() || [DEFAULT_BIKE];
+          // Safety check: if cloud has logs, use cloud; if cloud is empty but local has logs, preserve local logs!
+          const localFuel = storage.getFuelLogs() || [];
+          const localService = storage.getServiceLogs() || [];
+          const localBikes = storage.getBikes() || [DEFAULT_BIKE];
 
-        const finalBikes = (data.bikes && data.bikes.length > 0 && data.bikes[0]?.name !== 'My Bike')
-          ? data.bikes
-          : (localBikes.length > 0 && localBikes[0]?.name !== 'My Bike' ? localBikes : data.bikes || [DEFAULT_BIKE]);
+          const finalBikes = (data.bikes && data.bikes.length > 0 && data.bikes[0]?.name !== 'My Bike')
+            ? data.bikes
+            : (localBikes.length > 0 && localBikes[0]?.name !== 'My Bike' ? localBikes : data.bikes || [DEFAULT_BIKE]);
 
-        const finalFuel = (data.fuelLogs && data.fuelLogs.length > 0) ? data.fuelLogs : localFuel;
-        const finalService = (data.serviceLogs && data.serviceLogs.length > 0) ? data.serviceLogs : localService;
+          const finalFuel = (data.fuelLogs && data.fuelLogs.length > 0) ? data.fuelLogs : localFuel;
+          const finalService = (data.serviceLogs && data.serviceLogs.length > 0) ? data.serviceLogs : localService;
 
-        setBikes(finalBikes);
-        setActiveBikeId(data.activeBikeId || storage.getActiveBikeId() || 'bike_1');
-        setFuelLogs(finalFuel);
-        setServiceLogs(finalService);
-        if (data.settings?.lang) setLang(data.settings.lang);
-        if (data.settings?.theme) setTheme(data.settings.theme);
-
-        setDataLoading(false);
-        isLoadedRef.current = true;
+          setBikes(finalBikes);
+          setActiveBikeId(data.activeBikeId || storage.getActiveBikeId() || 'bike_1');
+          setFuelLogs(finalFuel);
+          setServiceLogs(finalService);
+          if (data.settings?.lang) setLang(data.settings.lang);
+          if (data.settings?.theme) setTheme(data.settings.theme);
+        } catch (e) {
+          console.error('Error loading user data from cloud:', e);
+        } finally {
+          setDataLoading(false);
+          isLoadedRef.current = true;
+        }
 
         // ── Analytics: track login & update lastActiveAt ──
         trackUserLogin(firebaseUser.providerData?.[0]?.providerId || 'unknown');

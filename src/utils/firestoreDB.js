@@ -56,16 +56,34 @@ export async function loadUserData(uid) {
     let activeBikeId = rootData.activeBikeId || 'bike_1';
     let settings = rootData.settings || DEFAULT_DATA.settings;
 
-    // Try reading subcollections safely (if rules permit)
+    // If rootData already has logs, return immediately for instant 0ms load!
+    if (fuelLogs.length > 0 || serviceLogs.length > 0) {
+      fuelLogs.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+      serviceLogs.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+      return {
+        settings,
+        activeBikeId,
+        bikes: bikes.length > 0 ? bikes : [DEFAULT_BIKE],
+        fuelLogs,
+        serviceLogs
+      };
+    }
+
+    // Otherwise, try reading subcollections with a fast 2-second timeout
     try {
       const bikesRef = collection(db, 'users', uid, 'bikes');
       const fuelLogsRef = collection(db, 'users', uid, 'fuel_logs');
       const serviceLogsRef = collection(db, 'users', uid, 'service_logs');
 
-      const [bikesSnap, fuelLogsSnap, serviceLogsSnap] = await Promise.all([
-        getDocs(bikesRef).catch(() => null),
-        getDocs(fuelLogsRef).catch(() => null),
-        getDocs(serviceLogsRef).catch(() => null)
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000));
+
+      const [bikesSnap, fuelLogsSnap, serviceLogsSnap] = await Promise.race([
+        Promise.all([
+          getDocs(bikesRef).catch(() => null),
+          getDocs(fuelLogsRef).catch(() => null),
+          getDocs(serviceLogsRef).catch(() => null)
+        ]),
+        timeoutPromise
       ]);
 
       if (bikesSnap && !bikesSnap.empty) {
