@@ -6,7 +6,7 @@ import {
   Play, Pause, Square, Navigation, RotateCcw, 
   Trash2, Calendar, Compass, History, Layers, Check,
   Map, Globe, Bike, Mountain, Moon, Activity, Film,
-  Gauge, Clock, Flag, MapPin, Zap
+  Gauge, Clock, Flag, MapPin, Zap, X, Sparkles, CheckCircle2, Save
 } from 'lucide-react';
 import { saveTrip, getTripsLast3Days, deleteTrip, calculateDistanceKm } from '../utils/tripStorage';
 
@@ -149,6 +149,13 @@ export default function GpsTrackerTab({
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackIndex, setPlaybackIndex] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1); // 1x, 2x, 4x, 8x
+
+  // ── SAVE TRIP MODAL STATES ──
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [pendingTripData, setPendingTripData] = useState(null);
+  const [customTripTitle, setCustomTripTitle] = useState('');
+  const [isSavingTrip, setIsSavingTrip] = useState(false);
+  const [saveToastMsg, setSaveToastMsg] = useState('');
 
   // ── MAP LAYER STATE ──
   const [selectedLayerKey, setSelectedLayerKey] = useState(() => {
@@ -468,35 +475,66 @@ export default function GpsTrackerTab({
       ? `রাইড - ${new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' })}`
       : `Ride - ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 
-    const tripTitle = prompt(
-      isBn ? 'রাইডের নাম দিন (যেমন: ধানমন্ডি থেকে উত্তরা):' : 'Enter Trip Title (e.g. Home to Office):',
-      defaultTitle
-    );
-
-    if (tripTitle === null) return; // User cancelled
-
     const avgSpeed = elapsedSeconds > 0 ? +((tripDistanceKm / (elapsedSeconds / 3600))).toFixed(1) : 0;
 
-    const newTrip = {
-      id: `trip_${Date.now()}`,
+    // Open Custom Save Trip Modal
+    setPendingTripData({
       userId,
       bikeId: activeBike?.id || 'bike_1',
       bikeName: activeBike?.name || 'My Bike',
-      title: tripTitle || defaultTitle,
       startTime: tripStartTime || new Date().toISOString(),
       endTime: new Date().toISOString(),
       durationSeconds: Math.max(1, elapsedSeconds),
       distanceKm: tripDistanceKm,
       maxSpeedKmH: maxSpeed,
       avgSpeedKmH: isNaN(avgSpeed) ? 0 : avgSpeed,
-      points: finalPoints
-    };
+      points: finalPoints,
+      defaultTitle
+    });
+    setCustomTripTitle(defaultTitle);
+    setIsSaveModalOpen(true);
+  };
 
-    await saveTrip(newTrip);
-    alert(isBn ? '✅ রাইড সফলভাবে সংরক্ষিত হয়েছে!' : '✅ Trip saved successfully!');
-    await loadRecentTrips();
-    setSelectedTrip(newTrip);
-    setMode('playback');
+  const handleConfirmSaveTrip = async () => {
+    if (!pendingTripData || isSavingTrip) return;
+    setIsSavingTrip(true);
+
+    try {
+      const newTrip = {
+        id: `trip_${Date.now()}`,
+        userId: pendingTripData.userId,
+        bikeId: pendingTripData.bikeId,
+        bikeName: pendingTripData.bikeName,
+        title: customTripTitle.trim() || pendingTripData.defaultTitle,
+        startTime: pendingTripData.startTime,
+        endTime: pendingTripData.endTime,
+        durationSeconds: pendingTripData.durationSeconds,
+        distanceKm: pendingTripData.distanceKm,
+        maxSpeedKmH: pendingTripData.maxSpeedKmH,
+        avgSpeedKmH: pendingTripData.avgSpeedKmH,
+        points: pendingTripData.points
+      };
+
+      await saveTrip(newTrip);
+      setIsSaveModalOpen(false);
+      setPendingTripData(null);
+      setSaveToastMsg(isBn ? '✅ রাইড সফলভাবে সংরক্ষিত হয়েছে!' : '✅ Trip saved successfully!');
+      setTimeout(() => setSaveToastMsg(''), 4000);
+
+      await loadRecentTrips();
+      setSelectedTrip(newTrip);
+      setMode('playback');
+    } catch (e) {
+      console.error('Failed to save trip:', e);
+    } finally {
+      setIsSavingTrip(false);
+    }
+  };
+
+  const handleDiscardTrip = () => {
+    setIsSaveModalOpen(false);
+    setPendingTripData(null);
+    setCustomTripTitle('');
   };
 
   // ── 3-DAY PLAYBACK CONTROLS ──
@@ -1239,6 +1277,204 @@ export default function GpsTrackerTab({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── SAVE TRIP CUSTOM MODAL (NO BROWSER ALERT / PROMPT) ── */}
+      {isSaveModalOpen && pendingTripData && (
+        <div className="modal-overlay" style={{ zIndex: 99999 }} onClick={handleDiscardTrip}>
+          <div className="modal-content" style={{ maxWidth: '460px', padding: '24px', borderRadius: '20px', position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+            
+            {/* Modal Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: 40, height: 40, borderRadius: '12px', background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(2, 132, 199, 0.3))', color: '#38bdf8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Flag size={22} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800 }}>
+                    {isBn ? 'রাইড সংরক্ষণ করুন' : 'Save Trip Summary'}
+                  </h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                    {isBn ? 'আপনার রাইডের নাম দিন এবং পরিসংখ্যান দেখুন' : 'Name your trip and review performance'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-icon"
+                onClick={handleDiscardTrip}
+                style={{ padding: '6px' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Ride Stats Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '18px' }}>
+              <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '10px 12px' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Navigation size={12} color="#38bdf8" /> {isBn ? 'দূরত্ব' : 'Distance'}
+                </span>
+                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#38bdf8', marginTop: '2px' }}>
+                  {pendingTripData.distanceKm.toFixed(2)} <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>{isBn ? 'কিমি' : 'km'}</span>
+                </div>
+              </div>
+
+              <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '10px 12px' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Clock size={12} color="#10b981" /> {isBn ? 'সময়' : 'Duration'}
+                </span>
+                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#10b981', marginTop: '2px' }}>
+                  {Math.floor(pendingTripData.durationSeconds / 60)}m {pendingTripData.durationSeconds % 60}s
+                </div>
+              </div>
+
+              <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '10px 12px' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Zap size={12} color="#f59e0b" /> {isBn ? 'সর্বোচ্চ গতি' : 'Max Speed'}
+                </span>
+                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f59e0b', marginTop: '2px' }}>
+                  {Math.round(pendingTripData.maxSpeedKmH)} <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>km/h</span>
+                </div>
+              </div>
+
+              <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '10px 12px' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Gauge size={12} color="#a78bfa" /> {isBn ? 'গড় গতি' : 'Avg Speed'}
+                </span>
+                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#a78bfa', marginTop: '2px' }}>
+                  {pendingTripData.avgSpeedKmH} <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>km/h</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Trip Title Input */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '6px', color: 'var(--text-main)' }}>
+                {isBn ? 'রাইডের নাম / শিরোনাম:' : 'Trip Title / Destination:'}
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={customTripTitle}
+                  onChange={(e) => setCustomTripTitle(e.target.value)}
+                  placeholder={isBn ? 'যেমন: বাসা থেকে অফিস / ধানমন্ডি থেকে উত্তরা' : 'e.g. Home to Office / Highway Ride'}
+                  style={{ width: '100%', height: '42px', paddingLeft: '12px', paddingRight: '36px', fontSize: '0.88rem', borderRadius: '12px' }}
+                  autoFocus
+                />
+                {customTripTitle && (
+                  <button
+                    type="button"
+                    onClick={() => setCustomTripTitle('')}
+                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
+                  >
+                    <X size={15} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Quick Suggestion Pills */}
+            <div style={{ marginBottom: '20px' }}>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                {isBn ? 'দ্রুত পরামর্শ (Quick Presets):' : 'Quick Presets:'}
+              </span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {[
+                  { bn: '🏠 ➔ 🏢 বাসা থেকে অফিস', en: '🏠 ➔ 🏢 Home to Office' },
+                  { bn: '🏢 ➔ 🏠 অফিস থেকে বাসা', en: '🏢 ➔ 🏠 Office to Home' },
+                  { bn: '🛣️ হাইওয়ে রাইড', en: '🛣️ Highway Tour' },
+                  { bn: '🌆 সিটি রাইড', en: '🌆 City Ride' },
+                  { bn: '☕ ইভনিং হাওয়া', en: '☕ Evening Hangout' }
+                ].map((preset, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setCustomTripTitle(isBn ? preset.bn : preset.en)}
+                    style={{
+                      fontSize: '0.74rem',
+                      padding: '4px 10px',
+                      borderRadius: '16px',
+                      border: '1px solid var(--border-color)',
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      color: 'var(--text-main)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    {isBn ? preset.bn : preset.en}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleDiscardTrip}
+                disabled={isSavingTrip}
+                style={{ flex: 1, height: '42px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 700 }}
+              >
+                {isBn ? 'বাতিল' : 'Cancel'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmSaveTrip}
+                disabled={isSavingTrip}
+                style={{
+                  flex: 2,
+                  height: '42px',
+                  borderRadius: '12px',
+                  fontSize: '0.86rem',
+                  fontWeight: 800,
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #0284c7, #0369a1)',
+                  color: '#ffffff',
+                  boxShadow: '0 4px 14px rgba(2, 132, 199, 0.4)',
+                  cursor: isSavingTrip ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                <Save size={16} />
+                <span>{isSavingTrip ? (isBn ? 'সংরক্ষণ হচ্ছে...' : 'Saving...') : (isBn ? 'রাইড সংরক্ষণ করুন' : 'Save Trip')}</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Success Toast */}
+      {saveToastMsg && (
+        <div style={{
+          position: 'fixed',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 10000,
+          background: 'rgba(16, 185, 129, 0.95)',
+          color: '#ffffff',
+          padding: '10px 20px',
+          borderRadius: '30px',
+          fontSize: '0.88rem',
+          fontWeight: 700,
+          boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          backdropFilter: 'blur(8px)',
+          animation: 'fadeIn 0.3s ease'
+        }}>
+          <CheckCircle2 size={18} />
+          <span>{saveToastMsg}</span>
         </div>
       )}
     </div>
