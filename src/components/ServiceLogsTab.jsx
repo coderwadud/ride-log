@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   Wrench, Plus, Edit2, Trash2, Calendar, Gauge, FileText,
-  Search, X, ChevronLeft, ChevronRight, Filter, ArrowUpDown
+  Search, X, ChevronLeft, ChevronRight, Filter, ArrowUpDown, Clock
 } from 'lucide-react';
 import { translations } from '../utils/translations';
 import { formatCurrency, formatNum } from '../utils/calculations';
@@ -20,7 +20,11 @@ export default function ServiceLogsTab({
   // Filter & Search States
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('all'); // 'all', 'oil', 'brake', 'tire', 'chain', etc.
-  const [sortOrder, setSortOrder] = useState('newest'); // 'newest', 'oldest', 'highest_cost'
+  const [sortOrder, setSortOrder] = useState('newest'); // 'newest', 'oldest', 'highest_cost', 'lowest_cost'
+  const [datePreset, setDatePreset] = useState('all'); // 'all', 'this_month', 'last_month', 'last_30_days', 'this_year', 'custom'
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [showCustomDate, setShowCustomDate] = useState(false);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -44,6 +48,43 @@ export default function ServiceLogsTab({
       list = list.filter(item => Array.isArray(item.types) && item.types.includes(filterCategory));
     }
 
+    // Date & Date Range Filter
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    let start = startDate;
+    let end = endDate;
+
+    if (datePreset === 'this_month') {
+      start = new Date(currentYear, currentMonth, 1).toISOString().slice(0, 10);
+      end = new Date(currentYear, currentMonth + 1, 0).toISOString().slice(0, 10);
+    } else if (datePreset === 'last_month') {
+      start = new Date(currentYear, currentMonth - 1, 1).toISOString().slice(0, 10);
+      end = new Date(currentYear, currentMonth, 0).toISOString().slice(0, 10);
+    } else if (datePreset === 'last_30_days') {
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      start = d.toISOString().slice(0, 10);
+      end = now.toISOString().slice(0, 10);
+    } else if (datePreset === 'this_year') {
+      start = `${currentYear}-01-01`;
+      end = `${currentYear}-12-31`;
+    }
+
+    if (start) {
+      list = list.filter(item => {
+        const itemDate = (item.date || '').slice(0, 10);
+        return itemDate >= start;
+      });
+    }
+    if (end) {
+      list = list.filter(item => {
+        const itemDate = (item.date || '').slice(0, 10);
+        return itemDate <= end;
+      });
+    }
+
     // Search Query
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
@@ -63,13 +104,15 @@ export default function ServiceLogsTab({
       list.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
     } else if (sortOrder === 'highest_cost') {
       list.sort((a, b) => (Number(b.serviceCost || 0) + Number(b.partsCost || 0)) - (Number(a.serviceCost || 0) + Number(a.partsCost || 0)));
+    } else if (sortOrder === 'lowest_cost') {
+      list.sort((a, b) => (Number(a.serviceCost || 0) + Number(a.partsCost || 0)) - (Number(b.serviceCost || 0) + Number(b.partsCost || 0)));
     } else {
       // Default: Newest first
       list.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
     }
 
     return list;
-  }, [serviceLogs, filterCategory, searchQuery, sortOrder, t]);
+  }, [serviceLogs, filterCategory, datePreset, startDate, endDate, searchQuery, sortOrder, t]);
 
   // Pagination Calculation
   const totalItems = filteredLogs.length;
@@ -87,12 +130,30 @@ export default function ServiceLogsTab({
     }
   };
 
+  const handleDatePresetChange = (preset) => {
+    setDatePreset(preset);
+    if (preset === 'custom') {
+      setShowCustomDate(true);
+    } else {
+      setShowCustomDate(false);
+      setStartDate('');
+      setEndDate('');
+    }
+    setCurrentPage(1);
+  };
+
   const handleResetFilters = () => {
     setSearchQuery('');
     setFilterCategory('all');
+    setDatePreset('all');
+    setStartDate('');
+    setEndDate('');
+    setShowCustomDate(false);
     setSortOrder('newest');
     setCurrentPage(1);
   };
+
+  const isFilterActive = searchQuery || filterCategory !== 'all' || datePreset !== 'all' || startDate || endDate;
 
   return (
     <div className="service-logs-view" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -157,7 +218,7 @@ export default function ServiceLogsTab({
               )}
             </div>
 
-            {/* Filter Pills & Sort Row */}
+            {/* Filter Pills, Date & Sort Row */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
               {/* Service Category Filter Pills */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
@@ -207,29 +268,119 @@ export default function ServiceLogsTab({
                 })}
               </div>
 
-              {/* Sort Order Selector */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <ArrowUpDown size={14} color="var(--text-dim)" />
-                <select
-                  value={sortOrder}
-                  onChange={(e) => setSortOrder(e.target.value)}
-                  style={{
-                    background: 'var(--bg-card-hover)',
-                    color: 'var(--text-main)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '8px',
-                    padding: '4px 8px',
-                    fontSize: '0.76rem',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="newest">{isBn ? 'নতুন প্রথমে' : 'Newest First'}</option>
-                  <option value="oldest">{isBn ? 'পুরাতন প্রথমে' : 'Oldest First'}</option>
-                  <option value="highest_cost">{isBn ? 'সর্বোচ্চ খরচ' : 'Highest Cost'}</option>
-                </select>
+              {/* Date Filter & Sort Selectors */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                {/* Date Presets Dropdown */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Calendar size={14} color="var(--text-dim)" />
+                  <select
+                    value={datePreset}
+                    onChange={(e) => handleDatePresetChange(e.target.value)}
+                    style={{
+                      background: datePreset !== 'all' ? 'rgba(139, 92, 246, 0.15)' : 'var(--bg-card-hover)',
+                      color: datePreset !== 'all' ? '#a78bfa' : 'var(--text-main)',
+                      border: `1px solid ${datePreset !== 'all' ? 'rgba(139, 92, 246, 0.4)' : 'var(--border-color)'}`,
+                      borderRadius: '8px',
+                      padding: '5px 8px',
+                      fontSize: '0.76rem',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="all">{isBn ? '📅 সব সময়' : '📅 All Time'}</option>
+                    <option value="this_month">{isBn ? 'চলতি মাস' : 'This Month'}</option>
+                    <option value="last_month">{isBn ? 'গত মাস' : 'Last Month'}</option>
+                    <option value="last_30_days">{isBn ? 'বিগত ৩০ দিন' : 'Last 30 Days'}</option>
+                    <option value="this_year">{isBn ? 'চলতি বছর' : 'This Year'}</option>
+                    <option value="custom">{isBn ? 'তারিখ সীমা (Custom)...' : 'Custom Range...'}</option>
+                  </select>
+                </div>
+
+                {/* Sort Order Selector */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <ArrowUpDown size={14} color="var(--text-dim)" />
+                  <select
+                    value={sortOrder}
+                    onChange={(e) => setSortOrder(e.target.value)}
+                    style={{
+                      background: 'var(--bg-card-hover)',
+                      color: 'var(--text-main)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '8px',
+                      padding: '5px 8px',
+                      fontSize: '0.76rem',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="newest">{isBn ? 'নতুন প্রথমে' : 'Newest First'}</option>
+                    <option value="oldest">{isBn ? 'পুরাতন প্রথমে' : 'Oldest First'}</option>
+                    <option value="highest_cost">{isBn ? 'সর্বোচ্চ খরচ' : 'Highest Cost'}</option>
+                    <option value="lowest_cost">{isBn ? 'সর্বনিম্ন খরচ' : 'Lowest Cost'}</option>
+                  </select>
+                </div>
               </div>
             </div>
+
+            {/* ── CUSTOM DATE RANGE PICKER (EXPANDABLE) ── */}
+            {showCustomDate && (
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(139, 92, 246, 0.3)',
+                borderRadius: '10px',
+                padding: '10px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '8px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>{isBn ? 'শুরু:' : 'From:'}</span>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={startDate}
+                      onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1); }}
+                      style={{ padding: '4px 8px', fontSize: '0.78rem', height: '32px', width: 'auto' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>{isBn ? 'শেষ:' : 'To:'}</span>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={endDate}
+                      onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1); }}
+                      style={{ padding: '4px 8px', fontSize: '0.78rem', height: '32px', width: 'auto' }}
+                    />
+                  </div>
+                </div>
+
+                {(startDate || endDate) && (
+                  <button
+                    type="button"
+                    onClick={() => { setStartDate(''); setEndDate(''); setCurrentPage(1); }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#ef4444',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <X size={14} />
+                    <span>{isBn ? 'তারিখ মুছুন' : 'Clear Dates'}</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* ── LOGS LIST VIEW ── */}
@@ -239,14 +390,16 @@ export default function ServiceLogsTab({
               <p style={{ fontWeight: 700, fontSize: '0.95rem', margin: '0 0 6px' }}>
                 {isBn ? 'কোনো সার্ভিস লগ পাওয়া যায়নি' : 'No Matching Service Logs'}
               </p>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={handleResetFilters}
-                style={{ padding: '6px 14px', fontSize: '0.8rem', marginTop: '6px' }}
-              >
-                {isBn ? 'ফিল্টার রিসেট করুন' : 'Reset Filters'}
-              </button>
+              {isFilterActive && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleResetFilters}
+                  style={{ padding: '6px 14px', fontSize: '0.8rem', marginTop: '6px' }}
+                >
+                  {isBn ? 'ফিল্টার রিসেট করুন' : 'Reset Filters'}
+                </button>
+              )}
             </div>
           ) : (
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
