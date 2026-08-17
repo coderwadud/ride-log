@@ -21,7 +21,8 @@ const MAP_LAYERS = {
     descBn: 'রাস্তাঘাট, মোড় ও ল্যান্ডমার্ক',
     descEn: 'Roads, turns & local landmarks',
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    maxZoom: 19,
+    maxZoom: 22,
+    maxNativeZoom: 19,
     subdomains: 'abc'
   },
   satellite: {
@@ -33,7 +34,8 @@ const MAP_LAYERS = {
     descBn: 'আকাশ থেকে পরিষ্কার উপগ্রহ দৃশ্য',
     descEn: 'High-res aerial satellite view',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    maxZoom: 19,
+    maxZoom: 22,
+    maxNativeZoom: 18,
     subdomains: 'abc'
   },
   bike: {
@@ -45,7 +47,8 @@ const MAP_LAYERS = {
     descBn: 'বাইক রুট, সার্ভিস রোড ও লেন',
     descEn: 'Cycling infrastructure & bike tracks',
     url: 'https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
-    maxZoom: 19,
+    maxZoom: 22,
+    maxNativeZoom: 19,
     subdomains: 'abc'
   },
   terrain: {
@@ -57,7 +60,8 @@ const MAP_LAYERS = {
     descBn: 'উচ্চতা, পাহাড় ও পাহাড়ি রাস্তা',
     descEn: 'Elevation contours & hills',
     url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-    maxZoom: 17,
+    maxZoom: 22,
+    maxNativeZoom: 17,
     subdomains: 'abc'
   },
   dark: {
@@ -69,7 +73,8 @@ const MAP_LAYERS = {
     descBn: 'রাতের চোখের আরামদায়ক ডার্ক ম্যাপ',
     descEn: 'Eye-friendly night dark theme',
     url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    maxZoom: 19,
+    maxZoom: 22,
+    maxNativeZoom: 19,
     subdomains: 'abcd'
   }
 };
@@ -209,13 +214,16 @@ export default function GpsTrackerTab({
 
     const map = L.map(mapContainerRef.current, {
       zoomControl: false,
-      attributionControl: false
-    }).setView([defaultLat, defaultLng], 15);
+      attributionControl: false,
+      maxZoom: 22,
+      minZoom: 4
+    }).setView([defaultLat, defaultLng], 16);
 
     // Initial Base Tile Layer from saved preference
     const initialConfig = MAP_LAYERS[selectedLayerKey] || MAP_LAYERS.street;
     const initialLayer = L.tileLayer(initialConfig.url, {
-      maxZoom: initialConfig.maxZoom || 19,
+      maxZoom: 22,
+      maxNativeZoom: initialConfig.maxNativeZoom || 19,
       subdomains: initialConfig.subdomains || 'abc'
     }).addTo(map);
 
@@ -230,7 +238,7 @@ export default function GpsTrackerTab({
       setCurrentPosition([latitude, longitude]);
       setGpsAccuracy(Math.round(accuracy || 0));
       if (mapInstanceRef.current) {
-        mapInstanceRef.current.setView([latitude, longitude], 16);
+        mapInstanceRef.current.setView([latitude, longitude], 17);
       }
     };
 
@@ -269,7 +277,8 @@ export default function GpsTrackerTab({
     }
 
     const newLayer = L.tileLayer(layerConfig.url, {
-      maxZoom: layerConfig.maxZoom || 19,
+      maxZoom: 22,
+      maxNativeZoom: layerConfig.maxNativeZoom || 19,
       subdomains: layerConfig.subdomains || 'abc'
     }).addTo(map);
 
@@ -772,23 +781,25 @@ export default function GpsTrackerTab({
           <div
             style={{
               position: 'absolute',
-              top: '58px',
+              top: '56px',
               right: '12px',
               zIndex: 1001,
-              background: 'linear-gradient(145deg, #1e293b, #0f172a)',
-              border: '1px solid rgba(56, 189, 248, 0.4)',
-              borderRadius: '16px',
-              padding: '12px',
-              width: '240px',
-              boxShadow: '0 12px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(56, 189, 248, 0.2)',
+              background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.98))',
+              border: '1px solid rgba(56, 189, 248, 0.35)',
+              borderRadius: '14px',
+              padding: '10px',
+              width: '230px',
+              maxHeight: 'calc(100% - 68px)',
+              overflowY: 'auto',
+              boxShadow: '0 12px 30px rgba(0, 0, 0, 0.7), 0 0 15px rgba(56, 189, 248, 0.2)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '6px',
-              backdropFilter: 'blur(10px)',
+              gap: '4px',
+              backdropFilter: 'blur(12px)',
               animation: 'fadeIn 0.2s ease'
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '6px', marginBottom: '2px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
               <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Layers size={14} color="#38bdf8" />
                 <span>{isBn ? 'ম্যাপ লেয়ার নির্বাচন' : 'Select Map Layer'}</span>
@@ -800,9 +811,10 @@ export default function GpsTrackerTab({
                   background: 'none',
                   border: 'none',
                   color: '#94a3b8',
-                  fontSize: '0.75rem',
+                  fontSize: '0.8rem',
                   cursor: 'pointer',
-                  fontWeight: 700
+                  fontWeight: 700,
+                  padding: '2px 4px'
                 }}
               >
                 ✕
@@ -824,8 +836,8 @@ export default function GpsTrackerTab({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '8px 10px',
-                    borderRadius: '10px',
+                    padding: '6px 8px',
+                    borderRadius: '8px',
                     border: isSelected ? `1px solid ${layer.color}` : '1px solid transparent',
                     background: isSelected ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.03)',
                     cursor: 'pointer',
@@ -834,11 +846,11 @@ export default function GpsTrackerTab({
                     width: '100%'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '8px',
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '7px',
                       background: 'rgba(255, 255, 255, 0.06)',
                       display: 'flex',
                       alignItems: 'center',
@@ -846,18 +858,18 @@ export default function GpsTrackerTab({
                       color: layer.color,
                       flexShrink: 0
                     }}>
-                      <IconComp size={18} />
+                      <IconComp size={15} />
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '0.82rem', fontWeight: isSelected ? 800 : 600, color: isSelected ? '#ffffff' : '#f1f5f9' }}>
+                      <span style={{ fontSize: '0.78rem', fontWeight: isSelected ? 800 : 600, color: isSelected ? '#ffffff' : '#f1f5f9' }}>
                         {isBn ? layer.nameBn : layer.nameEn}
                       </span>
-                      <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
+                      <span style={{ fontSize: '0.64rem', color: '#94a3b8', lineHeight: 1.2 }}>
                         {isBn ? layer.descBn : layer.descEn}
                       </span>
                     </div>
                   </div>
-                  {isSelected && <Check size={16} color={layer.color} />}
+                  {isSelected && <Check size={14} color={layer.color} />}
                 </button>
               );
             })}
