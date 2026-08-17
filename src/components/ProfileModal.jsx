@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  X, User, Shield, Lock, FileText, Upload, Plus, Trash2, Edit3, 
-  Eye, LogOut, Check, FileCheck, FileCode2, Image as ImageIcon, 
+import {
+  X, User, Shield, Lock, FileText, Upload, Plus, Trash2, Edit3,
+  Eye, LogOut, Check, FileCheck, FileCode2, Image as ImageIcon,
   CreditCard, ShieldCheck, AlertCircle, FileSpreadsheet, Download, UserX,
   MessageSquare, Calendar, Send, Clock
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
-import { 
-  getPrivateDocuments, 
-  addPrivateDocument, 
-  updatePrivateDocument, 
+import {
+  getPrivateDocuments,
+  addPrivateDocument,
+  updatePrivateDocument,
   deletePrivateDocument,
   downloadOrShareDocument
 } from '../utils/documentStorage';
@@ -254,8 +254,8 @@ export default function ProfileModal({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div 
-        className="modal-content" 
+      <div
+        className="modal-content"
         style={{ maxHeight: '92vh', overflowY: 'auto', maxWidth: '520px' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -341,8 +341,8 @@ export default function ProfileModal({
               🔒 {isBn ? '১০০% প্রাইভেট অ্যাপ মেমোরি স্টোরেজ (ROM)' : '🔒 100% Private App ROM Storage'}
             </p>
             <p style={{ fontSize: '0.74rem', color: 'var(--text-muted)', margin: '3px 0 0', lineHeight: '1.4' }}>
-              {isBn 
-                ? 'ডকুমেন্টগুলো কোনো ক্লাউড সার্ভারে যাবে না। ফোনের গোপন অ্যাপ ফোল্ডারে সংরক্ষিত থাকবে। ফোনের গ্যালারি বা ফাইল ম্যানেজারে এগুলো দেখা যাবে না।' 
+              {isBn
+                ? 'ডকুমেন্টগুলো কোনো ক্লাউড সার্ভারে যাবে না। ফোনের গোপন অ্যাপ ফোল্ডারে সংরক্ষিত থাকবে। ফোনের গ্যালারি বা ফাইল ম্যানেজারে এগুলো দেখা যাবে না।'
                 : 'Documents are stored securely inside the app private memory. Completely hidden from phone gallery & external file managers.'}
             </p>
           </div>
@@ -369,7 +369,7 @@ export default function ProfileModal({
 
         {/* ===== Upload Form Dropdown ===== */}
         {showUploadForm && (
-          <form 
+          <form
             onSubmit={handleUploadSubmit}
             style={{
               background: 'rgba(255, 255, 255, 0.03)',
@@ -764,11 +764,11 @@ export default function ProfileModal({
                 <p style={{ fontSize: '0.82rem', color: '#94a3b8', margin: 0, lineHeight: '1.6' }}>
                   {deactivateStep === 1
                     ? (isBn
-                        ? 'এই অ্যাকশনটি সম্পূর্ণ অপরিবর্তনীয়। আপনার সমস্ত বাইক ডাটা, ফুয়েল লগ, সার্ভিস লগ ও ডকুমেন্ট চিরতরে মুছে যাবে।'
-                        : 'This action is completely irreversible. All your bike data, fuel logs, service logs, and documents will be permanently erased.')
+                      ? 'এই অ্যাকশনটি সম্পূর্ণ অপরিবর্তনীয়। আপনার সমস্ত বাইক ডাটা, ফুয়েল লগ, সার্ভিস লগ ও ডকুমেন্ট চিরতরে মুছে যাবে।'
+                      : 'This action is completely irreversible. All your bike data, fuel logs, service logs, and documents will be permanently erased.')
                     : (isBn
-                        ? 'আপনি কি সত্যিই নিশ্চিত? "হ্যাঁ, ডিলিট করুন" চাপলে আর ফিরিয়ে আনা সম্ভব হবে না।'
-                        : 'Are you absolutely sure? Pressing "Yes, Delete" cannot be undone. Ever.')
+                      ? 'আপনি কি সত্যিই নিশ্চিত? "হ্যাঁ, ডিলিট করুন" চাপলে আর ফিরিয়ে আনা সম্ভব হবে না।'
+                      : 'Are you absolutely sure? Pressing "Yes, Delete" cannot be undone. Ever.')
                   }
                 </p>
               </div>
@@ -826,7 +826,7 @@ export default function ProfileModal({
 
         {/* ===== Document Preview Sub-Modal ===== */}
         {previewDoc && (
-          <div 
+          <div
             style={{
               position: 'fixed',
               top: 0,
@@ -876,7 +876,7 @@ export default function ProfileModal({
               </div>
             </div>
 
-            <div 
+            <div
               style={{
                 flex: 1,
                 display: 'flex',
