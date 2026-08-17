@@ -20,7 +20,10 @@ import FeedbackPage from './components/FeedbackPage';
 import Footer from './components/Footer';
 import BikeSelector from './components/BikeSelector';
 
-import { exportBackupData, mergeImportBackupData, loadSettings, saveSettings } from './utils/storage';
+import {
+  exportBackupData, mergeImportBackupData, loadSettings, saveSettings,
+  saveBikes, saveFuelLogs, saveServiceLogs, saveActiveBikeId
+} from './utils/storage';
 import { calculateFuelLogStats, calculateServiceStats } from './utils/calculations';
 import { translations } from './utils/translations';
 import { LayoutDashboard, Fuel, Wrench, BarChart3, Navigation } from 'lucide-react';
@@ -335,6 +338,13 @@ export default function App() {
   }, [user, lang, theme, activeBikeId, bikes, fuelLogs, serviceLogs]);
 
   useEffect(() => {
+    if (isLoadedRef.current) {
+      saveBikes(bikes);
+      saveFuelLogs(fuelLogs);
+      saveServiceLogs(serviceLogs);
+      saveActiveBikeId(activeBikeId);
+      saveSettings({ lang, theme });
+    }
     scheduleSave();
   }, [bikes, fuelLogs, serviceLogs, activeBikeId, lang, theme, scheduleSave]);
 
