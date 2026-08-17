@@ -4,9 +4,63 @@ import { Geolocation } from '@capacitor/geolocation';
 import { Capacitor } from '@capacitor/core';
 import { 
   Play, Pause, Square, Navigation, RotateCcw, 
-  Trash2, Calendar, Compass, History
+  Trash2, Calendar, Compass, History, Layers, Check
 } from 'lucide-react';
 import { saveTrip, getTripsLast3Days, deleteTrip, calculateDistanceKm } from '../utils/tripStorage';
+
+// 5 100% Free Map Modes / Layers
+const MAP_LAYERS = {
+  street: {
+    id: 'street',
+    nameBn: 'স্ট্যান্ডার্ড রোড',
+    nameEn: 'Street Map',
+    icon: '🗺️',
+    descBn: 'রাস্তাঘাট, মোড় ও ল্যান্ডমার্ক',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    maxZoom: 19,
+    subdomains: 'abc'
+  },
+  satellite: {
+    id: 'satellite',
+    nameBn: 'স্যাটেলাইট ছবি',
+    nameEn: 'Satellite HD',
+    icon: '🛰️',
+    descBn: 'আকাশ থেকে পরিষ্কার উপগ্রহ দৃশ্য',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    maxZoom: 19,
+    subdomains: 'abc'
+  },
+  bike: {
+    id: 'bike',
+    nameBn: 'বাইক ও সাইকেল',
+    nameEn: 'Bike & Cycle',
+    icon: '🚲',
+    descBn: 'বাইক রুট, সার্ভিস রোড ও লেন',
+    url: 'https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
+    maxZoom: 19,
+    subdomains: 'abc'
+  },
+  terrain: {
+    id: 'terrain',
+    nameBn: 'ভূপ্রকৃতি ও পাহাড়',
+    nameEn: 'Terrain & Topo',
+    icon: '🏔️',
+    descBn: 'উচ্চতা, পাহাড় ও পাহাড়ি রাস্তা',
+    url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+    maxZoom: 17,
+    subdomains: 'abc'
+  },
+  dark: {
+    id: 'dark',
+    nameBn: 'নাইট / ডার্ক মোড',
+    nameEn: 'Dark Night',
+    icon: '🌙',
+    descBn: 'রাতের চোখের আরামদায়ক ডার্ক ম্যাপ',
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    maxZoom: 19,
+    subdomains: 'abcd'
+  }
+};
 
 // Custom Map Marker Icons using SVG data URIs
 const createPulseIcon = () => L.divIcon({
@@ -84,6 +138,17 @@ export default function GpsTrackerTab({
   const [playbackIndex, setPlaybackIndex] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState(1); // 1x, 2x, 4x, 8x
 
+  // ── MAP LAYER STATE ──
+  const [selectedLayerKey, setSelectedLayerKey] = useState(() => {
+    try {
+      return localStorage.getItem('ridelog_map_layer') || (theme === 'dark' ? 'dark' : 'street');
+    } catch (e) {
+      return 'street';
+    }
+  });
+  const [showLayerMenu, setShowLayerMenu] = useState(false);
+  const currentTileLayerRef = useRef(null);
+
   // ── MAP REFERENCES ──
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -128,15 +193,14 @@ export default function GpsTrackerTab({
       attributionControl: false
     }).setView([defaultLat, defaultLng], 15);
 
-    // OpenStreetMap Free CartoDB / Standard Tiles
-    const tileUrl = theme === 'dark'
-      ? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-
-    L.tileLayer(tileUrl, {
-      maxZoom: 19,
-      subdomains: 'abcd'
+    // Initial Base Tile Layer from saved preference
+    const initialConfig = MAP_LAYERS[selectedLayerKey] || MAP_LAYERS.street;
+    const initialLayer = L.tileLayer(initialConfig.url, {
+      maxZoom: initialConfig.maxZoom || 19,
+      subdomains: initialConfig.subdomains || 'abc'
     }).addTo(map);
+
+    currentTileLayerRef.current = initialLayer;
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
@@ -171,7 +235,35 @@ export default function GpsTrackerTab({
         mapInstanceRef.current = null;
       }
     };
-  }, [theme]);
+  }, []);
+
+  // ── DYNAMIC MAP LAYER SWITCHER ──
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+    const map = mapInstanceRef.current;
+    const layerConfig = MAP_LAYERS[selectedLayerKey] || MAP_LAYERS.street;
+
+    if (currentTileLayerRef.current) {
+      try {
+        map.removeLayer(currentTileLayerRef.current);
+      } catch (e) {}
+    }
+
+    const newLayer = L.tileLayer(layerConfig.url, {
+      maxZoom: layerConfig.maxZoom || 19,
+      subdomains: layerConfig.subdomains || 'abc'
+    }).addTo(map);
+
+    if (newLayer.bringToBack) {
+      newLayer.bringToBack();
+    }
+
+    currentTileLayerRef.current = newLayer;
+
+    try {
+      localStorage.setItem('ridelog_map_layer', selectedLayerKey);
+    } catch (e) {}
+  }, [selectedLayerKey]);
 
   // ── LIVE TRACKING TIMER ──
   useEffect(() => {
@@ -566,32 +658,148 @@ export default function GpsTrackerTab({
       <div style={{ position: 'relative', width: '100%', height: '360px', borderRadius: '18px', overflow: 'hidden', border: '1px solid var(--border-color)', boxShadow: '0 8px 24px rgba(0,0,0,0.3)' }}>
         <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
 
-        {/* Center on Me Floating Action Button */}
-        <button
-          type="button"
-          onClick={handleCenterOnMe}
-          title={isBn ? 'আমার বর্তমান অবস্থান' : 'My Location'}
-          style={{
-            position: 'absolute',
-            top: '12px',
-            right: '12px',
-            zIndex: 1000,
-            width: '40px',
-            height: '40px',
-            borderRadius: '12px',
-            background: 'rgba(15, 23, 42, 0.85)',
-            border: '1px solid var(--border-color)',
-            color: '#38bdf8',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            backdropFilter: 'blur(8px)',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
-          }}
-        >
-          <Navigation size={18} />
-        </button>
+        {/* Floating Top-Right Action Controls */}
+        <div style={{
+          position: 'absolute',
+          top: '12px',
+          right: '12px',
+          zIndex: 1000,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px'
+        }}>
+          {/* Map Layer Switcher Button */}
+          <button
+            type="button"
+            onClick={() => setShowLayerMenu(!showLayerMenu)}
+            title={isBn ? 'ম্যাপ লেয়ার পরিবর্তন করুন' : 'Change Map Layer'}
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '12px',
+              background: showLayerMenu ? '#0284c7' : 'rgba(15, 23, 42, 0.88)',
+              border: '1px solid var(--border-color)',
+              color: showLayerMenu ? '#ffffff' : '#38bdf8',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              backdropFilter: 'blur(8px)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <Layers size={18} />
+          </button>
+
+          {/* Center on Me Action Button */}
+          <button
+            type="button"
+            onClick={handleCenterOnMe}
+            title={isBn ? 'আমার বর্তমান অবস্থান' : 'My Location'}
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '12px',
+              background: 'rgba(15, 23, 42, 0.88)',
+              border: '1px solid var(--border-color)',
+              color: '#38bdf8',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              backdropFilter: 'blur(8px)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <Navigation size={18} />
+          </button>
+        </div>
+
+        {/* ── Interactive Map Layers Menu Popover ── */}
+        {showLayerMenu && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '58px',
+              right: '12px',
+              zIndex: 1001,
+              background: 'linear-gradient(145deg, #1e293b, #0f172a)',
+              border: '1px solid rgba(56, 189, 248, 0.4)',
+              borderRadius: '16px',
+              padding: '12px',
+              width: '240px',
+              boxShadow: '0 12px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(56, 189, 248, 0.2)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              backdropFilter: 'blur(10px)',
+              animation: 'fadeIn 0.2s ease'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '4px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <Layers size={14} color="#38bdf8" />
+                <span>{isBn ? 'ম্যাপ লেয়ার নির্বাচন' : 'Select Map Layer'}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowLayerMenu(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#94a3b8',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  fontWeight: 700
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {Object.values(MAP_LAYERS).map((layer) => {
+              const isSelected = selectedLayerKey === layer.id;
+              return (
+                <button
+                  key={layer.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedLayerKey(layer.id);
+                    setShowLayerMenu(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 10px',
+                    borderRadius: '10px',
+                    border: isSelected ? '1px solid #0284c7' : '1px solid transparent',
+                    background: isSelected ? 'rgba(2, 132, 199, 0.2)' : 'rgba(255, 255, 255, 0.03)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    textAlign: 'left',
+                    width: '100%'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '1.2rem' }}>{layer.icon}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '0.82rem', fontWeight: isSelected ? 800 : 600, color: isSelected ? '#38bdf8' : '#f1f5f9' }}>
+                        {isBn ? layer.nameBn : layer.nameEn}
+                      </span>
+                      <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
+                        {layer.descBn}
+                      </span>
+                    </div>
+                  </div>
+                  {isSelected && <Check size={16} color="#38bdf8" />}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* GPS Accuracy Indicator */}
         {gpsAccuracy !== null && mode === 'live' && (
