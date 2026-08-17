@@ -101,10 +101,29 @@ export default function App() {
   const [updateInfo, setUpdateInfo] = useState(null);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
 
-  // Listen for real-time app updates from Firestore
+  // Listen for real-time app updates from Firestore (with 24h snooze memory on dismiss)
   useEffect(() => {
     const unsubscribe = listenToAppUpdates('1.1', (update) => {
       if (update?.isUpdateAvailable) {
+        // If update is mandatory, show every time without snooze
+        if (update.isMandatory) {
+          setUpdateInfo(update);
+          setIsUpdateModalOpen(true);
+          return;
+        }
+
+        // Check if user dismissed this version within the last 24 hours
+        try {
+          const dismissedTimestamp = localStorage.getItem(`ridelog_dismissed_update_${update.latestVersion}`);
+          if (dismissedTimestamp) {
+            const hoursPassed = (Date.now() - parseInt(dismissedTimestamp, 10)) / (1000 * 60 * 60);
+            if (hoursPassed < 24) {
+              // Snooze active: user already dismissed this version recently
+              return;
+            }
+          }
+        } catch (e) {}
+
         setUpdateInfo(update);
         setIsUpdateModalOpen(true);
       } else {
@@ -116,6 +135,15 @@ export default function App() {
       if (typeof unsubscribe === 'function') unsubscribe();
     };
   }, []);
+
+  const handleDismissUpdateModal = () => {
+    if (updateInfo?.latestVersion && !updateInfo.isMandatory) {
+      try {
+        localStorage.setItem(`ridelog_dismissed_update_${updateInfo.latestVersion}`, Date.now().toString());
+      } catch (e) {}
+    }
+    setIsUpdateModalOpen(false);
+  };
 
   // PWA Install Event
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -552,7 +580,7 @@ export default function App() {
         lang={lang}
         isOpen={isUpdateModalOpen}
         updateInfo={updateInfo}
-        onClose={() => setIsUpdateModalOpen(false)}
+        onClose={handleDismissUpdateModal}
       />
     </div>
   );
