@@ -31,7 +31,7 @@ import {
   trackLanguageChanged
 } from './utils/analytics';
 import { initPushNotifications, syncFCMTokenWithUser } from './utils/pushNotifications';
-import { checkAppUpdate } from './utils/firestoreDB';
+import { checkAppUpdate, listenToAppUpdates } from './utils/firestoreDB';
 
 const DEFAULT_BIKE = {
   id: 'bike_1',
@@ -101,18 +101,20 @@ export default function App() {
   const [updateInfo, setUpdateInfo] = useState(null);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
 
-  // Check for app updates on mount (Native Android app only)
+  // Listen for real-time app updates from Firestore
   useEffect(() => {
-    const runVersionCheck = async () => {
-      if (!Capacitor.isNativePlatform()) return;
-
-      const update = await checkAppUpdate('1.1');
+    const unsubscribe = listenToAppUpdates('1.1', (update) => {
       if (update?.isUpdateAvailable) {
         setUpdateInfo(update);
         setIsUpdateModalOpen(true);
+      } else {
+        setIsUpdateModalOpen(false);
       }
+    });
+
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
     };
-    runVersionCheck();
   }, []);
 
   // PWA Install Event

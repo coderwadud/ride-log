@@ -1,5 +1,5 @@
 import { db } from './firebase';
-import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 
 const DEFAULT_BIKE = {
   id: 'bike_1',
@@ -197,6 +197,41 @@ export async function checkAppUpdate(currentVersion = '1.1') {
   } catch (err) {
     console.debug('App version check skipped:', err);
     return { isUpdateAvailable: false };
+  }
+}
+
+/**
+ * Real-time listener for app updates from Firestore 'app_config/version'
+ */
+export function listenToAppUpdates(currentVersion = '1.1', callback) {
+  try {
+    const docRef = doc(db, 'app_config', 'version');
+    return onSnapshot(
+      docRef,
+      (snap) => {
+        if (snap.exists()) {
+          const config = snap.data();
+          const latestVersion = config.latestVersion || currentVersion;
+          const isUpdateAvailable = compareVersions(latestVersion, currentVersion) > 0;
+          callback({
+            isUpdateAvailable,
+            latestVersion,
+            updateUrl: config.updateUrl || '',
+            releaseNotes: config.releaseNotes || '',
+            isMandatory: !!config.isMandatory
+          });
+        } else {
+          callback({ isUpdateAvailable: false });
+        }
+      },
+      (err) => {
+        console.warn('App version real-time listener notice:', err);
+        callback({ isUpdateAvailable: false });
+      }
+    );
+  } catch (err) {
+    console.debug('App version listener setup skipped:', err);
+    return () => {};
   }
 }
 
