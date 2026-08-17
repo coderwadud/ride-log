@@ -7,6 +7,7 @@ import Dashboard from './components/Dashboard';
 import FuelLogsTab from './components/FuelLogsTab';
 import ServiceLogsTab from './components/ServiceLogsTab';
 import AnalyticsTab from './components/AnalyticsTab';
+import GpsTrackerTab from './components/GpsTrackerTab';
 import FuelModal from './components/FuelModal';
 import ServiceModal from './components/ServiceModal';
 import BikeModal from './components/BikeModal';
@@ -19,7 +20,7 @@ import BikeSelector from './components/BikeSelector';
 import { exportBackupData, mergeImportBackupData, loadSettings, saveSettings } from './utils/storage';
 import { calculateFuelLogStats, calculateServiceStats } from './utils/calculations';
 import { translations } from './utils/translations';
-import { LayoutDashboard, Fuel, Wrench, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Fuel, Wrench, BarChart3, Navigation } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import {
   updateLastActiveAt,
@@ -364,6 +365,10 @@ export default function App() {
           <Fuel size={18} />
           <span>{t.fuelLogs}</span>
         </button>
+        <button className={`nav-tab-btn ${activeTab === 'gps' ? 'active' : ''}`} onClick={() => setActiveTab('gps')}>
+          <Navigation size={18} />
+          <span>{t.gpsTrack || 'GPS ট্র্যাক'}</span>
+        </button>
         <button className={`nav-tab-btn ${activeTab === 'service' ? 'active' : ''}`} onClick={() => setActiveTab('service')}>
           <Wrench size={18} />
           <span>{t.serviceLogs}</span>
@@ -394,6 +399,14 @@ export default function App() {
             onOpenAddFuel={() => { setEditingFuelData(null); setIsFuelModalOpen(true); }}
             onEditFuel={(data) => { setEditingFuelData(data); setIsFuelModalOpen(true); }}
             onDeleteFuel={handleDeleteFuel}
+          />
+        )}
+        {activeTab === 'gps' && (
+          <GpsTrackerTab
+            lang={lang}
+            theme={theme}
+            user={user}
+            activeBike={activeBike}
           />
         )}
         {activeTab === 'service' && (
@@ -429,19 +442,23 @@ export default function App() {
       {/* Mobile Bottom Navigation */}
       <nav className="mobile-nav-bar">
         <button className={`mobile-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
-          <LayoutDashboard size={20} />
+          <LayoutDashboard size={19} />
           <span>{t.dashboard}</span>
         </button>
         <button className={`mobile-nav-item ${activeTab === 'fuel' ? 'active' : ''}`} onClick={() => setActiveTab('fuel')}>
-          <Fuel size={20} />
+          <Fuel size={19} />
           <span>{t.fuelLogs}</span>
         </button>
+        <button className={`mobile-nav-item ${activeTab === 'gps' ? 'active' : ''}`} onClick={() => setActiveTab('gps')}>
+          <Navigation size={19} />
+          <span>{t.gpsTrack || 'GPS'}</span>
+        </button>
         <button className={`mobile-nav-item ${activeTab === 'service' ? 'active' : ''}`} onClick={() => setActiveTab('service')}>
-          <Wrench size={20} />
+          <Wrench size={19} />
           <span>{t.serviceLogs}</span>
         </button>
         <button className={`mobile-nav-item ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => setActiveTab('analytics')}>
-          <BarChart3 size={20} />
+          <BarChart3 size={19} />
           <span>{t.analytics}</span>
         </button>
       </nav>

@@ -1,4 +1,5 @@
 /* Modern Dark Aesthetics & Native Android App Design System for RideLog BD */
+@import 'leaflet/dist/leaflet.css';
 
 @keyframes spin {
   to {

@@ -5,6 +5,7 @@ export const translations = {
     dashboard: "ড্যাশবোর্ড",
     fuelLogs: "ফুয়েল লগ",
     serviceLogs: "সার্ভিস হিস্ট্রি",
+    gpsTrack: "GPS ট্র্যাক",
     analytics: "অ্যানালিটিক্স",
     settings: "সেটিংস",
     
@@ -130,6 +131,7 @@ export const translations = {
     dashboard: "Dashboard",
     fuelLogs: "Fuel Logs",
     serviceLogs: "Service History",
+    gpsTrack: "GPS Track",
     analytics: "Analytics",
     settings: "Settings",
 
