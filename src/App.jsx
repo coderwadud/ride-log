@@ -19,6 +19,14 @@ import { exportBackupData, mergeImportBackupData, loadSettings, saveSettings } f
 import { calculateFuelLogStats, calculateServiceStats } from './utils/calculations';
 import { translations } from './utils/translations';
 import { LayoutDashboard, Fuel, Wrench, BarChart3 } from 'lucide-react';
+import {
+  updateLastActiveAt,
+  trackUserLogin,
+  trackFuelLogAdded,
+  trackServiceLogAdded,
+  trackBikeAdded,
+  trackLanguageChanged
+} from './utils/analytics';
 
 const DEFAULT_BIKE = {
   id: 'bike_1',
@@ -107,6 +115,10 @@ export default function App() {
 
         setDataLoading(false);
         isLoadedRef.current = true;
+
+        // ── Analytics: track login & update lastActiveAt ──
+        trackUserLogin(firebaseUser.providerData?.[0]?.providerId || 'unknown');
+        updateLastActiveAt(firebaseUser.uid);
       } else {
         // Logged out — clear user data from memory
         setBikes([DEFAULT_BIKE]);
@@ -181,6 +193,9 @@ export default function App() {
     const newBike = { ...newBikeData, id: `bike_${Date.now()}` };
     setBikes(prev => [...prev, newBike]);
     setActiveBikeId(newBike.id);
+    // Analytics: track new bike added
+    trackBikeAdded();
+    if (user) updateLastActiveAt(user.uid);
   };
 
   const handleDeleteBike = (bikeId) => {
@@ -198,7 +213,11 @@ export default function App() {
   };
 
   const handleToggleLang = () => {
-    setLang(prev => prev === 'bn' ? 'en' : 'bn');
+    setLang(prev => {
+      const next = prev === 'bn' ? 'en' : 'bn';
+      trackLanguageChanged(next);
+      return next;
+    });
   };
 
   const handleToggleTheme = () => {
@@ -211,6 +230,9 @@ export default function App() {
       setFuelLogs(prev => prev.map(item => item.id === entryWithBike.id ? entryWithBike : item));
     } else {
       setFuelLogs(prev => [...prev, entryWithBike]);
+      // Analytics: only track new entries, not edits
+      trackFuelLogAdded(activeBikeId);
+      if (user) updateLastActiveAt(user.uid);
     }
     setEditingFuelData(null);
   };
@@ -227,6 +249,9 @@ export default function App() {
       setServiceLogs(prev => prev.map(item => item.id === entryWithBike.id ? entryWithBike : item));
     } else {
       setServiceLogs(prev => [...prev, entryWithBike]);
+      // Analytics: only track new entries, not edits
+      trackServiceLogAdded(activeBikeId);
+      if (user) updateLastActiveAt(user.uid);
     }
     setEditingServiceData(null);
   };

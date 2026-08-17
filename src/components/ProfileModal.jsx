@@ -12,6 +12,7 @@ import {
   deletePrivateDocument,
   downloadOrShareDocument
 } from '../utils/documentStorage';
+import { trackDocumentUploaded, updateLastActiveAt } from '../utils/analytics';
 
 const DOC_TYPES = [
   { key: 'license', label: 'ড্রাইভিং লাইসেন্স', labelEn: 'Driving License', icon: CreditCard, color: '#38bdf8' },
@@ -109,6 +110,9 @@ export default function ProfileModal({
       setTitle('');
       setSelectedFile(null);
       setDocType('license');
+      // Analytics: track document upload
+      trackDocumentUploaded(docType);
+      if (userId && userId !== 'guest') updateLastActiveAt(userId);
     } catch (err) {
       console.error('Document upload error:', err);
       alert(isBn ? '❌ ফাইল আপলোড ব্যর্থ হয়েছে' : '❌ Document save failed');
