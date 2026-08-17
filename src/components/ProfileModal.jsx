@@ -1348,22 +1348,23 @@ export default function ProfileModal({
                     </div>
                   ) : (
                     userTickets.map((tkt) => {
-                      const status = tkt.status || 'pending';
-                      const isPending = status === 'pending';
-                      const isInProgress = status === 'in_progress';
-                      const isResolved = status === 'resolved';
+                      const s = (tkt.status || 'pending').toLowerCase().trim();
+                      const isResolved = s === 'resolved' || s === 'done' || s === 'fixed' || s === 'completed' || s === 'success';
+                      const isInProgress = s === 'in_progress' || s === 'processing' || s === 'working' || s === 'ongoing';
+                      const isClosed = s === 'closed' || s === 'rejected' || s === 'cancelled';
+                      const isPending = !isResolved && !isInProgress && !isClosed;
 
-                      const statusColor = isResolved ? '#10b981' : isInProgress ? '#38bdf8' : isPending ? '#f59e0b' : '#ef4444';
-                      const statusBg = isResolved ? 'rgba(16, 185, 129, 0.15)' : isInProgress ? 'rgba(56, 189, 248, 0.15)' : isPending ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)';
-                      const statusBorder = isResolved ? 'rgba(16, 185, 129, 0.35)' : isInProgress ? 'rgba(56, 189, 248, 0.35)' : isPending ? 'rgba(245, 158, 11, 0.35)' : 'rgba(239, 68, 68, 0.35)';
+                      const statusColor = isResolved ? '#10b981' : isInProgress ? '#38bdf8' : isClosed ? '#ef4444' : '#f59e0b';
+                      const statusBg = isResolved ? 'rgba(16, 185, 129, 0.15)' : isInProgress ? 'rgba(56, 189, 248, 0.15)' : isClosed ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)';
+                      const statusBorder = isResolved ? 'rgba(16, 185, 129, 0.35)' : isInProgress ? 'rgba(56, 189, 248, 0.35)' : isClosed ? 'rgba(239, 68, 68, 0.35)' : 'rgba(245, 158, 11, 0.35)';
                       
                       const statusLabel = isResolved
-                        ? (isBn ? '✓ সমাধান হয়েছে (Resolved)' : '✓ Resolved')
+                        ? (isBn ? '✓ সমাধান হয়েছে (Done)' : '✓ Resolved')
                         : isInProgress
                           ? (isBn ? '⚡ কাজ চলছে (In Progress)' : '⚡ In Progress')
-                          : isPending
-                            ? (isBn ? '⏳ পর্যালোচনায় আছে (Pending)' : '⏳ Pending Review')
-                            : (isBn ? '✕ বন্ধ (Closed)' : '✕ Closed');
+                          : isClosed
+                            ? (isBn ? '✕ বন্ধ (Closed)' : '✕ Closed')
+                            : (isBn ? '⏳ পর্যালোচনায় আছে (Pending)' : '⏳ Pending Review');
 
                       const typeName = tkt.type === 'bug'
                         ? (isBn ? '🐛 সমস্যা' : 'Bug')
