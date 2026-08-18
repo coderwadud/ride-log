@@ -190,7 +190,7 @@ export default function TicketUpdateModal({
                 src={imgUrl}
                 alt="Attachment"
                 style={{
-                  maxHeight: '180px',
+                  maxHeight: '120px',
                   width: '100%',
                   objectFit: 'contain',
                   borderRadius: '10px',

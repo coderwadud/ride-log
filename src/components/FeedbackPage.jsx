@@ -457,7 +457,7 @@ export default function FeedbackPage({
                         src={tkt.replyImageUrl || tkt.replyLink}
                         alt="Attachment"
                         style={{
-                          maxHeight: '180px',
+                          maxHeight: '120px',
                           width: '100%',
                           objectFit: 'contain',
                           borderRadius: '12px',
