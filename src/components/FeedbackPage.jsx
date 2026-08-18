@@ -853,33 +853,57 @@ export default function FeedbackPage({
                     </p>
 
                     {/* Admin Reply Snippet (if exists) */}
-                    {adminNote && (
-                      <div style={{
-                        background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(16, 185, 129, 0.15))',
-                        border: '1px solid rgba(56, 189, 248, 0.4)',
-                        borderRadius: '10px',
-                        padding: '8px 10px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '6px'
-                      }}>
-                        <span style={{
-                          fontSize: '0.76rem',
-                          fontWeight: 700,
-                          color: '#38bdf8',
+                    {(() => {
+                      const tktLink = tkt.replyLink || tkt.reply_link || tkt.linkUrl || tkt.link;
+                      const tktLinkLabel = tkt.replyLinkLabel || tkt.reply_link_label || tkt.linkLabel || tkt.buttonTitle;
+                      const tktImg = tkt.replyImageUrl || tkt.reply_image_url || tkt.imageUrl || tkt.image;
+
+                      if (!adminNote && !tktLink && !tktImg) return null;
+
+                      return (
+                        <div style={{
+                          background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(16, 185, 129, 0.15))',
+                          border: '1px solid rgba(56, 189, 248, 0.4)',
+                          borderRadius: '10px',
+                          padding: '8px 10px',
                           display: 'flex',
-                          alignItems: 'center',
-                          gap: '5px',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap'
+                          flexDirection: 'column',
+                          gap: '6px'
                         }}>
-                          <MessageCircle size={14} color="#38bdf8" style={{ flexShrink: 0 }} />
-                          <span>{isBn ? 'উত্তর:' : 'Reply:'} {adminNote}</span>
-                        </span>
-                      </div>
-                    )}
+                          <span style={{
+                            fontSize: '0.76rem',
+                            fontWeight: 700,
+                            color: '#38bdf8',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            <MessageCircle size={14} color="#38bdf8" style={{ flexShrink: 0 }} />
+                            <span>{isBn ? 'উত্তর:' : 'Reply:'} {adminNote || (isBn ? 'অ্যাডমিনের আপডেট সংযুক্তি' : 'Admin attachment included')}</span>
+                          </span>
+
+                          {tktLink && (
+                            <span style={{
+                              fontSize: '0.7rem',
+                              fontWeight: 800,
+                              color: '#0ea5e9',
+                              background: 'rgba(14, 165, 233, 0.15)',
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              width: 'fit-content',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}>
+                              🔗 {tktLinkLabel || (isBn ? 'অ্যাকশন লিংক' : 'Action Link')}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* Footer */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem', color: '#64748b' }}>

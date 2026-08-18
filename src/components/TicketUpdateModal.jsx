@@ -28,7 +28,10 @@ export default function TicketUpdateModal({
         ? (isBn ? '✕ বন্ধ (Closed)' : '✕ Closed')
         : (isBn ? '⏳ পর্যালোচনায় আছে (Pending)' : '⏳ Pending Review');
 
-  const adminMessage = ticket.adminReply || ticket.adminNote || ticket.reply || ticket.note;
+  const adminMessage = ticket.adminReply || ticket.adminNote || ticket.admin_reply || ticket.admin_note || ticket.reply || ticket.note;
+  const link = ticket.replyLink || ticket.reply_link || ticket.linkUrl || ticket.link;
+  const linkLabel = ticket.replyLinkLabel || ticket.reply_link_label || ticket.linkLabel || ticket.buttonTitle;
+  const imgUrl = ticket.replyImageUrl || ticket.reply_image_url || ticket.imageUrl || ticket.image || (link && /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(link) ? link : null);
 
   return (
     <div
@@ -78,8 +81,8 @@ export default function TicketUpdateModal({
             background: 'rgba(255, 255, 255, 0.08)',
             border: 'none',
             borderRadius: '50%',
-            width: '30px',
-            height: '30px',
+            width: '28px',
+            height: '28px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -108,8 +111,8 @@ export default function TicketUpdateModal({
           <MessageCircle size={28} />
         </div>
 
-        {/* Badge & Ticket ID */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {/* Status Badge */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
           <span
             style={{
               fontSize: '0.74rem',
@@ -144,73 +147,78 @@ export default function TicketUpdateModal({
           {isBn ? 'আপনার টিকিটে নতুন আপডেট এসেছে!' : 'Support Ticket Updated!'}
         </h3>
 
-        {/* Admin Message Bubble */}
-        {adminMessage && (
+        {/* Admin Message & Action Box */}
+        {(adminMessage || link || imgUrl) && (
           <div
             style={{
               background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(16, 185, 129, 0.12))',
               border: '1px solid rgba(56, 189, 248, 0.35)',
               borderRadius: '14px',
-              padding: '12px 14px',
+              padding: '14px',
               textAlign: 'left',
               width: '100%',
               display: 'flex',
               flexDirection: 'column',
-              gap: '8px'
+              gap: '10px'
             }}
           >
             <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '5px' }}>
               <MessageCircle size={13} />
-              <span>{isBn ? 'অ্যাডমিনের বার্তা:' : 'Admin Message:'}</span>
+              <span>{isBn ? 'অ্যাডমিনের উত্তর (Admin Response):' : 'Admin Response:'}</span>
             </span>
-            <p style={{ fontSize: '0.86rem', color: '#f1f5f9', margin: 0, lineHeight: '1.45', fontWeight: 500 }}>
-              "{adminMessage}"
-            </p>
+
+            {adminMessage && (
+              <p style={{ fontSize: '0.86rem', color: '#f1f5f9', margin: 0, lineHeight: '1.45', fontWeight: 500 }}>
+                "{adminMessage}"
+              </p>
+            )}
 
             {/* Attached Image Preview */}
-            {(ticket.replyImageUrl || (ticket.replyLink && /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(ticket.replyLink))) && (
+            {imgUrl && (
               <img
-                src={ticket.replyImageUrl || ticket.replyLink}
+                src={imgUrl}
                 alt="Attachment"
                 style={{
-                  maxHeight: '160px',
+                  maxHeight: '180px',
                   width: '100%',
                   objectFit: 'contain',
                   borderRadius: '10px',
                   border: '1px solid rgba(56, 189, 248, 0.3)',
-                  marginTop: '4px'
+                  background: 'rgba(0, 0, 0, 0.3)',
+                  marginTop: '2px'
                 }}
               />
             )}
 
             {/* Custom Link Action Button */}
-            {ticket.replyLink && (
+            {link && (
               <a
-                href={ticket.replyLink}
+                href={link}
                 target="_system"
                 rel="noopener noreferrer"
                 onClick={(e) => {
                   e.stopPropagation();
-                  window.open(ticket.replyLink, '_system');
+                  window.open(link, '_system');
                 }}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '6px',
-                  padding: '9px 14px',
+                  padding: '10px 16px',
                   borderRadius: '10px',
                   background: 'linear-gradient(135deg, #0284c7, #0ea5e9)',
                   color: '#ffffff',
                   fontWeight: 800,
-                  fontSize: '0.8rem',
+                  fontSize: '0.82rem',
                   textDecoration: 'none',
                   marginTop: '4px',
-                  boxShadow: '0 4px 12px rgba(14, 165, 233, 0.3)'
+                  boxShadow: '0 4px 12px rgba(14, 165, 233, 0.35)',
+                  cursor: 'pointer'
                 }}
               >
-                <span>{ticket.replyLinkLabel || (isBn ? 'লিংক খুলুন' : 'Open Link')}</span>
-                <ArrowRight size={13} />
+                <span>{linkLabel || (isBn ? 'লিংক খুলুন' : 'Open Link')}</span>
+                <ArrowRight size={14} />
               </a>
             )}
           </div>
