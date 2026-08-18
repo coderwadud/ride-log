@@ -1478,7 +1478,173 @@ export default function GpsTrackerTab({
             <span>GPS ±{gpsAccuracy}m</span>
           </div>
         )}
+
+        {/* Floating Nearby POI Finder Buttons (Bottom Left of Map) */}
+        <div style={{
+          position: 'absolute',
+          bottom: '12px',
+          left: '12px',
+          zIndex: 1000,
+          display: 'flex',
+          gap: '6px'
+        }}>
+          <button
+            type="button"
+            onClick={() => handleSearchNearbyPoi('fuel')}
+            disabled={isPoiLoading}
+            title={isBn ? 'আশপাশের পেট্রোল পাম্প খুঁজুন' : 'Search nearby fuel pumps'}
+            style={{
+              padding: '7px 12px',
+              borderRadius: '20px',
+              background: activePoiType === 'fuel' ? '#f59e0b' : 'rgba(15, 23, 42, 0.88)',
+              border: '1px solid rgba(245, 158, 11, 0.5)',
+              color: activePoiType === 'fuel' ? '#ffffff' : '#f59e0b',
+              fontSize: '0.76rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              backdropFilter: 'blur(8px)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <Fuel size={14} />
+            <span>{isPoiLoading && activePoiType === 'fuel' ? (isBn ? 'খোঁজা হচ্ছে...' : 'Searching...') : (isBn ? '⛽ পাম্প' : '⛽ Pumps')}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSearchNearbyPoi('garage')}
+            disabled={isPoiLoading}
+            title={isBn ? 'আশপাশের বাইক গ্যারেজ খুঁজুন' : 'Search nearby bike garages'}
+            style={{
+              padding: '7px 12px',
+              borderRadius: '20px',
+              background: activePoiType === 'garage' ? '#8b5cf6' : 'rgba(15, 23, 42, 0.88)',
+              border: '1px solid rgba(139, 92, 246, 0.5)',
+              color: activePoiType === 'garage' ? '#ffffff' : '#c084fc',
+              fontSize: '0.76rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              backdropFilter: 'blur(8px)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <Wrench size={14} />
+            <span>{isPoiLoading && activePoiType === 'garage' ? (isBn ? 'খোঁজা হচ্ছে...' : 'Searching...') : (isBn ? '🔧 গ্যারেজ' : '🔧 Garages')}</span>
+          </button>
+
+          {activePoiType && (
+            <button
+              type="button"
+              onClick={clearPoiMarkers}
+              style={{
+                padding: '7px 10px',
+                borderRadius: '20px',
+                background: 'rgba(239, 68, 68, 0.88)',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                color: '#ffffff',
+                fontSize: '0.74rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+                backdropFilter: 'blur(8px)',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
+              }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* ── NEARBY POI RESULTS TRAY ── */}
+      {poiList.length > 0 && (
+        <div style={{
+          background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95))',
+          border: `1px solid ${activePoiType === 'fuel' ? 'rgba(245, 158, 11, 0.4)' : 'rgba(139, 92, 246, 0.4)'}`,
+          borderRadius: '18px',
+          padding: '14px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.84rem', fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {activePoiType === 'fuel' ? <Fuel size={16} color="#f59e0b" /> : <Wrench size={16} color="#c084fc" />}
+              <span>
+                {isBn
+                  ? `আশপাশের ${activePoiType === 'fuel' ? 'পেট্রোল পাম্পসমূহ' : 'গ্যারেজ & সার্ভিস সেন্টার'}`
+                  : `Nearby ${activePoiType === 'fuel' ? 'Fuel Stations' : 'Garages & Repair Shops'}`}
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={clearPoiMarkers}
+              style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 700 }}
+            >
+              ✕ {isBn ? 'বন্ধ করুন' : 'Close'}
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
+            {poiList.map((poi) => {
+              const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${poi.lat},${poi.lng}`;
+              return (
+                <div
+                  key={poi.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 12px',
+                    borderRadius: '12px',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid var(--border-color)'
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden', paddingRight: '8px' }}>
+                    <span style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {poi.name}
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      📍 {poi.distanceKm} {isBn ? 'কিমি দূরে' : 'km away'} {poi.brand ? `• ${poi.brand}` : ''}
+                    </span>
+                  </div>
+
+                  <a
+                    href={mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '6px 12px',
+                      borderRadius: '10px',
+                      background: 'linear-gradient(135deg, #0284c7, #0369a1)',
+                      color: '#ffffff',
+                      fontSize: '0.76rem',
+                      fontWeight: 800,
+                      textDecoration: 'none',
+                      flexShrink: 0,
+                      boxShadow: '0 3px 10px rgba(2, 132, 199, 0.3)'
+                    }}
+                  >
+                    <ExternalLink size={13} />
+                    <span>{isBn ? 'নেভিগেট' : 'Directions'}</span>
+                  </a>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── MODE 1: LIVE RIDE DASHBOARD & CONTROLS ── */}
       {mode === 'live' && (
