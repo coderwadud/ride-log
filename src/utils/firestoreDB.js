@@ -348,6 +348,67 @@ export async function submitUserFeedback({ uid, email, name, type = 'feedback', 
 }
 
 /**
+ * Send follow-up reply message from rider on an existing ticket
+ */
+export async function sendUserTicketReply(feedbackId, userId, messageText) {
+  if (!feedbackId || !messageText || !messageText.trim()) return false;
+  try {
+    const newMsg = {
+      id: `msg_${Date.now()}`,
+      sender: 'user',
+      senderName: 'Rider',
+      text: messageText.trim(),
+      createdAt: new Date().toISOString()
+    };
+
+    const collectionsToTry = ['feedbacks', 'supportTickets', 'tickets'];
+    for (const colName of collectionsToTry) {
+      try {
+        const fRef = doc(db, colName, feedbackId);
+        const fSnap = await getDoc(fRef);
+        let existingMsgs = [];
+        if (fSnap.exists() && Array.isArray(fSnap.data().messages)) {
+          existingMsgs = fSnap.data().messages;
+        }
+        await setDoc(fRef, {
+          messages: [...existingMsgs, newMsg],
+          updatedAt: new Date().toISOString(),
+          status: 'in_progress'
+        }, { merge: true });
+      } catch (e) {}
+    }
+
+    if (userId && userId !== 'guest') {
+      try {
+        const uRef = doc(db, 'users', userId);
+        const uSnap = await getDoc(uRef);
+        if (uSnap.exists()) {
+          const uData = uSnap.data();
+          const fList = uData.feedbacks || uData.userFeedbacks || uData.tickets || [];
+          const newList = fList.map(f => {
+            if (f.id === feedbackId) {
+              const msgs = Array.isArray(f.messages) ? f.messages : [];
+              return {
+                ...f,
+                messages: [...msgs, newMsg],
+                updatedAt: new Date().toISOString(),
+                status: 'in_progress'
+              };
+            }
+            return f;
+          });
+          await updateDoc(uRef, { userFeedbacks: newList, feedbacks: newList });
+        }
+      } catch (e) {}
+    }
+    return true;
+  } catch (err) {
+    console.error('Error sending user ticket reply:', err);
+    return false;
+  }
+}
+
+/**
  * Real-time listener for user support tickets & status directly from root 'feedbacks' collection
  */
 export function listenToUserTickets(uid, callback) {

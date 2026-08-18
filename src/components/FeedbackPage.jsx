@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft, MessageSquare, Plus, Ticket, CheckCircle2, Clock,
   AlertCircle, Send, Copy, Check, MessageCircle, RefreshCw, ChevronRight,
-  Shield, Sparkles, Filter, FileText
+  Shield, Sparkles, Filter, FileText, User
 } from 'lucide-react';
-import { submitUserFeedback, listenToUserTickets } from '../utils/firestoreDB';
+import { submitUserFeedback, listenToUserTickets, sendUserTicketReply } from '../utils/firestoreDB';
 import { getCurrentAppVersion } from '../utils/appVersion';
 import Footer from './Footer';
 
@@ -25,6 +25,10 @@ export default function FeedbackPage({
   const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'pending', 'in_progress', 'done'
   const [copiedId, setCopiedId] = useState(false);
 
+  // User Followup Reply States
+  const [userFollowupText, setUserFollowupText] = useState('');
+  const [sendingFollowup, setSendingFollowup] = useState(false);
+
   // New Ticket Form States
   const [feedbackType, setFeedbackType] = useState('bug');
   const [feedbackMessage, setFeedbackMessage] = useState('');
@@ -39,9 +43,9 @@ export default function FeedbackPage({
     const unsub = listenToUserTickets(userId, (tickets) => {
       setUserTickets(tickets);
 
-      // If initialTicketId provided or current selected ticket was updated
-      if (initialTicketId) {
-        const match = tickets.find(t => (t.ticketId === initialTicketId || t.id === initialTicketId));
+      const targetId = initialTicketId;
+      if (targetId) {
+        const match = tickets.find(t => (t.ticketId === targetId || t.id === targetId));
         if (match) {
           setSelectedTicket(match);
           setViewMode('details');
@@ -49,13 +53,27 @@ export default function FeedbackPage({
       } else if (selectedTicket) {
         const updated = tickets.find(t => (t.ticketId === selectedTicket.ticketId || t.id === selectedTicket.id));
         if (updated) setSelectedTicket(updated);
+      } else if (initialViewMode === 'details' && tickets.length > 0) {
+        setSelectedTicket(tickets[0]);
+        setViewMode('details');
       }
     });
 
     return () => {
       if (typeof unsub === 'function') unsub();
     };
-  }, [userId, initialTicketId]);
+  }, [userId, initialTicketId, initialViewMode]);
+
+  const handleSendFollowup = async () => {
+    if (!selectedTicket || !userFollowupText.trim() || sendingFollowup) return;
+    const targetId = selectedTicket.id || selectedTicket.ticketId;
+    setSendingFollowup(true);
+    const ok = await sendUserTicketReply(targetId, userId, userFollowupText);
+    setSendingFollowup(false);
+    if (ok) {
+      setUserFollowupText('');
+    }
+  };
 
   const handleCopyTicketId = (id) => {
     if (!id) return;
@@ -263,10 +281,36 @@ export default function FeedbackPage({
         {/* ========================================================= */}
         {/* 1. TICKET DETAILS PAGE (ফুল ডিটেইলস পেজ)                 */}
         {/* ========================================================= */}
+        {viewMode === 'details' && !selectedTicket && (
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}>
+            <p style={{ fontSize: '0.88rem', margin: 0, fontWeight: 700 }}>
+              {isBn ? 'টিকিট বিবরণ লোড হচ্ছে...' : 'Loading ticket details...'}
+            </p>
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              style={{
+                marginTop: '16px',
+                padding: '8px 16px',
+                borderRadius: '10px',
+                background: 'rgba(255, 255, 255, 0.08)',
+                color: '#38bdf8',
+                border: '1px solid rgba(56, 189, 248, 0.3)',
+                fontSize: '0.8rem',
+                cursor: 'pointer'
+              }}
+            >
+              {isBn ? '← টিকিট তালিকায় ফিরে যান' : '← Back to Tickets'}
+            </button>
+          </div>
+        )}
+
         {viewMode === 'details' && selectedTicket && (() => {
           const tkt = selectedTicket;
           const statusMeta = getStatusMeta(tkt.status);
           const adminNote = tkt.adminReply || tkt.adminNote || tkt.admin_reply || tkt.admin_note || tkt.reply || tkt.note;
+          const link = tkt.replyLink || tkt.reply_link || tkt.linkUrl || tkt.link;
+          const messages = Array.isArray(tkt.messages) ? tkt.messages : [];
 
           return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', animation: 'fadeIn 0.2s ease' }}>
@@ -408,62 +452,176 @@ export default function FeedbackPage({
                 </div>
               </div>
 
-              {/* Admin Reply & Note Box */}
-              <div style={{
-                background: adminNote
-                  ? 'linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(16, 185, 129, 0.18))'
-                  : 'rgba(255, 255, 255, 0.02)',
-                border: adminNote
-                  ? '1px solid rgba(56, 189, 248, 0.45)'
-                  : '1px dashed rgba(255, 255, 255, 0.12)',
-                borderRadius: '16px',
-                padding: '16px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px',
-                boxShadow: adminNote ? '0 8px 24px rgba(0, 0, 0, 0.3)' : 'none'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              {/* 💬 Live Discussion Thread (User <-> Admin Chat) */}
+              {messages.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <MessageCircle size={16} color="#38bdf8" />
-                    <span>{isBn ? 'অ্যাডমিন নোট ও উত্তর (Admin Response):' : 'Admin Response & Status Note:'}</span>
+                    <span>{isBn ? 'কথোপকথন ইতিহাস (Support Chat Thread):' : 'Support Chat Thread:'}</span>
                   </span>
-                  {tkt.updatedAt && (
-                    <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
-                      {new Date(tkt.updatedAt).toLocaleDateString(isBn ? 'bn-BD' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  )}
+
+                  {messages.map((msg) => {
+                    const isAdmin = msg.sender === 'admin';
+                    const msgLink = msg.link || tkt.replyLink;
+                    const msgImg = msg.imageUrl || tkt.replyImageUrl;
+
+                    return (
+                      <div
+                        key={msg.id || msg.createdAt}
+                        style={{
+                          background: isAdmin
+                            ? 'linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(16, 185, 129, 0.15))'
+                            : 'rgba(255, 255, 255, 0.05)',
+                          border: isAdmin ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid var(--border-color)',
+                          borderRadius: '16px',
+                          padding: '14px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '6px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: '0.76rem', fontWeight: 800, color: isAdmin ? '#38bdf8' : '#10b981', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            {isAdmin ? <Shield size={14} /> : <User size={14} />}
+                            <span>{isAdmin ? (isBn ? 'অ্যাডমিন সাপোর্ট টিম' : 'RideLog Admin Support') : (isBn ? 'আপনি (রাইডার)' : 'You')}</span>
+                          </span>
+                          <span style={{ fontSize: '0.68rem', color: '#64748b' }}>
+                            {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+
+                        <p style={{ fontSize: '0.88rem', color: '#ffffff', margin: 0, lineHeight: '1.45' }}>
+                          {msg.text}
+                        </p>
+
+                        {/* Image Preview inside msg */}
+                        {msgImg && (
+                          <div style={{ marginTop: '4px' }}>
+                            {msgLink ? (
+                              <a
+                                href={msgLink}
+                                target="_system"
+                                rel="noopener noreferrer"
+                                onClick={(e) => { e.stopPropagation(); window.open(msgLink, '_system'); }}
+                                style={{ display: 'block', cursor: 'pointer' }}
+                              >
+                                <img
+                                  src={msgImg}
+                                  alt="Attachment"
+                                  style={{ maxHeight: '120px', width: '100%', objectFit: 'contain', borderRadius: '10px', border: '1px solid rgba(56, 189, 248, 0.4)' }}
+                                />
+                              </a>
+                            ) : (
+                              <img
+                                src={msgImg}
+                                alt="Attachment"
+                                style={{ maxHeight: '120px', width: '100%', objectFit: 'contain', borderRadius: '10px', border: '1px solid rgba(56, 189, 248, 0.3)' }}
+                              />
+                            )}
+                          </div>
+                        )}
+
+                        {/* Action Link inside msg */}
+                        {msgLink && (
+                          <div style={{ marginTop: '4px' }}>
+                            <a
+                              href={msgLink}
+                              target="_system"
+                              rel="noopener noreferrer"
+                              onClick={(e) => { e.stopPropagation(); window.open(msgLink, '_system'); }}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '8px 14px',
+                                borderRadius: '10px',
+                                background: 'linear-gradient(135deg, #0284c7, #0ea5e9)',
+                                color: '#ffffff',
+                                fontWeight: 800,
+                                fontSize: '0.8rem',
+                                textDecoration: 'none'
+                              }}
+                            >
+                              <span>{msg.linkLabel || tkt.replyLinkLabel || (isBn ? 'লিংক খুলুন' : 'Open Link')}</span>
+                              <ChevronRight size={14} />
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
+              ) : (
+                /* Admin Reply & Note Box (Fallback if no messages array yet) */
+                <div style={{
+                  background: adminNote
+                    ? 'linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(16, 185, 129, 0.18))'
+                    : 'rgba(255, 255, 255, 0.02)',
+                  border: adminNote
+                    ? '1px solid rgba(56, 189, 248, 0.45)'
+                    : '1px dashed rgba(255, 255, 255, 0.12)',
+                  borderRadius: '16px',
+                  padding: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                  boxShadow: adminNote ? '0 8px 24px rgba(0, 0, 0, 0.3)' : 'none'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <MessageCircle size={16} color="#38bdf8" />
+                      <span>{isBn ? 'অ্যাডমিন নোট ও উত্তর (Admin Response):' : 'Admin Response & Status Note:'}</span>
+                    </span>
+                    {tkt.updatedAt && (
+                      <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                        {new Date(tkt.updatedAt).toLocaleDateString(isBn ? 'bn-BD' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+                  </div>
 
-                {adminNote ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <p style={{
-                      fontSize: '0.94rem',
-                      color: '#ffffff',
-                      margin: 0,
-                      lineHeight: '1.5',
-                      fontWeight: 600,
-                      background: 'rgba(0,0,0,0.25)',
-                      padding: '12px 14px',
-                      borderRadius: '12px',
-                      border: '1px solid rgba(56, 189, 248, 0.2)'
-                    }}>
-                      "{adminNote}"
-                    </p>
+                  {adminNote ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <p style={{
+                        fontSize: '0.94rem',
+                        color: '#ffffff',
+                        margin: 0,
+                        lineHeight: '1.5',
+                        fontWeight: 600,
+                        background: 'rgba(0,0,0,0.25)',
+                        padding: '12px 14px',
+                        borderRadius: '12px',
+                        border: '1px solid rgba(56, 189, 248, 0.2)'
+                      }}>
+                        "{adminNote}"
+                      </p>
 
-                    {/* Attached Image Preview */}
-                    {(tkt.replyImageUrl || (tkt.replyLink && /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(tkt.replyLink))) && (
-                      link ? (
-                        <a
-                          href={link}
-                          target="_system"
-                          rel="noopener noreferrer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            window.open(link, '_system');
-                          }}
-                          style={{ display: 'block', cursor: 'pointer', width: '100%' }}
-                        >
+                      {/* Attached Image Preview */}
+                      {(tkt.replyImageUrl || (tkt.replyLink && /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(tkt.replyLink))) && (
+                        link ? (
+                          <a
+                            href={link}
+                            target="_system"
+                            rel="noopener noreferrer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(link, '_system');
+                            }}
+                            style={{ display: 'block', cursor: 'pointer', width: '100%' }}
+                          >
+                            <img
+                              src={tkt.replyImageUrl || tkt.replyLink}
+                              alt="Attachment"
+                              style={{
+                                maxHeight: '120px',
+                                width: '100%',
+                                objectFit: 'contain',
+                                borderRadius: '12px',
+                                border: '1px solid rgba(56, 189, 248, 0.4)',
+                                background: 'rgba(0, 0, 0, 0.3)'
+                              }}
+                            />
+                          </a>
+                        ) : (
                           <img
                             src={tkt.replyImageUrl || tkt.replyLink}
                             alt="Attachment"
@@ -472,65 +630,52 @@ export default function FeedbackPage({
                               width: '100%',
                               objectFit: 'contain',
                               borderRadius: '12px',
-                              border: '1px solid rgba(56, 189, 248, 0.4)',
+                              border: '1px solid rgba(56, 189, 248, 0.3)',
                               background: 'rgba(0, 0, 0, 0.3)'
                             }}
                           />
-                        </a>
-                      ) : (
-                        <img
-                          src={tkt.replyImageUrl || tkt.replyLink}
-                          alt="Attachment"
-                          style={{
-                            maxHeight: '120px',
-                            width: '100%',
-                            objectFit: 'contain',
-                            borderRadius: '12px',
-                            border: '1px solid rgba(56, 189, 248, 0.3)',
-                            background: 'rgba(0, 0, 0, 0.3)'
-                          }}
-                        />
-                      )
-                    )}
+                        )
+                      )}
 
-                    {/* Custom Link Button */}
-                    {tkt.replyLink && (
-                      <a
-                        href={tkt.replyLink}
-                        target="_system"
-                        rel="noopener noreferrer"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          window.open(tkt.replyLink, '_system');
-                        }}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          padding: '10px 16px',
-                          borderRadius: '12px',
-                          background: 'linear-gradient(135deg, #0284c7, #0ea5e9)',
-                          color: '#ffffff',
-                          fontWeight: 800,
-                          fontSize: '0.84rem',
-                          textDecoration: 'none',
-                          boxShadow: '0 4px 14px rgba(14, 165, 233, 0.35)'
-                        }}
-                      >
-                        <span>{tkt.replyLinkLabel || (isBn ? 'লিংক খুলুন' : 'Open Link')}</span>
-                        <ChevronRight size={14} />
-                      </a>
-                    )}
-                  </div>
-                ) : (
-                  <p style={{ fontSize: '0.82rem', color: '#94a3b8', margin: 0, lineHeight: '1.4' }}>
-                    {isBn
-                      ? 'অ্যাডমিন টিম আপনার বার্তাটি পর্যালোচনা করছে। কোনো আপডেট বা সমাধান হলে এখানে অ্যাডমিন নোট হিসেবে দেখা যাবে।'
-                      : 'Our engineering team is currently reviewing your ticket. Any updates will appear here automatically.'}
-                  </p>
-                )}
-              </div>
+                      {/* Custom Link Button */}
+                      {tkt.replyLink && (
+                        <a
+                          href={tkt.replyLink}
+                          target="_system"
+                          rel="noopener noreferrer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(tkt.replyLink, '_system');
+                          }}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            padding: '10px 16px',
+                            borderRadius: '12px',
+                            background: 'linear-gradient(135deg, #0284c7, #0ea5e9)',
+                            color: '#ffffff',
+                            fontWeight: 800,
+                            fontSize: '0.84rem',
+                            textDecoration: 'none',
+                            boxShadow: '0 4px 14px rgba(14, 165, 233, 0.35)'
+                          }}
+                        >
+                          <span>{tkt.replyLinkLabel || (isBn ? 'লিংক খুলুন' : 'Open Link')}</span>
+                          <ChevronRight size={14} />
+                        </a>
+                      )}
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: '0.82rem', color: '#94a3b8', margin: 0, lineHeight: '1.4' }}>
+                      {isBn
+                        ? 'অ্যাডমিন টিম আপনার বার্তাটি পর্যালোচনা করছে। কোনো আপডেট বা সমাধান হলে এখানে অ্যাডমিন নোট হিসেবে দেখা যাবে।'
+                        : 'Our engineering team is currently reviewing your ticket. Any updates will appear here automatically.'}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           );
         })()}
