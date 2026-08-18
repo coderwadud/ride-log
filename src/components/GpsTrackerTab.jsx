@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { Geolocation } from '@capacitor/geolocation';
 import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
 import { 
   Play, Pause, Square, Navigation, RotateCcw, 
   Trash2, Calendar, Compass, History, Layers, Check,
@@ -184,6 +185,8 @@ export default function GpsTrackerTab({
   const playbackEndMarkerRef = useRef(null);
   const watchIdRef = useRef(null);
   const timerIntervalRef = useRef(null);
+  const wakeLockRef = useRef(null);
+  const startTimeEpochRef = useRef(null);
   const playbackIntervalRef = useRef(null);
 
   // Load 3-day trips on mount & mode change
@@ -294,16 +297,54 @@ export default function GpsTrackerTab({
   }, [selectedLayerKey]);
 
   // ── LIVE TRACKING TIMER ──
+  // ── BACKGROUND APP STATE & REAL-TIME TIMER SYNCHRONIZATION ──
   useEffect(() => {
     if (isRecording && !isPaused) {
+      if (!startTimeEpochRef.current) {
+        startTimeEpochRef.current = Date.now() - (elapsedSeconds * 1000);
+      }
+
       timerIntervalRef.current = setInterval(() => {
-        setElapsedSeconds((prev) => prev + 1);
+        if (startTimeEpochRef.current) {
+          const diffSec = Math.floor((Date.now() - startTimeEpochRef.current) / 1000);
+          setElapsedSeconds(Math.max(0, diffSec));
+        } else {
+          setElapsedSeconds((prev) => prev + 1);
+        }
       }, 1000);
+
+      // Request screen WakeLock to prevent GPS sensor sleep
+      if ('wakeLock' in navigator && !wakeLockRef.current) {
+        navigator.wakeLock.request('screen').then((lock) => {
+          wakeLockRef.current = lock;
+        }).catch(() => {});
+      }
     } else {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release().catch(() => {});
+        wakeLockRef.current = null;
+      }
     }
+
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    };
+  }, [isRecording, isPaused]);
+
+  // Listen to App background/foreground transitions to auto-resync
+  useEffect(() => {
+    let sub = null;
+    if (Capacitor.isNativePlatform()) {
+      sub = App.addListener('appStateChange', (state) => {
+        if (state.isActive && isRecording && !isPaused && startTimeEpochRef.current) {
+          const diffSec = Math.floor((Date.now() - startTimeEpochRef.current) / 1000);
+          setElapsedSeconds(Math.max(0, diffSec));
+        }
+      });
+    }
+    return () => {
+      if (sub && typeof sub.remove === 'function') sub.remove();
     };
   }, [isRecording, isPaused]);
 
@@ -321,6 +362,10 @@ export default function GpsTrackerTab({
       setIsRecording(true);
       setIsPaused(false);
       setElapsedSeconds(0);
+      startTimeEpochRef.current = Date.now();
+      try {
+        localStorage.setItem('ridelog_active_ride', JSON.stringify({ isRecording: true, startTime: Date.now() }));
+      } catch (e) {}
       setTripDistanceKm(0);
       setMaxSpeed(0);
       setCurrentSpeed(0);
@@ -456,6 +501,14 @@ export default function GpsTrackerTab({
 
     setIsRecording(false);
     setIsPaused(false);
+    startTimeEpochRef.current = null;
+    if (wakeLockRef.current) {
+      wakeLockRef.current.release().catch(() => {});
+      wakeLockRef.current = null;
+    }
+    try {
+      localStorage.removeItem('ridelog_active_ride');
+    } catch (e) {}
 
     // Ensure we have at least 2 points to draw and playback
     let finalPoints = [...recordedPoints];
