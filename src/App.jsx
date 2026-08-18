@@ -1,3 +1,4 @@
+import { trackUserIpAndActivity } from './utils/ipTracker';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import LoginScreen from './components/LoginScreen';
 import { onAuthChange, signOutUser } from './utils/firebase';
