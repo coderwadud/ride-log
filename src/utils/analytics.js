@@ -56,6 +56,9 @@ export async function logAnalyticsEvent(eventName, params = {}) {
   }
 }
 
+import { getCurrentAppVersion, BASE_APP_VERSION } from './appVersion';
+import { Capacitor } from '@capacitor/core';
+
 /**
  * Update `lastActiveAt` timestamp in Firestore user document.
  * Called every time the user opens the app or performs a key action.
@@ -73,13 +76,26 @@ export async function updateLastActiveAt(uid, userObj = null) {
   try {
     lastActivePingTime = now;
     const currentVer = await getCurrentAppVersion();
+    const isNative = Capacitor.isNativePlatform();
     const userRef = doc(db, 'users', uid);
     const payload = {
       lastActiveAt: serverTimestamp(),
       lastActiveMs: now,
       isOnline: true,
-      appVersion: currentVer || '1.6.2'
+      lastPlatform: isNative ? 'Android App' : 'Web Browser'
     };
+
+    if (isNative) {
+      payload.hasUsedAndroid = true;
+      payload.nativeAppVersion = currentVer || '1.6.2';
+      payload.lastAndroidActiveAt = serverTimestamp();
+      payload.appVersion = currentVer || '1.6.2';
+    } else {
+      payload.hasUsedWeb = true;
+      payload.webAppVersion = BASE_APP_VERSION || '1.6.2';
+      payload.lastWebActiveAt = serverTimestamp();
+    }
+
     if (userObj?.email) payload.email = userObj.email;
     if (userObj?.displayName) payload.displayName = userObj.displayName;
     if (userObj?.photoURL) payload.photoURL = userObj.photoURL;
@@ -89,6 +105,9 @@ export async function updateLastActiveAt(uid, userObj = null) {
       const snap = await getDoc(userRef);
       if (snap.exists()) {
         const existingData = snap.data();
+        if (existingData.hasUsedWeb) payload.hasUsedWeb = true;
+        if (existingData.hasUsedAndroid) payload.hasUsedAndroid = true;
+
         if (existingData.appVersion && existingData.appVersion !== currentVer) {
           payload.versionUpdatedAt = serverTimestamp();
           payload.previousAppVersion = existingData.appVersion;
