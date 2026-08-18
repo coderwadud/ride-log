@@ -10,6 +10,7 @@ import {
   Gauge, Clock, Flag, MapPin, Zap, X, Sparkles, CheckCircle2, Save
 } from 'lucide-react';
 import { saveTrip, getTripsLast3Days, deleteTrip, calculateDistanceKm } from '../utils/tripStorage';
+import { filterGpsJitter, snapToRoadsOSRM, calculateBearing, smoothPathMovingAverage } from '../utils/geoUtils';
 
 // 5 100% Free Map Modes / Layers with Lucide SVG Icons
 const MAP_LAYERS = {
@@ -81,16 +82,35 @@ const MAP_LAYERS = {
 };
 
 // Custom Map Marker Icons using SVG data URIs
-const createPulseIcon = () => L.divIcon({
-  className: 'custom-pulse-marker',
+const createBikeUserIcon = (heading = 0) => L.divIcon({
+  className: 'custom-bike-user-marker',
   html: `
-    <div style="position: relative; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
-      <div style="position: absolute; width: 24px; height: 24px; border-radius: 50%; background: rgba(56, 189, 248, 0.4); animation: pulse 1.5s infinite;"></div>
-      <div style="width: 14px; height: 14px; border-radius: 50%; background: #0284c7; border: 2.5px solid #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.4);"></div>
+    <div style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;">
+      <div style="position: absolute; width: 44px; height: 44px; border-radius: 50%; background: rgba(56, 189, 248, 0.3); border: 1.5px solid rgba(56, 189, 248, 0.6); animation: pulse 2s infinite ease-in-out;"></div>
+      <div style="
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #0284c7, #38bdf8);
+        border: 2.5px solid #ffffff;
+        box-shadow: 0 4px 14px rgba(2, 132, 199, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transform: rotate(${heading || 0}deg);
+        transition: transform 0.3s ease;
+      ">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="18.5" cy="17.5" r="3.5"/>
+          <circle cx="5.5" cy="17.5" r="3.5"/>
+          <circle cx="15" cy="5" r="1"/>
+          <path d="M12 17.5V14l-3-3 4-3 2 3h2"/>
+        </svg>
+      </div>
     </div>
   `,
-  iconSize: [24, 24],
-  iconAnchor: [12, 12]
+  iconSize: [44, 44],
+  iconAnchor: [22, 22]
 });
 
 const createStartIcon = () => L.divIcon({
@@ -115,15 +135,32 @@ const createEndIcon = () => L.divIcon({
   iconAnchor: [14, 14]
 });
 
-const createBikePlaybackIcon = () => L.divIcon({
+const createBikePlaybackIcon = (heading = 0) => L.divIcon({
   className: 'custom-bike-marker',
   html: `
-    <div style="background: linear-gradient(135deg, #38bdf8, #0284c7); color: #ffffff; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; border: 2.5px solid #ffffff; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.6); transition: transform 0.2s ease;">
-      🏍️
+    <div style="
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #38bdf8, #0284c7);
+      border: 2.5px solid #ffffff;
+      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform: rotate(${heading || 0}deg);
+      transition: transform 0.3s ease;
+    ">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="18.5" cy="17.5" r="3.5"/>
+        <circle cx="5.5" cy="17.5" r="3.5"/>
+        <circle cx="15" cy="5" r="1"/>
+        <path d="M12 17.5V14l-3-3 4-3 2 3h2"/>
+      </svg>
     </div>
   `,
-  iconSize: [34, 34],
-  iconAnchor: [17, 17]
+  iconSize: [36, 36],
+  iconAnchor: [18, 18]
 });
 
 export default function GpsTrackerTab({
@@ -188,6 +225,7 @@ export default function GpsTrackerTab({
   const wakeLockRef = useRef(null);
   const startTimeEpochRef = useRef(null);
   const playbackIntervalRef = useRef(null);
+  const currentHeadingRef = useRef(0);
 
   // Load 3-day trips on mount & mode change
   useEffect(() => {
@@ -269,23 +307,34 @@ export default function GpsTrackerTab({
     mapInstanceRef.current = map;
 
     // Get initial user position with browser fallback
-    const onInitialPos = (latitude, longitude, accuracy) => {
-      setCurrentPosition([latitude, longitude]);
+    const onInitialPos = (latitude, longitude, accuracy, heading) => {
+      const coord = [latitude, longitude];
+      setCurrentPosition(coord);
       setGpsAccuracy(Math.round(accuracy || 0));
+      if (heading && !isNaN(heading)) {
+        currentHeadingRef.current = heading;
+      }
       if (mapInstanceRef.current) {
-        mapInstanceRef.current.setView([latitude, longitude], 17);
+        const map = mapInstanceRef.current;
+        map.setView(coord, 17);
+        if (!liveMarkerRef.current) {
+          liveMarkerRef.current = L.marker(coord, { icon: createBikeUserIcon(currentHeadingRef.current) }).addTo(map);
+        } else {
+          liveMarkerRef.current.setLatLng(coord);
+          liveMarkerRef.current.setIcon(createBikeUserIcon(currentHeadingRef.current));
+        }
       }
     };
 
     if (Capacitor.isNativePlatform()) {
       Geolocation.getCurrentPosition({ enableHighAccuracy: true })
         .then((pos) => {
-          onInitialPos(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+          onInitialPos(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, pos.coords.heading);
         })
         .catch((err) => console.warn('Initial native geolocation warning:', err));
     } else if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => onInitialPos(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy),
+        (pos) => onInitialPos(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, pos.coords.heading),
         (err) => console.warn('Initial web geolocation error:', err),
         { enableHighAccuracy: true, timeout: 8000 }
       );
@@ -295,6 +344,67 @@ export default function GpsTrackerTab({
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
+      }
+    };
+  }, []);
+
+  // ── PASSIVE GEOLOCATION WATCHER (Always shows bike icon at exact location when location is on) ──
+  useEffect(() => {
+    let passiveWatchId = null;
+
+    const handlePassiveUpdate = (latitude, longitude, accuracy, heading) => {
+      const coord = [latitude, longitude];
+      setCurrentPosition(coord);
+      setGpsAccuracy(Math.round(accuracy || 0));
+
+      if (heading && !isNaN(heading)) {
+        currentHeadingRef.current = heading;
+      }
+
+      if (mapInstanceRef.current) {
+        const map = mapInstanceRef.current;
+        if (!liveMarkerRef.current) {
+          liveMarkerRef.current = L.marker(coord, { icon: createBikeUserIcon(currentHeadingRef.current) }).addTo(map);
+        } else {
+          liveMarkerRef.current.setLatLng(coord);
+          liveMarkerRef.current.setIcon(createBikeUserIcon(currentHeadingRef.current));
+        }
+      }
+    };
+
+    const initPassiveWatch = async () => {
+      try {
+        if (Capacitor.isNativePlatform()) {
+          passiveWatchId = await Geolocation.watchPosition(
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+            (pos, err) => {
+              if (err || !pos?.coords) return;
+              handlePassiveUpdate(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, pos.coords.heading);
+            }
+          );
+        } else if (navigator.geolocation) {
+          passiveWatchId = navigator.geolocation.watchPosition(
+            (pos) => {
+              handlePassiveUpdate(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, pos.coords.heading);
+            },
+            (err) => console.warn('Passive web watch warning:', err),
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+          );
+        }
+      } catch (e) {
+        console.warn('Failed to start passive location watcher:', e);
+      }
+    };
+
+    initPassiveWatch();
+
+    return () => {
+      if (passiveWatchId !== null) {
+        if (Capacitor.isNativePlatform()) {
+          Geolocation.clearWatch({ id: passiveWatchId }).catch(() => {});
+        } else if (navigator.geolocation) {
+          navigator.geolocation.clearWatch(passiveWatchId);
+        }
       }
     };
   }, []);
@@ -384,7 +494,7 @@ export default function GpsTrackerTab({
   // Dedicated GPS Watcher Re-Attacher for Auto-Recovery
   const startGpsWatcherOnly = async () => {
     try {
-      const handleLocationUpdate = (latitude, longitude, speed, accuracy, altitude) => {
+      const handleLocationUpdate = (latitude, longitude, speed, accuracy, altitude, heading) => {
         const newCoord = [latitude, longitude];
         const speedKmH = speed ? Math.max(0, Math.round(speed * 3.6)) : 0;
 
@@ -392,6 +502,10 @@ export default function GpsTrackerTab({
         setCurrentSpeed(speedKmH);
         setGpsAccuracy(Math.round(accuracy || 0));
         setMaxSpeed((prev) => Math.max(prev, speedKmH));
+
+        if (heading && !isNaN(heading)) {
+          currentHeadingRef.current = heading;
+        }
 
         const pointObj = {
           lat: latitude,
@@ -403,59 +517,71 @@ export default function GpsTrackerTab({
         };
 
         setRecordedPoints((prev) => {
-          let newDist = tripDistanceKm;
-          if (prev.length > 0) {
-            const last = prev[prev.length - 1];
-            const distInc = calculateDistanceKm(last.lat, last.lng, latitude, longitude);
-            if (distInc > 0.003) {
-              newDist = +(tripDistanceKm + distInc).toFixed(2);
-              setTripDistanceKm(newDist);
-            }
-          }
-          const updated = [...prev, pointObj];
+          // 🛡️ JITTER & STATIONARY FILTER
+          const filterRes = filterGpsJitter(prev, pointObj);
+          let updated = prev;
 
-          // 💾 CONTINUOUSLY PERSIST TO STORAGE ON EVERY GPS TICK
-          try {
-            localStorage.setItem('ridelog_active_session_persistent_v1', JSON.stringify({
-              isRecording: true,
-              isPaused: false,
-              startTimeEpoch: startTimeEpochRef.current || Date.now(),
-              tripStartTime: tripStartTime || new Date().toISOString(),
-              tripDistanceKm: newDist,
-              maxSpeed: Math.max(maxSpeed, speedKmH),
-              recordedPoints: updated
-            }));
-          } catch (e) {}
+          if (filterRes.accept) {
+            let newDist = tripDistanceKm;
+            if (prev.length > 0) {
+              const last = prev[prev.length - 1];
+              const distInc = calculateDistanceKm(last.lat, last.lng, latitude, longitude);
+              if (distInc > 0.003) {
+                newDist = +(tripDistanceKm + distInc).toFixed(2);
+                setTripDistanceKm(newDist);
+              }
+              if (!heading) {
+                const bearing = calculateBearing(last.lat, last.lng, latitude, longitude);
+                if (bearing) currentHeadingRef.current = bearing;
+              }
+            }
+            updated = [...prev, pointObj];
+
+            // 💾 CONTINUOUSLY PERSIST TO STORAGE ON VALID MOVEMENT
+            try {
+              localStorage.setItem('ridelog_active_session_persistent_v1', JSON.stringify({
+                isRecording: true,
+                isPaused: false,
+                startTimeEpoch: startTimeEpochRef.current || Date.now(),
+                tripStartTime: tripStartTime || new Date().toISOString(),
+                tripDistanceKm: newDist,
+                maxSpeed: Math.max(maxSpeed, speedKmH),
+                recordedPoints: updated
+              }));
+            } catch (e) {}
+          }
+
+          // Update Map Marker & Polyline
+          if (mapInstanceRef.current) {
+            const map = mapInstanceRef.current;
+            if (!liveMarkerRef.current) {
+              liveMarkerRef.current = L.marker(newCoord, { icon: createBikeUserIcon(currentHeadingRef.current) }).addTo(map);
+            } else {
+              liveMarkerRef.current.setLatLng(newCoord);
+              liveMarkerRef.current.setIcon(createBikeUserIcon(currentHeadingRef.current));
+            }
+
+            if (filterRes.accept && updated.length > 1) {
+              const latLngs = updated.map((p) => [p.lat, p.lng]);
+              if (!livePolylineRef.current) {
+                livePolylineRef.current = L.polyline(latLngs, {
+                  color: '#0284c7',
+                  weight: 6,
+                  opacity: 0.9,
+                  smoothFactor: 2.0,
+                  lineCap: 'round',
+                  lineJoin: 'round'
+                }).addTo(map);
+              } else {
+                livePolylineRef.current.setLatLngs(latLngs);
+              }
+            }
+
+            map.panTo(newCoord, { animate: true, duration: 0.5 });
+          }
 
           return updated;
         });
-
-        // Update Map Marker & Polyline
-        if (mapInstanceRef.current) {
-          const map = mapInstanceRef.current;
-          if (!liveMarkerRef.current) {
-            liveMarkerRef.current = L.marker(newCoord, { icon: createPulseIcon() }).addTo(map);
-          } else {
-            liveMarkerRef.current.setLatLng(newCoord);
-          }
-
-          setRecordedPoints((currentList) => {
-            const latLngs = currentList.map((p) => [p.lat, p.lng]);
-            if (!livePolylineRef.current && latLngs.length > 1) {
-              livePolylineRef.current = L.polyline(latLngs, {
-                color: '#0284c7',
-                weight: 5,
-                opacity: 0.85,
-                smoothFactor: 1
-              }).addTo(map);
-            } else if (livePolylineRef.current) {
-              livePolylineRef.current.setLatLngs(latLngs);
-            }
-            return currentList;
-          });
-
-          map.panTo(newCoord, { animate: true, duration: 0.5 });
-        }
       };
 
       if (Capacitor.isNativePlatform()) {
@@ -522,7 +648,7 @@ export default function GpsTrackerTab({
         livePolylineRef.current = null;
       }
 
-      const handleLocationUpdate = (latitude, longitude, speed, accuracy, altitude) => {
+      const handleLocationUpdate = (latitude, longitude, speed, accuracy, altitude, heading) => {
         const newCoord = [latitude, longitude];
         const speedKmH = speed ? Math.max(0, Math.round(speed * 3.6)) : 0;
 
@@ -531,7 +657,10 @@ export default function GpsTrackerTab({
         setGpsAccuracy(Math.round(accuracy || 0));
         setMaxSpeed((prev) => Math.max(prev, speedKmH));
 
-        // Save point
+        if (heading && !isNaN(heading)) {
+          currentHeadingRef.current = heading;
+        }
+
         const pointObj = {
           lat: latitude,
           lng: longitude,
@@ -542,67 +671,75 @@ export default function GpsTrackerTab({
         };
 
         setRecordedPoints((prev) => {
-          if (prev.length > 0) {
-            const last = prev[prev.length - 1];
-            const distInc = calculateDistanceKm(last.lat, last.lng, latitude, longitude);
-            // Add distance if movement is > 3 meters
-            if (distInc > 0.003) {
-              setTripDistanceKm((curr) => +(curr + distInc).toFixed(2));
+          // 🛡️ JITTER & STATIONARY FILTER
+          const filterRes = filterGpsJitter(prev, pointObj);
+          let updated = prev;
+
+          if (filterRes.accept) {
+            if (prev.length > 0) {
+              const last = prev[prev.length - 1];
+              const distInc = calculateDistanceKm(last.lat, last.lng, latitude, longitude);
+              if (distInc > 0.003) {
+                setTripDistanceKm((curr) => +(curr + distInc).toFixed(2));
+              }
+              if (!heading) {
+                const bearing = calculateBearing(last.lat, last.lng, latitude, longitude);
+                if (bearing) currentHeadingRef.current = bearing;
+              }
             }
+            updated = [...prev, pointObj];
           }
-          return [...prev, pointObj];
+
+          // Update Map Marker & Polyline
+          if (mapInstanceRef.current) {
+            const map = mapInstanceRef.current;
+
+            if (!liveMarkerRef.current) {
+              liveMarkerRef.current = L.marker(newCoord, { icon: createBikeUserIcon(currentHeadingRef.current) }).addTo(map);
+            } else {
+              liveMarkerRef.current.setLatLng(newCoord);
+              liveMarkerRef.current.setIcon(createBikeUserIcon(currentHeadingRef.current));
+            }
+
+            if (filterRes.accept && updated.length > 1) {
+              const latLngs = updated.map((p) => [p.lat, p.lng]);
+              if (!livePolylineRef.current) {
+                livePolylineRef.current = L.polyline(latLngs, {
+                  color: '#0284c7',
+                  weight: 6,
+                  opacity: 0.9,
+                  smoothFactor: 2.0,
+                  lineCap: 'round',
+                  lineJoin: 'round'
+                }).addTo(map);
+              } else {
+                livePolylineRef.current.setLatLngs(latLngs);
+              }
+            }
+
+            map.panTo(newCoord, { animate: true, duration: 0.5 });
+          }
+
+          return updated;
         });
-
-        // Update Map Marker & Polyline
-        if (mapInstanceRef.current) {
-          const map = mapInstanceRef.current;
-
-          // Live Rider Marker
-          if (!liveMarkerRef.current) {
-            liveMarkerRef.current = L.marker(newCoord, { icon: createPulseIcon() }).addTo(map);
-          } else {
-            liveMarkerRef.current.setLatLng(newCoord);
-          }
-
-          // Live Polyline
-          setRecordedPoints((currentList) => {
-            const latLngs = currentList.map((p) => [p.lat, p.lng]);
-            if (!livePolylineRef.current && latLngs.length > 1) {
-              livePolylineRef.current = L.polyline(latLngs, {
-                color: '#0284c7',
-                weight: 5,
-                opacity: 0.85,
-                smoothFactor: 1
-              }).addTo(map);
-            } else if (livePolylineRef.current) {
-              livePolylineRef.current.setLatLngs(latLngs);
-            }
-            return currentList;
-          });
-
-          map.panTo(newCoord, { animate: true, duration: 0.5 });
-        }
       };
 
       if (Capacitor.isNativePlatform()) {
         watchIdRef.current = await Geolocation.watchPosition(
           { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
           (position, err) => {
-            if (err || !position) return;
-            const { latitude, longitude, speed, accuracy, altitude } = position.coords;
-            handleLocationUpdate(latitude, longitude, speed, accuracy, altitude);
+            if (err || !position?.coords) return;
+            const { latitude, longitude, speed, accuracy, altitude, heading } = position.coords;
+            handleLocationUpdate(latitude, longitude, speed, accuracy, altitude, heading);
           }
         );
       } else if (navigator.geolocation) {
-        // Standard Web Browser / Localhost
         watchIdRef.current = navigator.geolocation.watchPosition(
           (position) => {
-            const { latitude, longitude, speed, accuracy, altitude } = position.coords;
-            handleLocationUpdate(latitude, longitude, speed, accuracy, altitude);
+            const { latitude, longitude, speed, accuracy, altitude, heading } = position.coords;
+            handleLocationUpdate(latitude, longitude, speed, accuracy, altitude, heading);
           },
-          (err) => {
-            console.warn('Web geolocation watch warning:', err);
-          },
+          (err) => console.warn('Web geolocation watch warning:', err),
           { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
       }
@@ -644,17 +781,25 @@ export default function GpsTrackerTab({
       localStorage.removeItem('ridelog_active_session_persistent_v1');
     } catch (e) {}
 
-    // Ensure we have at least 2 points to draw and playback
-    let finalPoints = [...recordedPoints];
-    if (finalPoints.length === 0 && currentPosition) {
+    // Ensure road snapping / smoothing on final route points before saving
+    let rawPoints = [...recordedPoints];
+    let finalPoints = rawPoints;
+
+    if (rawPoints.length >= 2) {
+      try {
+        finalPoints = await snapToRoadsOSRM(rawPoints);
+      } catch (e) {
+        finalPoints = smoothPathMovingAverage(rawPoints);
+      }
+    } else if (rawPoints.length === 0 && currentPosition) {
       finalPoints = [
         { lat: currentPosition[0], lng: currentPosition[1], speed: 0, accuracy: 10, altitude: 0, timestamp: Date.now() - 5000 },
         { lat: currentPosition[0] + 0.0001, lng: currentPosition[1] + 0.0001, speed: 0, accuracy: 10, altitude: 0, timestamp: Date.now() }
       ];
-    } else if (finalPoints.length === 1) {
+    } else if (rawPoints.length === 1) {
       finalPoints.push({
-        lat: finalPoints[0].lat + 0.0001,
-        lng: finalPoints[0].lng + 0.0001,
+        lat: rawPoints[0].lat + 0.0001,
+        lng: rawPoints[0].lng + 0.0001,
         speed: 0,
         accuracy: 10,
         altitude: 0,
@@ -787,10 +932,17 @@ export default function GpsTrackerTab({
           }
 
           const currentPoint = selectedTrip.points[nextIndex];
+          const prevPoint = selectedTrip.points[prevIndex];
           const newPos = [currentPoint.lat, currentPoint.lng];
+
+          let pHeading = 0;
+          if (prevPoint) {
+            pHeading = calculateBearing(prevPoint.lat, prevPoint.lng, currentPoint.lat, currentPoint.lng);
+          }
 
           if (playbackBikeMarkerRef.current) {
             playbackBikeMarkerRef.current.setLatLng(newPos);
+            playbackBikeMarkerRef.current.setIcon(createBikePlaybackIcon(pHeading));
           }
 
           return nextIndex;
