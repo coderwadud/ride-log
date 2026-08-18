@@ -327,7 +327,7 @@ export default function App() {
 
         // ── Analytics: track login & update lastActiveAt ──
         trackUserLogin(firebaseUser.providerData?.[0]?.providerId || 'unknown');
-        updateLastActiveAt(firebaseUser.uid);
+        updateLastActiveAt(firebaseUser.uid, firebaseUser);
 
         // ── FCM Token sync with user ID ──
         syncFCMTokenWithUser(firebaseUser.uid);

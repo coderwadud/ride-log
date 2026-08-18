@@ -62,22 +62,26 @@ export async function logAnalyticsEvent(eventName, params = {}) {
  * @param {string} uid - Firebase Auth user ID
  */
 let lastActivePingTime = 0;
-export async function updateLastActiveAt(uid) {
+export async function updateLastActiveAt(uid, userObj = null) {
   if (!uid) return;
 
   const now = Date.now();
-  // Throttle: only update if 5+ minutes have passed since last ping
-  if (now - lastActivePingTime < 5 * 60 * 1000) return;
+  // Throttle: only update if 2+ minutes have passed since last ping
+  if (now - lastActivePingTime < 2 * 60 * 1000) return;
 
   try {
     lastActivePingTime = now;
     const userRef = doc(db, 'users', uid);
-    await updateDoc(userRef, {
+    const payload = {
       lastActiveAt: serverTimestamp(),
-      appVersion: '1.1'
-    });
+      appVersion: '1.2'
+    };
+    if (userObj?.email) payload.email = userObj.email;
+    if (userObj?.displayName) payload.displayName = userObj.displayName;
+    if (userObj?.photoURL) payload.photoURL = userObj.photoURL;
+
+    await setDoc(userRef, payload, { merge: true });
   } catch (e) {
-    // Silently ignore — Firestore update failure should never crash the app
     console.debug('[Analytics] lastActiveAt update failed:', e?.message);
   }
 }
