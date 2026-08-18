@@ -113,26 +113,66 @@ const createBikeUserIcon = (heading = 0) => L.divIcon({
   iconAnchor: [22, 22]
 });
 
-const createStartIcon = () => L.divIcon({
-  className: 'custom-start-marker',
+const createStartPinIcon = () => L.divIcon({
+  className: 'custom-start-pin-marker',
   html: `
-    <div style="background: #10b981; color: #ffffff; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; border: 2px solid #ffffff; box-shadow: 0 3px 8px rgba(0,0,0,0.5);">
-      S
+    <div style="position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+      <div style="
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: #ffffff;
+        padding: 5px 9px;
+        border-radius: 18px;
+        font-size: 11px;
+        font-weight: 800;
+        border: 2px solid #ffffff;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.6);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+      ">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+          <circle cx="12" cy="10" r="3"/>
+        </svg>
+        <span>Start</span>
+      </div>
+      <div style="width: 2px; height: 6px; background: #10b981;"></div>
     </div>
   `,
-  iconSize: [28, 28],
-  iconAnchor: [14, 14]
+  iconSize: [60, 32],
+  iconAnchor: [30, 32]
 });
 
-const createEndIcon = () => L.divIcon({
-  className: 'custom-end-marker',
+const createFinishPinIcon = () => L.divIcon({
+  className: 'custom-finish-pin-marker',
   html: `
-    <div style="background: #ef4444; color: #ffffff; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; border: 2px solid #ffffff; box-shadow: 0 3px 8px rgba(0,0,0,0.5);">
-      E
+    <div style="position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+      <div style="
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        color: #ffffff;
+        padding: 5px 9px;
+        border-radius: 18px;
+        font-size: 11px;
+        font-weight: 800;
+        border: 2px solid #ffffff;
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.6);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+      ">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+          <circle cx="12" cy="10" r="3"/>
+        </svg>
+        <span>Finish</span>
+      </div>
+      <div style="width: 2px; height: 6px; background: #ef4444;"></div>
     </div>
   `,
-  iconSize: [28, 28],
-  iconAnchor: [14, 14]
+  iconSize: [64, 32],
+  iconAnchor: [32, 32]
 });
 
 const createBikePlaybackIcon = (heading = 0) => L.divIcon({
@@ -216,6 +256,8 @@ export default function GpsTrackerTab({
   const mapInstanceRef = useRef(null);
   const livePolylineRef = useRef(null);
   const liveMarkerRef = useRef(null);
+  const liveStartMarkerRef = useRef(null);
+  const liveEndMarkerRef = useRef(null);
   const playbackPolylineRef = useRef(null);
   const playbackBikeMarkerRef = useRef(null);
   const playbackStartMarkerRef = useRef(null);
@@ -226,6 +268,11 @@ export default function GpsTrackerTab({
   const startTimeEpochRef = useRef(null);
   const playbackIntervalRef = useRef(null);
   const currentHeadingRef = useRef(0);
+  const modeRef = useRef(mode);
+
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
 
   // Load 3-day trips on mount & mode change
   useEffect(() => {
@@ -361,13 +408,17 @@ export default function GpsTrackerTab({
         currentHeadingRef.current = heading;
       }
 
-      if (mapInstanceRef.current) {
+      // Only display live user bike marker on map when mode is 'live'
+      if (mapInstanceRef.current && modeRef.current === 'live') {
         const map = mapInstanceRef.current;
         if (!liveMarkerRef.current) {
           liveMarkerRef.current = L.marker(coord, { icon: createBikeUserIcon(currentHeadingRef.current) }).addTo(map);
         } else {
           liveMarkerRef.current.setLatLng(coord);
           liveMarkerRef.current.setIcon(createBikeUserIcon(currentHeadingRef.current));
+          if (!map.hasLayer(liveMarkerRef.current)) {
+            liveMarkerRef.current.addTo(map);
+          }
         }
       }
     };
@@ -642,10 +693,21 @@ export default function GpsTrackerTab({
       setRecordedPoints(initialPoints);
       setTripStartTime(new Date().toISOString());
 
-      // Reset live polyline
+      // Reset live polyline and end pin
       if (livePolylineRef.current) {
         livePolylineRef.current.remove();
         livePolylineRef.current = null;
+      }
+      if (liveEndMarkerRef.current) {
+        liveEndMarkerRef.current.remove();
+        liveEndMarkerRef.current = null;
+      }
+
+      // Place Green Start Pin Marker at starting position
+      if (currentPosition && mapInstanceRef.current) {
+        const map = mapInstanceRef.current;
+        if (liveStartMarkerRef.current) liveStartMarkerRef.current.remove();
+        liveStartMarkerRef.current = L.marker(currentPosition, { icon: createStartPinIcon() }).addTo(map);
       }
 
       const handleLocationUpdate = (latitude, longitude, speed, accuracy, altitude, heading) => {
@@ -812,6 +874,14 @@ export default function GpsTrackerTab({
       return;
     }
 
+    // Place Red Finish Pin Marker at end position
+    if (finalPoints.length > 0 && mapInstanceRef.current) {
+      const map = mapInstanceRef.current;
+      const lastPt = finalPoints[finalPoints.length - 1];
+      if (liveEndMarkerRef.current) liveEndMarkerRef.current.remove();
+      liveEndMarkerRef.current = L.marker([lastPt.lat, lastPt.lng], { icon: createFinishPinIcon() }).addTo(map);
+    }
+
     const defaultTitle = isBn
       ? `রাইড - ${new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' })}`
       : `Ride - ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
@@ -880,42 +950,68 @@ export default function GpsTrackerTab({
 
   // ── 3-DAY PLAYBACK CONTROLS ──
   useEffect(() => {
-    if (mode !== 'playback' || !selectedTrip || !mapInstanceRef.current) return;
-
+    if (!mapInstanceRef.current) return;
     const map = mapInstanceRef.current;
-    const points = selectedTrip.points || [];
 
-    if (points.length === 0) return;
+    if (mode === 'playback') {
+      // 🙈 Hide Live Ride Markers when in Playback mode so only 1 bike marker exists!
+      if (liveMarkerRef.current) liveMarkerRef.current.remove();
+      if (liveStartMarkerRef.current) liveStartMarkerRef.current.remove();
+      if (liveEndMarkerRef.current) liveEndMarkerRef.current.remove();
 
-    // Clear previous playback markers
-    if (playbackPolylineRef.current) playbackPolylineRef.current.remove();
-    if (playbackBikeMarkerRef.current) playbackBikeMarkerRef.current.remove();
-    if (playbackStartMarkerRef.current) playbackStartMarkerRef.current.remove();
-    if (playbackEndMarkerRef.current) playbackEndMarkerRef.current.remove();
+      if (!selectedTrip) return;
+      const points = selectedTrip.points || [];
+      if (points.length === 0) return;
 
-    const latLngs = points.map((p) => [p.lat, p.lng]);
+      // Clear previous playback markers
+      if (playbackPolylineRef.current) playbackPolylineRef.current.remove();
+      if (playbackBikeMarkerRef.current) playbackBikeMarkerRef.current.remove();
+      if (playbackStartMarkerRef.current) playbackStartMarkerRef.current.remove();
+      if (playbackEndMarkerRef.current) playbackEndMarkerRef.current.remove();
 
-    // Draw full route polyline with gradient style
-    playbackPolylineRef.current = L.polyline(latLngs, {
-      color: '#38bdf8',
-      weight: 6,
-      opacity: 0.9,
-      lineCap: 'round',
-      lineJoin: 'round'
-    }).addTo(map);
+      const latLngs = points.map((p) => [p.lat, p.lng]);
 
-    // Start & End markers
-    playbackStartMarkerRef.current = L.marker(latLngs[0], { icon: createStartIcon() }).addTo(map);
-    playbackEndMarkerRef.current = L.marker(latLngs[latLngs.length - 1], { icon: createEndIcon() }).addTo(map);
+      // Draw full route polyline with gradient style
+      playbackPolylineRef.current = L.polyline(latLngs, {
+        color: '#38bdf8',
+        weight: 6,
+        opacity: 0.9,
+        lineCap: 'round',
+        lineJoin: 'round'
+      }).addTo(map);
 
-    // Moving Bike Marker
-    playbackBikeMarkerRef.current = L.marker(latLngs[0], { icon: createBikePlaybackIcon() }).addTo(map);
+      // Start Pin & Finish Pin markers
+      playbackStartMarkerRef.current = L.marker(latLngs[0], { icon: createStartPinIcon() }).addTo(map);
+      playbackEndMarkerRef.current = L.marker(latLngs[latLngs.length - 1], { icon: createFinishPinIcon() }).addTo(map);
 
-    // Fit map bounds to show full route
-    map.fitBounds(playbackPolylineRef.current.getBounds(), { padding: [40, 40] });
+      // Moving Bike Marker
+      const initialBearing = points.length > 1 ? calculateBearing(points[0].lat, points[0].lng, points[1].lat, points[1].lng) : 0;
+      playbackBikeMarkerRef.current = L.marker(latLngs[0], { icon: createBikePlaybackIcon(initialBearing) }).addTo(map);
 
-    setPlaybackIndex(0);
-    setIsPlaying(false);
+      // Fit map bounds to show full route
+      map.fitBounds(playbackPolylineRef.current.getBounds(), { padding: [40, 40] });
+
+      setPlaybackIndex(0);
+      setIsPlaying(false);
+    } else {
+      // 🟢 Restoring Live Mode
+      // Clear playback markers
+      if (playbackPolylineRef.current) playbackPolylineRef.current.remove();
+      if (playbackBikeMarkerRef.current) playbackBikeMarkerRef.current.remove();
+      if (playbackStartMarkerRef.current) playbackStartMarkerRef.current.remove();
+      if (playbackEndMarkerRef.current) playbackEndMarkerRef.current.remove();
+
+      // Re-add live bike marker to map
+      if (currentPosition) {
+        if (!liveMarkerRef.current) {
+          liveMarkerRef.current = L.marker(currentPosition, { icon: createBikeUserIcon(currentHeadingRef.current) }).addTo(map);
+        } else {
+          liveMarkerRef.current.addTo(map);
+          liveMarkerRef.current.setLatLng(currentPosition);
+          liveMarkerRef.current.setIcon(createBikeUserIcon(currentHeadingRef.current));
+        }
+      }
+    }
   }, [selectedTrip, mode]);
 
   // Handle Playback Interval Animation
