@@ -10,7 +10,9 @@ export default function CampaignModal({
   if (!isOpen || !campaign || !campaign.isActive) return null;
 
   const isBn = lang === 'bn';
-  const { title, message, actionText, actionUrl, badge } = campaign;
+  const { title, message, description, actionText, actionUrl, badge, bannerUrl, imageUrl } = campaign || {};
+  const imgUrl = bannerUrl || imageUrl;
+  const bodyText = message || description || '';
 
   const handleActionClick = () => {
     if (actionUrl) {
@@ -43,7 +45,7 @@ export default function CampaignModal({
           background: 'linear-gradient(145deg, #1e293b, #0f172a)',
           border: '1px solid rgba(245, 158, 11, 0.4)',
           borderRadius: '22px',
-          padding: '26px 22px',
+          padding: '24px 20px',
           maxWidth: '420px',
           width: '100%',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 20px rgba(245, 158, 11, 0.15)',
@@ -64,8 +66,8 @@ export default function CampaignModal({
             position: 'absolute',
             top: '14px',
             right: '14px',
-            background: 'rgba(255, 255, 255, 0.08)',
-            border: 'none',
+            background: 'rgba(0, 0, 0, 0.5)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
             borderRadius: '50%',
             width: '30px',
             height: '30px',
@@ -73,29 +75,59 @@ export default function CampaignModal({
             alignItems: 'center',
             justifyContent: 'center',
             color: '#94a3b8',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            zIndex: 10
           }}
         >
           <X size={16} />
         </button>
 
-        {/* Announcement Megaphone Icon */}
-        <div
-          style={{
-            width: '62px',
-            height: '62px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(239, 68, 68, 0.2))',
-            border: '2px solid #f59e0b',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#f59e0b',
-            boxShadow: '0 4px 16px rgba(245, 158, 11, 0.25)'
-          }}
-        >
-          <Megaphone size={30} />
-        </div>
+        {/* Campaign Banner Image (if available) */}
+        {imgUrl ? (
+          <div
+            style={{
+              width: '100%',
+              borderRadius: '14px',
+              overflow: 'hidden',
+              maxHeight: '190px',
+              marginBottom: '2px',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+            }}
+          >
+            <img
+              src={imgUrl}
+              alt={title || 'Announcement'}
+              style={{
+                width: '100%',
+                maxHeight: '190px',
+                objectFit: 'cover',
+                display: 'block'
+              }}
+              onError={(e) => {
+                e.currentTarget.parentElement.style.display = 'none';
+              }}
+            />
+          </div>
+        ) : (
+          /* Announcement Megaphone Icon fallback */
+          <div
+            style={{
+              width: '62px',
+              height: '62px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(239, 68, 68, 0.2))',
+              border: '2px solid #f59e0b',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#f59e0b',
+              boxShadow: '0 4px 16px rgba(245, 158, 11, 0.25)'
+            }}
+          >
+            <Megaphone size={30} />
+          </div>
+        )}
 
         {/* Badge */}
         <span
@@ -111,7 +143,7 @@ export default function CampaignModal({
             letterSpacing: '0.5px'
           }}
         >
-          {badge || (isBn ? '📢 বিশেষ নোটিশ' : '📢 Announcement')}
+          {badge || (isBn ? 'ঘোষণা / প্রমোশন' : 'Announcement')}
         </span>
 
         {/* Title */}
@@ -136,7 +168,7 @@ export default function CampaignModal({
           }}
         >
           <p style={{ margin: 0, whiteSpace: 'pre-line' }}>
-            {message}
+            {bodyText}
           </p>
         </div>
 
@@ -179,7 +211,7 @@ export default function CampaignModal({
               color: actionUrl ? '#94a3b8' : '#ffffff',
               fontWeight: 700,
               fontSize: '0.86rem',
-              border: actionUrl ? 'none' : 'none',
+              border: 'none',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
