@@ -186,19 +186,47 @@ export default function TicketUpdateModal({
 
             {/* Attached Image Preview */}
             {imgUrl && (
-              <img
-                src={imgUrl}
-                alt="Attachment"
-                style={{
-                  maxHeight: '120px',
-                  width: '100%',
-                  objectFit: 'contain',
-                  borderRadius: '10px',
-                  border: '1px solid rgba(56, 189, 248, 0.3)',
-                  background: 'rgba(0, 0, 0, 0.3)',
-                  marginTop: '2px'
-                }}
-              />
+              link ? (
+                <a
+                  href={link}
+                  target="_system"
+                  rel="noopener noreferrer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.open(link, '_system');
+                  }}
+                  style={{ display: 'block', cursor: 'pointer', width: '100%' }}
+                >
+                  <img
+                    src={imgUrl}
+                    alt="Attachment"
+                    style={{
+                      maxHeight: '120px',
+                      width: '100%',
+                      objectFit: 'contain',
+                      borderRadius: '10px',
+                      border: '1px solid rgba(56, 189, 248, 0.4)',
+                      background: 'rgba(0, 0, 0, 0.3)',
+                      marginTop: '2px',
+                      transition: 'transform 0.2s ease'
+                    }}
+                  />
+                </a>
+              ) : (
+                <img
+                  src={imgUrl}
+                  alt="Attachment"
+                  style={{
+                    maxHeight: '120px',
+                    width: '100%',
+                    objectFit: 'contain',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(56, 189, 248, 0.3)',
+                    background: 'rgba(0, 0, 0, 0.3)',
+                    marginTop: '2px'
+                  }}
+                />
+              )
             )}
 
             {/* Custom Link Action Button */}

@@ -453,18 +453,44 @@ export default function FeedbackPage({
 
                     {/* Attached Image Preview */}
                     {(tkt.replyImageUrl || (tkt.replyLink && /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(tkt.replyLink))) && (
-                      <img
-                        src={tkt.replyImageUrl || tkt.replyLink}
-                        alt="Attachment"
-                        style={{
-                          maxHeight: '120px',
-                          width: '100%',
-                          objectFit: 'contain',
-                          borderRadius: '12px',
-                          border: '1px solid rgba(56, 189, 248, 0.3)',
-                          background: 'rgba(0, 0, 0, 0.3)'
-                        }}
-                      />
+                      link ? (
+                        <a
+                          href={link}
+                          target="_system"
+                          rel="noopener noreferrer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(link, '_system');
+                          }}
+                          style={{ display: 'block', cursor: 'pointer', width: '100%' }}
+                        >
+                          <img
+                            src={tkt.replyImageUrl || tkt.replyLink}
+                            alt="Attachment"
+                            style={{
+                              maxHeight: '120px',
+                              width: '100%',
+                              objectFit: 'contain',
+                              borderRadius: '12px',
+                              border: '1px solid rgba(56, 189, 248, 0.4)',
+                              background: 'rgba(0, 0, 0, 0.3)'
+                            }}
+                          />
+                        </a>
+                      ) : (
+                        <img
+                          src={tkt.replyImageUrl || tkt.replyLink}
+                          alt="Attachment"
+                          style={{
+                            maxHeight: '120px',
+                            width: '100%',
+                            objectFit: 'contain',
+                            borderRadius: '12px',
+                            border: '1px solid rgba(56, 189, 248, 0.3)',
+                            background: 'rgba(0, 0, 0, 0.3)'
+                          }}
+                        />
+                      )
                     )}
 
                     {/* Custom Link Button */}
