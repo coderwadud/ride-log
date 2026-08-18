@@ -216,73 +216,120 @@ export function snapToRoadsOSRM(points) {
 
 /**
  * Fetch nearby Petrol Pumps (fuel stations) or Motorcycle Garages/Repair Shops
- * using 100% Free OpenStreetMap Overpass API
+ * using 100% Free OpenStreetMap Overpass API & Nominatim Fallback
  * @param {number} lat Latitude
  * @param {number} lng Longitude
  * @param {'fuel' | 'garage'} type Search type
- * @param {number} radiusMeters Search radius in meters (default 4000 = 4km)
+ * @param {number} radiusMeters Search radius in meters (default 6000 = 6km)
  */
-export async function fetchNearbyPumpsAndGarages(lat, lng, type = 'fuel', radiusMeters = 4000) {
+export async function fetchNearbyPumpsAndGarages(lat, lng, type = 'fuel', radiusMeters = 6000) {
   if (!lat || !lng) return [];
 
   let queryFilter = '';
   if (type === 'fuel') {
-    queryFilter = `node["amenity"="fuel"](around:${radiusMeters},${lat},${lng});`;
+    queryFilter = `
+      nwr["amenity"="fuel"](around:${radiusMeters},${lat},${lng});
+    `;
   } else {
     queryFilter = `
-      node["shop"="motorcycle"](around:${radiusMeters},${lat},${lng});
-      node["craft"="motorcycle_repair"](around:${radiusMeters},${lat},${lng});
-      node["shop"="car_repair"](around:${radiusMeters},${lat},${lng});
-      node["amenity"="motorcycle_repair"](around:${radiusMeters},${lat},${lng});
+      nwr["shop"="motorcycle"](around:${radiusMeters},${lat},${lng});
+      nwr["craft"="motorcycle_repair"](around:${radiusMeters},${lat},${lng});
+      nwr["shop"="car_repair"](around:${radiusMeters},${lat},${lng});
+      nwr["amenity"="motorcycle_repair"](around:${radiusMeters},${lat},${lng});
+      nwr["amenity"="car_wash"](around:${radiusMeters},${lat},${lng});
     `;
   }
 
-  const query = `[out:json][timeout:12];(${queryFilter});out body 25;`;
-  const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+  const query = `[out:json][timeout:15];(${queryFilter});out center 40;`;
+  const overpassEndpoints = [
+    `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`,
+    `https://overpass.khtml.disroot.org/api/interpreter?data=${encodeURIComponent(query)}`
+  ];
 
+  for (const url of overpassEndpoints) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 7000);
+
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const data = await response.json();
+        const elements = data.elements || [];
+
+        const results = elements
+          .map((item) => {
+            const itemLat = item.lat || item.center?.lat;
+            const itemLng = item.lon || item.center?.lon;
+            if (!itemLat || !itemLng) return null;
+
+            const distKm = calculateDistanceKm(lat, lng, itemLat, itemLng);
+            const name =
+              item.tags?.name ||
+              item.tags?.['name:bn'] ||
+              item.tags?.brand ||
+              (type === 'fuel' ? 'পেট্রোল / ফুয়েল পাম্প' : 'বাইক গ্যারেজ & সার্ভিস সেন্টার');
+
+            return {
+              id: item.id || `poi_${Math.random()}`,
+              name,
+              type,
+              lat: itemLat,
+              lng: itemLng,
+              distanceKm: +distKm.toFixed(2),
+              brand: item.tags?.brand || '',
+              openingHours: item.tags?.opening_hours || ''
+            };
+          })
+          .filter(Boolean);
+
+        if (results.length > 0) {
+          results.sort((a, b) => a.distanceKm - b.distanceKm);
+          return results;
+        }
+      }
+    } catch (e) {
+      console.warn(`Overpass endpoint fetch attempt failed:`, e);
+    }
+  }
+
+  // 🛡️ Nominatim API Fallback if Overpass yielded 0 nodes
   try {
+    const searchTerm = type === 'fuel' ? 'fuel pump' : 'motorcycle repair';
+    const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchTerm)}&lat=${lat}&lon=${lng}&limit=15`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-    const response = await fetch(url, { signal: controller.signal });
+    const response = await fetch(nominatimUrl, { signal: controller.signal });
     clearTimeout(timeoutId);
 
     if (response.ok) {
-      const data = await response.json();
-      const elements = data.elements || [];
+      const items = await response.json();
+      const results = items.map((item) => {
+        const itemLat = parseFloat(item.lat);
+        const itemLng = parseFloat(item.lon);
+        const distKm = calculateDistanceKm(lat, lng, itemLat, itemLng);
+        return {
+          id: item.place_id || `nom_${Math.random()}`,
+          name: item.display_name?.split(',')[0] || (type === 'fuel' ? 'ফুয়েল পাম্প' : 'গ্যারেজ'),
+          type,
+          lat: itemLat,
+          lng: itemLng,
+          distanceKm: +distKm.toFixed(2),
+          brand: '',
+          openingHours: ''
+        };
+      });
 
-      const results = elements
-        .filter((item) => item.lat && item.lon)
-        .map((item) => {
-          const itemLat = item.lat;
-          const itemLng = item.lon;
-          const distKm = calculateDistanceKm(lat, lng, itemLat, itemLng);
-          const name =
-            item.tags?.name ||
-            item.tags?.['name:bn'] ||
-            item.tags?.brand ||
-            (type === 'fuel' ? 'পেট্রোল / ফুয়েল পাম্প' : 'বাইক গ্যারেজ & সার্ভিস সেন্টার');
-
-          return {
-            id: item.id || `poi_${Math.random()}`,
-            name,
-            type,
-            lat: itemLat,
-            lng: itemLng,
-            distanceKm: +distKm.toFixed(2),
-            brand: item.tags?.brand || '',
-            openingHours: item.tags?.opening_hours || ''
-          };
-        });
-
-      // Sort closest first
       results.sort((a, b) => a.distanceKm - b.distanceKm);
       return results;
     }
   } catch (e) {
-    console.warn(`Overpass API fetch warning for ${type}:`, e);
+    console.warn('Nominatim fallback fetch error:', e);
   }
 
   return [];
 }
+
 

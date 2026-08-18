@@ -326,7 +326,7 @@ export default function GpsTrackerTab({
     setActivePoiType(type);
 
     try {
-      const results = await fetchNearbyPumpsAndGarages(currentPosition[0], currentPosition[1], type, 4000);
+      const results = await fetchNearbyPumpsAndGarages(currentPosition[0], currentPosition[1], type, 6000);
       setPoiList(results);
 
       if (mapInstanceRef.current) {
@@ -335,7 +335,7 @@ export default function GpsTrackerTab({
         poiMarkersRef.current = [];
 
         if (results.length === 0) {
-          alert(isBn ? '⚠️ আশপাশের ৪ কিলোমিটারের মধ্যে কোনো তথ্য পাওয়া যায়নি।' : '⚠️ No nearby results found within 4 km.');
+          alert(isBn ? '⚠️ আশপাশের ৬ কিলোমিটারের মধ্যে কোনো তথ্য পাওয়া যায়নি।' : '⚠️ No nearby results found within 6 km.');
         } else {
           const bounds = L.latLngBounds([currentPosition]);
 
