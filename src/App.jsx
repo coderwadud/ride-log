@@ -266,7 +266,7 @@ export default function App() {
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
   }, []);
 
-  // ── FIREBASE AUTH & FIRESTORE DATA SYNC ──
+  // ── FIREBASE AUTH & HYBRID DATA SYNC (Web: Server-Direct | Android: 0ms Local-First + 1hr Auto-Sync) ──
   useEffect(() => {
     const unsubscribe = onAuthChange(async (firebaseUser) => {
       setUser(firebaseUser);
@@ -274,35 +274,51 @@ export default function App() {
 
       if (firebaseUser) {
         isLoadedRef.current = false;
+        const isNative = Capacitor.isNativePlatform();
 
         try {
-          // Fetch user data from Firestore document users/{uid}
+          // Fetch user data from Firestore server
           const data = await loadUserData(firebaseUser.uid);
 
-          // Safety check: if cloud has logs, use cloud; if cloud is empty but local has logs, preserve local logs!
-          const localFuel = loadFuelLogs() || [];
-          const localService = loadServiceLogs() || [];
-          const localBikes = loadBikes() || [DEFAULT_BIKE];
+          if (!isNative) {
+            // 🌐 WEB PLATFORM: Direct Server Sync (Always load live server data)
+            const serverBikes = (Array.isArray(data.bikes) && data.bikes.length > 0) ? data.bikes : [DEFAULT_BIKE];
+            const serverFuel = Array.isArray(data.fuelLogs) ? data.fuelLogs : [];
+            const serverService = Array.isArray(data.serviceLogs) ? data.serviceLogs : [];
+            const serverActiveId = data.activeBikeId || serverBikes[0]?.id || 'bike_1';
 
-          const finalBikes = (Array.isArray(data.bikes) && data.bikes.length > 0 && (data.bikes.length > 1 || data.bikes[0]?.name !== 'My Bike'))
-            ? data.bikes
-            : (localBikes.length > 0 && (localBikes.length > 1 || localBikes[0]?.name !== 'My Bike') ? localBikes : data.bikes || [DEFAULT_BIKE]);
+            setBikes(serverBikes);
+            setActiveBikeId(serverActiveId);
+            setFuelLogs(serverFuel);
+            setServiceLogs(serverService);
+            if (data.settings?.lang) setLang(data.settings.lang);
+            if (data.settings?.theme) setTheme(data.settings.theme);
+          } else {
+            // 📱 ANDROID APP: Local-First 0ms Speed with Cloud Self-Healing
+            const localFuel = loadFuelLogs() || [];
+            const localService = loadServiceLogs() || [];
+            const localBikes = loadBikes() || [DEFAULT_BIKE];
 
-          const finalFuel = (Array.isArray(data.fuelLogs) && data.fuelLogs.length > 0) ? data.fuelLogs : localFuel;
-          const finalService = (Array.isArray(data.serviceLogs) && data.serviceLogs.length > 0) ? data.serviceLogs : localService;
+            const finalBikes = (Array.isArray(data.bikes) && data.bikes.length > 0 && (data.bikes.length > 1 || data.bikes[0]?.name !== 'My Bike'))
+              ? data.bikes
+              : (localBikes.length > 0 && (localBikes.length > 1 || localBikes[0]?.name !== 'My Bike') ? localBikes : data.bikes || [DEFAULT_BIKE]);
 
-          setBikes(finalBikes);
-          setActiveBikeId(data.activeBikeId || loadActiveBikeId() || 'bike_1');
-          setFuelLogs(finalFuel);
-          setServiceLogs(finalService);
-          if (data.settings?.lang) setLang(data.settings.lang);
-          if (data.settings?.theme) setTheme(data.settings.theme);
+            const finalFuel = (Array.isArray(data.fuelLogs) && data.fuelLogs.length > 0) ? data.fuelLogs : localFuel;
+            const finalService = (Array.isArray(data.serviceLogs) && data.serviceLogs.length > 0) ? data.serviceLogs : localService;
 
-          // Save to local storage immediately
-          saveBikes(finalBikes);
-          saveFuelLogs(finalFuel);
-          saveServiceLogs(finalService);
-          saveActiveBikeId(data.activeBikeId || loadActiveBikeId() || 'bike_1');
+            setBikes(finalBikes);
+            setActiveBikeId(data.activeBikeId || loadActiveBikeId() || 'bike_1');
+            setFuelLogs(finalFuel);
+            setServiceLogs(finalService);
+            if (data.settings?.lang) setLang(data.settings.lang);
+            if (data.settings?.theme) setTheme(data.settings.theme);
+
+            // Save to Android local storage
+            saveBikes(finalBikes);
+            saveFuelLogs(finalFuel);
+            saveServiceLogs(finalService);
+            saveActiveBikeId(data.activeBikeId || loadActiveBikeId() || 'bike_1');
+          }
         } catch (e) {
           console.error('Error loading user data from cloud:', e);
         } finally {
@@ -338,21 +354,59 @@ export default function App() {
         activeBikeId,
         bikes,
         fuelLogs,
-        serviceLogs
+        serviceLogs,
+        email: user.email || '',
+        displayName: user.displayName || '',
+        photoURL: user.photoURL || ''
       });
     }, 600);
   }, [user, lang, theme, activeBikeId, bikes, fuelLogs, serviceLogs]);
 
+  // Persist mutations to local storage (Android) and trigger auto-save (Cloud)
   useEffect(() => {
     if (isLoadedRef.current) {
-      saveBikes(bikes);
-      saveFuelLogs(fuelLogs);
-      saveServiceLogs(serviceLogs);
-      saveActiveBikeId(activeBikeId);
-      saveSettings({ lang, theme });
+      if (Capacitor.isNativePlatform()) {
+        saveBikes(bikes);
+        saveFuelLogs(fuelLogs);
+        saveServiceLogs(serviceLogs);
+        saveActiveBikeId(activeBikeId);
+        saveSettings({ lang, theme });
+      }
     }
     scheduleSave();
   }, [bikes, fuelLogs, serviceLogs, activeBikeId, lang, theme, scheduleSave]);
+
+  // ── 1-HOUR PERIODIC AUTO-SYNC & ONLINE RECONNECT SYNC ──
+  useEffect(() => {
+    if (!user) return;
+    const ONE_HOUR = 60 * 60 * 1000;
+
+    const performBackgroundSync = () => {
+      if (navigator.onLine && isLoadedRef.current) {
+        saveUserData(user.uid, {
+          settings: { lang, theme },
+          activeBikeId,
+          bikes,
+          fuelLogs,
+          serviceLogs,
+          email: user.email || '',
+          displayName: user.displayName || '',
+          photoURL: user.photoURL || ''
+        });
+      }
+    };
+
+    // Auto-sync every 1 hour
+    const syncInterval = setInterval(performBackgroundSync, ONE_HOUR);
+
+    // Auto-sync as soon as internet connection is restored
+    window.addEventListener('online', performBackgroundSync);
+
+    return () => {
+      clearInterval(syncInterval);
+      window.removeEventListener('online', performBackgroundSync);
+    };
+  }, [user, lang, theme, activeBikeId, bikes, fuelLogs, serviceLogs]);
 
   // Active Bike Profile
   const activeBike = bikes.find(b => b.id === activeBikeId) || bikes[0] || DEFAULT_BIKE;
