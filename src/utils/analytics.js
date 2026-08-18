@@ -7,7 +7,7 @@ import { getCurrentAppVersion } from './appVersion';
 
 import { initializeApp, getApps } from 'firebase/app';
 import { getAnalytics, logEvent, isSupported } from 'firebase/analytics';
-import { getFirestore, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, doc, updateDoc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAgD2gnEiEoalKfespgnhMA_H2DvPfrD5M",
@@ -84,9 +84,43 @@ export async function updateLastActiveAt(uid, userObj = null) {
     if (userObj?.displayName) payload.displayName = userObj.displayName;
     if (userObj?.photoURL) payload.photoURL = userObj.photoURL;
 
+    // Check version upgrade timestamp
+    try {
+      const snap = await getDoc(userRef);
+      if (snap.exists()) {
+        const existingData = snap.data();
+        if (existingData.appVersion && existingData.appVersion !== currentVer) {
+          payload.versionUpdatedAt = serverTimestamp();
+          payload.previousAppVersion = existingData.appVersion;
+        } else if (!existingData.versionUpdatedAt) {
+          payload.versionUpdatedAt = serverTimestamp();
+        }
+      } else {
+        payload.versionUpdatedAt = serverTimestamp();
+      }
+    } catch (e) {}
+
     await setDoc(userRef, payload, { merge: true });
   } catch (e) {
     console.debug('[Analytics] lastActiveAt update failed:', e?.message);
+  }
+}
+
+/** Called when user clicks Update Now on the version update popup */
+export async function trackUpdatePopupClicked(uid, fromVersion = '', targetVersion = '1.6.2') {
+  await logAnalyticsEvent('app_update_clicked', { from_version: fromVersion, target_version: targetVersion });
+  if (uid) {
+    try {
+      const userRef = doc(db, 'users', uid);
+      await setDoc(userRef, {
+        lastUpdateClickedAt: serverTimestamp(),
+        lastUpdateClickedMs: Date.now(),
+        updateClickedVersion: targetVersion,
+        updatedViaPopup: true
+      }, { merge: true });
+    } catch (e) {
+      console.debug('[Analytics] Update click record failed:', e?.message);
+    }
   }
 }
 

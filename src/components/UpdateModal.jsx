@@ -1,10 +1,12 @@
 import React from 'react';
 import { Download, Sparkles, X, ArrowUpCircle } from 'lucide-react';
+import { trackUpdatePopupClicked } from '../utils/analytics';
 
 export default function UpdateModal({
   lang,
   isOpen,
   updateInfo,
+  user,
   onClose
 }) {
   if (!isOpen || !updateInfo) return null;
@@ -13,6 +15,7 @@ export default function UpdateModal({
   const { latestVersion, updateUrl, releaseNotes, isMandatory } = updateInfo;
 
   const handleUpdate = () => {
+    trackUpdatePopupClicked(user?.uid || null, '1.1', latestVersion || '1.6.2');
     if (updateUrl) {
       window.open(updateUrl, '_system');
     }
