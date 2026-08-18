@@ -156,7 +156,7 @@ export default function TicketUpdateModal({
               width: '100%',
               display: 'flex',
               flexDirection: 'column',
-              gap: '4px'
+              gap: '8px'
             }}
           >
             <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -166,6 +166,53 @@ export default function TicketUpdateModal({
             <p style={{ fontSize: '0.86rem', color: '#f1f5f9', margin: 0, lineHeight: '1.45', fontWeight: 500 }}>
               "{adminMessage}"
             </p>
+
+            {/* Attached Image Preview */}
+            {(ticket.replyImageUrl || (ticket.replyLink && /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(ticket.replyLink))) && (
+              <img
+                src={ticket.replyImageUrl || ticket.replyLink}
+                alt="Attachment"
+                style={{
+                  maxHeight: '160px',
+                  width: '100%',
+                  objectFit: 'contain',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  marginTop: '4px'
+                }}
+              />
+            )}
+
+            {/* Custom Link Action Button */}
+            {ticket.replyLink && (
+              <a
+                href={ticket.replyLink}
+                target="_system"
+                rel="noopener noreferrer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.open(ticket.replyLink, '_system');
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '9px 14px',
+                  borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #0284c7, #0ea5e9)',
+                  color: '#ffffff',
+                  fontWeight: 800,
+                  fontSize: '0.8rem',
+                  textDecoration: 'none',
+                  marginTop: '4px',
+                  boxShadow: '0 4px 12px rgba(14, 165, 233, 0.3)'
+                }}
+              >
+                <span>{ticket.replyLinkLabel || (isBn ? 'লিংক খুলুন' : 'Open Link')}</span>
+                <ArrowRight size={13} />
+              </a>
+            )}
           </div>
         )}
 

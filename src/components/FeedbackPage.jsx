@@ -436,19 +436,67 @@ export default function FeedbackPage({
                 </div>
 
                 {adminNote ? (
-                  <p style={{
-                    fontSize: '0.94rem',
-                    color: '#ffffff',
-                    margin: 0,
-                    lineHeight: '1.5',
-                    fontWeight: 600,
-                    background: 'rgba(0,0,0,0.25)',
-                    padding: '12px 14px',
-                    borderRadius: '12px',
-                    border: '1px solid rgba(56, 189, 248, 0.2)'
-                  }}>
-                    "{adminNote}"
-                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <p style={{
+                      fontSize: '0.94rem',
+                      color: '#ffffff',
+                      margin: 0,
+                      lineHeight: '1.5',
+                      fontWeight: 600,
+                      background: 'rgba(0,0,0,0.25)',
+                      padding: '12px 14px',
+                      borderRadius: '12px',
+                      border: '1px solid rgba(56, 189, 248, 0.2)'
+                    }}>
+                      "{adminNote}"
+                    </p>
+
+                    {/* Attached Image Preview */}
+                    {(tkt.replyImageUrl || (tkt.replyLink && /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(tkt.replyLink))) && (
+                      <img
+                        src={tkt.replyImageUrl || tkt.replyLink}
+                        alt="Attachment"
+                        style={{
+                          maxHeight: '180px',
+                          width: '100%',
+                          objectFit: 'contain',
+                          borderRadius: '12px',
+                          border: '1px solid rgba(56, 189, 248, 0.3)',
+                          background: 'rgba(0, 0, 0, 0.3)'
+                        }}
+                      />
+                    )}
+
+                    {/* Custom Link Button */}
+                    {tkt.replyLink && (
+                      <a
+                        href={tkt.replyLink}
+                        target="_system"
+                        rel="noopener noreferrer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(tkt.replyLink, '_system');
+                        }}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          padding: '10px 16px',
+                          borderRadius: '12px',
+                          background: 'linear-gradient(135deg, #0284c7, #0ea5e9)',
+                          color: '#ffffff',
+                          fontWeight: 800,
+                          fontSize: '0.84rem',
+                          textDecoration: 'none',
+                          boxShadow: '0 4px 14px rgba(14, 165, 233, 0.35)'
+                        }}
+                      >
+                        <span>{tkt.replyLinkLabel || (isBn ? 'লিংক খুলুন' : 'Open Link')}</span>
+                        <ChevronRight size={14} />
+                      </a>
+                    )}
+                  </div>
                 ) : (
                   <p style={{ fontSize: '0.82rem', color: '#94a3b8', margin: 0, lineHeight: '1.4' }}>
                     {isBn
