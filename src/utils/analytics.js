@@ -126,9 +126,10 @@ export async function updateLastActiveAt(uid, userObj = null) {
 /** Called when user clicks Update Now on the version update popup */
 export async function trackUpdatePopupClicked(uid, fromVersion = '', targetVersion = '1.6.2') {
   await logAnalyticsEvent('app_update_clicked', { from_version: fromVersion, target_version: targetVersion });
-  if (uid) {
+  const effectiveUid = uid || (typeof window !== 'undefined' ? (localStorage.getItem('ridelog_user_uid') || localStorage.getItem('user_id')) : null);
+  if (effectiveUid) {
     try {
-      const userRef = doc(db, 'users', uid);
+      const userRef = doc(db, 'users', effectiveUid);
       await setDoc(userRef, {
         lastUpdateClickedAt: serverTimestamp(),
         lastUpdateClickedMs: Date.now(),

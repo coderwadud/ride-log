@@ -799,6 +799,7 @@ export default function App() {
         lang={lang}
         isOpen={isUpdateModalOpen}
         updateInfo={updateInfo}
+        user={user}
         onClose={handleDismissUpdateModal}
       />
       <CampaignModal
