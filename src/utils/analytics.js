@@ -1,3 +1,4 @@
+import { getCurrentAppVersion } from './appVersion';
 /**
  * Firebase Analytics & Activity Tracking for RideLog BD
  * - Tracks key user events for Firebase Analytics dashboard
@@ -66,15 +67,18 @@ export async function updateLastActiveAt(uid, userObj = null) {
   if (!uid) return;
 
   const now = Date.now();
-  // Throttle: only update if 2+ minutes have passed since last ping
-  if (now - lastActivePingTime < 2 * 60 * 1000) return;
+  // Throttle: 1 minute heartbeat ping
+  if (now - lastActivePingTime < 60 * 1000) return;
 
   try {
     lastActivePingTime = now;
+    const currentVer = await getCurrentAppVersion();
     const userRef = doc(db, 'users', uid);
     const payload = {
       lastActiveAt: serverTimestamp(),
-      appVersion: '1.4.0'
+      lastActiveMs: now,
+      isOnline: true,
+      appVersion: currentVer || '1.6.2'
     };
     if (userObj?.email) payload.email = userObj.email;
     if (userObj?.displayName) payload.displayName = userObj.displayName;
