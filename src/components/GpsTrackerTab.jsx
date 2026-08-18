@@ -7,10 +7,11 @@ import {
   Play, Pause, Square, Navigation, RotateCcw, 
   Trash2, Calendar, Compass, History, Layers, Check,
   Map, Globe, Bike, Mountain, Moon, Activity, Film,
-  Gauge, Clock, Flag, MapPin, Zap, X, Sparkles, CheckCircle2, Save
+  Gauge, Clock, Flag, MapPin, Zap, X, Sparkles, CheckCircle2, Save,
+  Fuel, Wrench, ExternalLink
 } from 'lucide-react';
 import { saveTrip, getTripsLast3Days, deleteTrip, calculateDistanceKm } from '../utils/tripStorage';
-import { filterGpsJitter, snapToRoadsOSRM, calculateBearing, smoothPathMovingAverage } from '../utils/geoUtils';
+import { filterGpsJitter, snapToRoadsOSRM, calculateBearing, smoothPathMovingAverage, fetchNearbyPumpsAndGarages } from '../utils/geoUtils';
 
 // 5 100% Free Map Modes / Layers with Lucide SVG Icons
 const MAP_LAYERS = {
@@ -203,6 +204,61 @@ const createBikePlaybackIcon = (heading = 0) => L.divIcon({
   iconAnchor: [18, 18]
 });
 
+const createFuelPumpPoiIcon = () => L.divIcon({
+  className: 'custom-poi-fuel-marker',
+  html: `
+    <div style="position: relative; display: flex; align-items: center; justify-content: center;">
+      <div style="position: absolute; width: 34px; height: 34px; border-radius: 50%; background: rgba(245, 158, 11, 0.25); border: 1.5px solid rgba(245, 158, 11, 0.6); animation: pulse 2s infinite ease-in-out;"></div>
+      <div style="
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        border: 2px solid #ffffff;
+        box-shadow: 0 4px 10px rgba(245, 158, 11, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+        font-weight: bold;
+        font-size: 14px;
+      ">
+        ⛽
+      </div>
+    </div>
+  `,
+  iconSize: [34, 34],
+  iconAnchor: [17, 17]
+});
+
+const createGaragePoiIcon = () => L.divIcon({
+  className: 'custom-poi-garage-marker',
+  html: `
+    <div style="position: relative; display: flex; align-items: center; justify-content: center;">
+      <div style="position: absolute; width: 34px; height: 34px; border-radius: 50%; background: rgba(167, 139, 250, 0.25); border: 1.5px solid rgba(167, 139, 250, 0.6); animation: pulse 2s infinite ease-in-out;"></div>
+      <div style="
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+        border: 2px solid #ffffff;
+        box-shadow: 0 4px 10px rgba(139, 92, 246, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+        font-weight: bold;
+        font-size: 14px;
+      ">
+        🔧
+      </div>
+    </div>
+  `,
+  iconSize: [34, 34],
+  iconAnchor: [17, 17]
+});
+
+
 export default function GpsTrackerTab({
   lang,
   theme,
@@ -239,6 +295,94 @@ export default function GpsTrackerTab({
   const [customTripTitle, setCustomTripTitle] = useState('');
   const [isSavingTrip, setIsSavingTrip] = useState(false);
   const [saveToastMsg, setSaveToastMsg] = useState('');
+
+  // ── NEARBY PETROL PUMP & GARAGE FINDER STATES ──
+  const [poiList, setPoiList] = useState([]);
+  const [activePoiType, setActivePoiType] = useState(null); // 'fuel' or 'garage'
+  const [isPoiLoading, setIsPoiLoading] = useState(false);
+  const poiMarkersRef = useRef([]);
+
+  const clearPoiMarkers = () => {
+    if (mapInstanceRef.current && poiMarkersRef.current.length > 0) {
+      poiMarkersRef.current.forEach((m) => m.remove());
+      poiMarkersRef.current = [];
+    }
+    setPoiList([]);
+    setActivePoiType(null);
+  };
+
+  const handleSearchNearbyPoi = async (type) => {
+    if (activePoiType === type) {
+      clearPoiMarkers();
+      return;
+    }
+
+    if (!currentPosition) {
+      alert(isBn ? '⚠️ আপনার বর্তমান GPS লোকেশন পাওয়া যায়নি।' : '⚠️ Current GPS location not available.');
+      return;
+    }
+
+    setIsPoiLoading(true);
+    setActivePoiType(type);
+
+    try {
+      const results = await fetchNearbyPumpsAndGarages(currentPosition[0], currentPosition[1], type, 4000);
+      setPoiList(results);
+
+      if (mapInstanceRef.current) {
+        const map = mapInstanceRef.current;
+        poiMarkersRef.current.forEach((m) => m.remove());
+        poiMarkersRef.current = [];
+
+        if (results.length === 0) {
+          alert(isBn ? '⚠️ আশপাশের ৪ কিলোমিটারের মধ্যে কোনো তথ্য পাওয়া যায়নি।' : '⚠️ No nearby results found within 4 km.');
+        } else {
+          const bounds = L.latLngBounds([currentPosition]);
+
+          results.forEach((item) => {
+            const icon = type === 'fuel' ? createFuelPumpPoiIcon() : createGaragePoiIcon();
+            const marker = L.marker([item.lat, item.lng], { icon }).addTo(map);
+
+            const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${item.lat},${item.lng}`;
+            const popupHtml = `
+              <div style="font-family: sans-serif; padding: 4px; max-width: 200px;">
+                <div style="font-weight: 800; font-size: 13px; color: #0f172a; margin-bottom: 2px;">
+                  ${item.name}
+                </div>
+                <div style="font-size: 11px; color: #64748b; margin-bottom: 8px;">
+                  📍 ${item.distanceKm} km away ${item.brand ? `• ${item.brand}` : ''}
+                </div>
+                <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" style="
+                  display: inline-block;
+                  background: #0284c7;
+                  color: #ffffff;
+                  padding: 5px 10px;
+                  border-radius: 8px;
+                  font-size: 11px;
+                  font-weight: 700;
+                  text-decoration: none;
+                  text-align: center;
+                ">
+                  🗺️ নেভিগেট করুন
+                </a>
+              </div>
+            `;
+
+            marker.bindPopup(popupHtml);
+            poiMarkersRef.current.push(marker);
+            bounds.extend([item.lat, item.lng]);
+          });
+
+          map.fitBounds(bounds, { padding: [50, 50] });
+        }
+      }
+    } catch (e) {
+      console.error('POI search error:', e);
+    } finally {
+      setIsPoiLoading(false);
+    }
+  };
+
 
   // ── MAP LAYER STATE ──
   const [selectedLayerKey, setSelectedLayerKey] = useState(() => {

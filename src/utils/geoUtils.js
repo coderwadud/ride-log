@@ -213,3 +213,76 @@ export function snapToRoadsOSRM(points) {
     resolve(smoothed);
   });
 }
+
+/**
+ * Fetch nearby Petrol Pumps (fuel stations) or Motorcycle Garages/Repair Shops
+ * using 100% Free OpenStreetMap Overpass API
+ * @param {number} lat Latitude
+ * @param {number} lng Longitude
+ * @param {'fuel' | 'garage'} type Search type
+ * @param {number} radiusMeters Search radius in meters (default 4000 = 4km)
+ */
+export async function fetchNearbyPumpsAndGarages(lat, lng, type = 'fuel', radiusMeters = 4000) {
+  if (!lat || !lng) return [];
+
+  let queryFilter = '';
+  if (type === 'fuel') {
+    queryFilter = `node["amenity"="fuel"](around:${radiusMeters},${lat},${lng});`;
+  } else {
+    queryFilter = `
+      node["shop"="motorcycle"](around:${radiusMeters},${lat},${lng});
+      node["craft"="motorcycle_repair"](around:${radiusMeters},${lat},${lng});
+      node["shop"="car_repair"](around:${radiusMeters},${lat},${lng});
+      node["amenity"="motorcycle_repair"](around:${radiusMeters},${lat},${lng});
+    `;
+  }
+
+  const query = `[out:json][timeout:12];(${queryFilter});out body 25;`;
+  const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (response.ok) {
+      const data = await response.json();
+      const elements = data.elements || [];
+
+      const results = elements
+        .filter((item) => item.lat && item.lon)
+        .map((item) => {
+          const itemLat = item.lat;
+          const itemLng = item.lon;
+          const distKm = calculateDistanceKm(lat, lng, itemLat, itemLng);
+          const name =
+            item.tags?.name ||
+            item.tags?.['name:bn'] ||
+            item.tags?.brand ||
+            (type === 'fuel' ? 'পেট্রোল / ফুয়েল পাম্প' : 'বাইক গ্যারেজ & সার্ভিস সেন্টার');
+
+          return {
+            id: item.id || `poi_${Math.random()}`,
+            name,
+            type,
+            lat: itemLat,
+            lng: itemLng,
+            distanceKm: +distKm.toFixed(2),
+            brand: item.tags?.brand || '',
+            openingHours: item.tags?.opening_hours || ''
+          };
+        });
+
+      // Sort closest first
+      results.sort((a, b) => a.distanceKm - b.distanceKm);
+      return results;
+    }
+  } catch (e) {
+    console.warn(`Overpass API fetch warning for ${type}:`, e);
+  }
+
+  return [];
+}
+

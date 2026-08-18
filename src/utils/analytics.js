@@ -74,7 +74,7 @@ export async function updateLastActiveAt(uid, userObj = null) {
     const userRef = doc(db, 'users', uid);
     const payload = {
       lastActiveAt: serverTimestamp(),
-      appVersion: '1.3.2'
+      appVersion: '1.4.0'
     };
     if (userObj?.email) payload.email = userObj.email;
     if (userObj?.displayName) payload.displayName = userObj.displayName;
