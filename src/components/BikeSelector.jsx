@@ -18,7 +18,7 @@ export default function BikeSelector({ bikes = [], activeBikeId, onSelectBike, o
   }, []);
 
   return (
-    <div className="relative inline-block" ref={dropdownRef}>
+    <div className="relative inline-block" style={{ position: 'relative', display: 'inline-block', zIndex: 5001 }} ref={dropdownRef}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
