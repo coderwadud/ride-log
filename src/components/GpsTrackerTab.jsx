@@ -201,6 +201,38 @@ export default function GpsTrackerTab({
       setSelectedTrip(list[0]);
     }
   };
+  
+  // ── 🛡️ BULLETPROOF ACTIVE RIDE PERSISTENCE & AUTO-RECOVERY ──
+  // If app is killed, swiped away, or closed, restore active ride on launch until "Finish Ride" is tapped
+  useEffect(() => {
+    try {
+      const activeSessionStr = localStorage.getItem('ridelog_active_session_persistent_v1');
+      if (activeSessionStr) {
+        const session = JSON.parse(activeSessionStr);
+        if (session && session.isRecording && session.startTimeEpoch) {
+          console.log('⚡ Resuming persistent active ride session from storage...');
+          setIsRecording(true);
+          setIsPaused(session.isPaused || false);
+          startTimeEpochRef.current = session.startTimeEpoch;
+          
+          const currentElapsed = Math.max(0, Math.floor((Date.now() - session.startTimeEpoch) / 1000));
+          setElapsedSeconds(currentElapsed);
+          setTripDistanceKm(session.tripDistanceKm || 0);
+          setMaxSpeed(session.maxSpeed || 0);
+          setRecordedPoints(session.recordedPoints || []);
+          setTripStartTime(session.tripStartTime || new Date(session.startTimeEpoch).toISOString());
+
+          // Re-attach live GPS watcher if not already watching
+          if (!watchIdRef.current) {
+            startGpsWatcherOnly();
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Ride recovery error:', e);
+    }
+  }, []);
+
 
   // ── INITIALIZE LEAFLET MAP ──
   useEffect(() => {
@@ -349,6 +381,107 @@ export default function GpsTrackerTab({
   }, [isRecording, isPaused]);
 
   // ── LIVE TRACKING GPS WATCHER ──
+  // Dedicated GPS Watcher Re-Attacher for Auto-Recovery
+  const startGpsWatcherOnly = async () => {
+    try {
+      const handleLocationUpdate = (latitude, longitude, speed, accuracy, altitude) => {
+        const newCoord = [latitude, longitude];
+        const speedKmH = speed ? Math.max(0, Math.round(speed * 3.6)) : 0;
+
+        setCurrentPosition(newCoord);
+        setCurrentSpeed(speedKmH);
+        setGpsAccuracy(Math.round(accuracy || 0));
+        setMaxSpeed((prev) => Math.max(prev, speedKmH));
+
+        const pointObj = {
+          lat: latitude,
+          lng: longitude,
+          speed: speedKmH,
+          accuracy: Math.round(accuracy || 0),
+          altitude: altitude || 0,
+          timestamp: Date.now()
+        };
+
+        setRecordedPoints((prev) => {
+          let newDist = tripDistanceKm;
+          if (prev.length > 0) {
+            const last = prev[prev.length - 1];
+            const distInc = calculateDistanceKm(last.lat, last.lng, latitude, longitude);
+            if (distInc > 0.003) {
+              newDist = +(tripDistanceKm + distInc).toFixed(2);
+              setTripDistanceKm(newDist);
+            }
+          }
+          const updated = [...prev, pointObj];
+
+          // 💾 CONTINUOUSLY PERSIST TO STORAGE ON EVERY GPS TICK
+          try {
+            localStorage.setItem('ridelog_active_session_persistent_v1', JSON.stringify({
+              isRecording: true,
+              isPaused: false,
+              startTimeEpoch: startTimeEpochRef.current || Date.now(),
+              tripStartTime: tripStartTime || new Date().toISOString(),
+              tripDistanceKm: newDist,
+              maxSpeed: Math.max(maxSpeed, speedKmH),
+              recordedPoints: updated
+            }));
+          } catch (e) {}
+
+          return updated;
+        });
+
+        // Update Map Marker & Polyline
+        if (mapInstanceRef.current) {
+          const map = mapInstanceRef.current;
+          if (!liveMarkerRef.current) {
+            liveMarkerRef.current = L.marker(newCoord, { icon: createPulseIcon() }).addTo(map);
+          } else {
+            liveMarkerRef.current.setLatLng(newCoord);
+          }
+
+          setRecordedPoints((currentList) => {
+            const latLngs = currentList.map((p) => [p.lat, p.lng]);
+            if (!livePolylineRef.current && latLngs.length > 1) {
+              livePolylineRef.current = L.polyline(latLngs, {
+                color: '#0284c7',
+                weight: 5,
+                opacity: 0.85,
+                smoothFactor: 1
+              }).addTo(map);
+            } else if (livePolylineRef.current) {
+              livePolylineRef.current.setLatLngs(latLngs);
+            }
+            return currentList;
+          });
+
+          map.panTo(newCoord, { animate: true, duration: 0.5 });
+        }
+      };
+
+      if (Capacitor.isNativePlatform()) {
+        watchIdRef.current = await Geolocation.watchPosition(
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+          (position, err) => {
+            if (err || !position) return;
+            const { latitude, longitude, speed, accuracy, altitude } = position.coords;
+            handleLocationUpdate(latitude, longitude, speed, accuracy, altitude);
+          }
+        );
+      } else if (navigator.geolocation) {
+        watchIdRef.current = navigator.geolocation.watchPosition(
+          (position) => {
+            const { latitude, longitude, speed, accuracy, altitude } = position.coords;
+            handleLocationUpdate(latitude, longitude, speed, accuracy, altitude);
+          },
+          (err) => console.warn('Web geolocation watch warning:', err),
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      }
+    } catch (e) {
+      console.warn('Watcher attach error:', e);
+    }
+  };
+
   const startLiveRecording = async () => {
     try {
       if (Capacitor.isNativePlatform()) {
@@ -508,6 +641,7 @@ export default function GpsTrackerTab({
     }
     try {
       localStorage.removeItem('ridelog_active_ride');
+      localStorage.removeItem('ridelog_active_session_persistent_v1');
     } catch (e) {}
 
     // Ensure we have at least 2 points to draw and playback
