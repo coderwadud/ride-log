@@ -313,22 +313,28 @@ export default function FeedbackPage({
           const messages = Array.isArray(tkt.messages) ? tkt.messages : [];
 
           return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', animation: 'fadeIn 0.2s ease' }}>
-              {/* Ticket Hero Banner */}
-              <div style={{
-                background: 'linear-gradient(145deg, #1e293b, #0f172a)',
-                border: '1px solid rgba(56, 189, 248, 0.3)',
-                borderRadius: '18px',
-                padding: '18px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '14px',
-                boxShadow: '0 10px 30px rgba(0,0,0,0.4)'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '1.15rem', fontWeight: 900, color: '#38bdf8' }}>
+            <div style={{
+              background: 'linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.95))',
+              border: '1px solid rgba(56, 189, 248, 0.35)',
+              borderRadius: '22px',
+              padding: '18px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+              boxShadow: '0 12px 32px rgba(0, 0, 0, 0.45)'
+            }}>
+                {/* Unified Ticket Header & Stepper inside Chat Box */}
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                  paddingBottom: '14px',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                }}>
+                  {/* Top Row: Ticket ID + Copy + Type + Status */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '1.1rem', fontWeight: 900, color: '#38bdf8' }}>
                         #{tkt.ticketId || tkt.id}
                       </span>
                       <button
@@ -350,153 +356,74 @@ export default function FeedbackPage({
                         {copiedId ? <Check size={12} /> : <Copy size={12} />}
                         <span>{copiedId ? (isBn ? 'কপি হয়েছে' : 'Copied') : (isBn ? 'কপি' : 'Copy')}</span>
                       </button>
+
+                      <span style={{
+                        fontSize: '0.72rem',
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        background: 'rgba(255, 255, 255, 0.06)',
+                        color: '#cbd5e1',
+                        fontWeight: 600
+                      }}>
+                        {getTypeLabel(tkt.type)}
+                      </span>
                     </div>
+
                     <span style={{
-                      fontSize: '0.74rem',
-                      padding: '3px 8px',
-                      borderRadius: '6px',
-                      background: 'rgba(255, 255, 255, 0.06)',
-                      color: '#cbd5e1',
-                      fontWeight: 600
+                      fontSize: '0.76rem',
+                      fontWeight: 800,
+                      padding: '4px 12px',
+                      borderRadius: '20px',
+                      background: statusMeta.bg,
+                      color: statusMeta.color,
+                      border: `1px solid ${statusMeta.border}`,
+                      boxShadow: `0 2px 10px ${statusMeta.bg}`
                     }}>
-                      {getTypeLabel(tkt.type)}
+                      {statusMeta.label}
                     </span>
                   </div>
 
-                  <span style={{
-                    fontSize: '0.78rem',
-                    fontWeight: 800,
-                    padding: '5px 12px',
-                    borderRadius: '20px',
-                    background: statusMeta.bg,
-                    color: statusMeta.color,
-                    border: `1px solid ${statusMeta.border}`,
-                    boxShadow: `0 2px 10px ${statusMeta.bg}`
+                  {/* Stepper Progress Bar inside Chat Box Header */}
+                  <div style={{
+                    background: 'rgba(0, 0, 0, 0.3)',
+                    borderRadius: '12px',
+                    padding: '10px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '8px'
                   }}>
-                    {statusMeta.label}
-                  </span>
-                </div>
-
-                {/* Progress Stepper Visual */}
-                <div style={{
-                  background: 'rgba(0, 0, 0, 0.25)',
-                  borderRadius: '12px',
-                  padding: '12px 14px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '8px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: statusMeta.step >= 1 ? 1 : 0.4 }}>
-                    <div style={{ width: 22, height: 22, borderRadius: '50%', background: statusMeta.step >= 1 ? '#38bdf8' : '#64748b', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 800 }}>
-                      1
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: statusMeta.step >= 1 ? 1 : 0.4 }}>
+                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: statusMeta.step >= 1 ? '#38bdf8' : '#64748b', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: 800 }}>
+                        1
+                      </div>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: statusMeta.step >= 1 ? '#f8fafc' : '#64748b' }}>
+                        {isBn ? 'জমা দেওয়া হয়েছে' : 'Submitted'}
+                      </span>
                     </div>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: statusMeta.step >= 1 ? '#f8fafc' : '#64748b' }}>
-                      {isBn ? 'জমা দেওয়া হয়েছে' : 'Submitted'}
-                    </span>
-                  </div>
 
-                  <div style={{ flex: 1, height: '2px', background: statusMeta.step >= 2 ? '#38bdf8' : 'rgba(255,255,255,0.1)' }} />
+                    <div style={{ flex: 1, height: '2px', background: statusMeta.step >= 2 ? '#38bdf8' : 'rgba(255,255,255,0.1)' }} />
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: statusMeta.step >= 2 ? 1 : 0.4 }}>
-                    <div style={{ width: 22, height: 22, borderRadius: '50%', background: statusMeta.step >= 2 ? '#f59e0b' : '#64748b', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 800 }}>
-                      2
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: statusMeta.step >= 2 ? 1 : 0.4 }}>
+                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: statusMeta.step >= 2 ? '#f59e0b' : '#64748b', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: 800 }}>
+                        2
+                      </div>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: statusMeta.step >= 2 ? '#f8fafc' : '#64748b' }}>
+                        {isBn ? 'পর্যালোচনা' : 'In Review'}
+                      </span>
                     </div>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: statusMeta.step >= 2 ? '#f8fafc' : '#64748b' }}>
-                      {isBn ? 'পর্যালোচনা' : 'In Review'}
-                    </span>
-                  </div>
 
-                  <div style={{ flex: 1, height: '2px', background: statusMeta.step >= 3 ? '#10b981' : 'rgba(255,255,255,0.1)' }} />
+                    <div style={{ flex: 1, height: '2px', background: statusMeta.step >= 3 ? '#10b981' : 'rgba(255,255,255,0.1)' }} />
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: statusMeta.step >= 3 ? 1 : 0.4 }}>
-                    <div style={{ width: 22, height: 22, borderRadius: '50%', background: statusMeta.step >= 3 ? '#10b981' : '#64748b', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.68rem', fontWeight: 800 }}>
-                      ✓
-                    </div>
-                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: statusMeta.step >= 3 ? '#10b981' : '#64748b' }}>
-                      {isBn ? 'সমাধান' : 'Done'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* User Original Message Card */}
-              <div style={{
-                background: 'rgba(255, 255, 255, 0.03)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '16px',
-                padding: '16px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px'
-              }}>
-                <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  {isBn ? 'আপনার পাঠানো বার্তা / সমস্যা:' : 'Your Original Message / Bug Report:'}
-                </span>
-                <p style={{
-                  fontSize: '0.92rem',
-                  color: '#f8fafc',
-                  margin: 0,
-                  lineHeight: '1.5',
-                  whiteSpace: 'pre-line',
-                  background: 'rgba(0, 0, 0, 0.35)',
-                  padding: '12px 14px',
-                  borderRadius: '12px',
-                  border: '1px solid rgba(255, 255, 255, 0.06)'
-                }}>
-                  {tkt.message}
-                </p>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#64748b', marginTop: '4px' }}>
-                  <span>{isBn ? 'অ্যাপ সংস্করণ:' : 'App Version:'} {tkt.appVersion || '1.2.0'}</span>
-                  <span>{new Date(tkt.createdAt).toLocaleString(isBn ? 'bn-BD' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' })}</span>
-                </div>
-              </div>
-
-              {/* 💬 Modern Unified Chat Box Window */}
-              <div style={{
-                background: 'linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.95))',
-                border: '1px solid rgba(56, 189, 248, 0.3)',
-                borderRadius: '20px',
-                padding: '16px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '14px',
-                boxShadow: '0 12px 32px rgba(0, 0, 0, 0.4)'
-              }}>
-                {/* Chat Header */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingBottom: '10px',
-                  borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #0284c7, #10b981)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#ffffff'
-                    }}>
-                      <MessageCircle size={18} />
-                    </div>
-                    <div>
-                      <h4 style={{ fontSize: '0.88rem', fontWeight: 800, color: '#f8fafc', margin: 0 }}>
-                        {isBn ? 'সাপোর্ট চ্যাট বক্স' : 'Support Live Chat'}
-                      </h4>
-                      <span style={{ fontSize: '0.68rem', color: '#10b981', fontWeight: 700 }}>
-                        ● {isBn ? 'অনলাইন সাপোর্ট' : 'Online Support Thread'}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: statusMeta.step >= 3 ? 1 : 0.4 }}>
+                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: statusMeta.step >= 3 ? '#10b981' : '#64748b', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: 800 }}>
+                        ✓
+                      </div>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: statusMeta.step >= 3 ? '#10b981' : '#64748b' }}>
+                        {isBn ? 'সমাধান' : 'Done'}
                       </span>
                     </div>
                   </div>
-
-                  <span style={{ fontSize: '0.72rem', color: '#94a3b8', background: 'rgba(255, 255, 255, 0.05)', padding: '3px 9px', borderRadius: '12px' }}>
-                    #{tkt.ticketId || tkt.id}
-                  </span>
                 </div>
 
                 {/* Chat Messages Feed */}
@@ -735,7 +662,6 @@ export default function FeedbackPage({
                   </button>
                 </div>
               </div>
-            </div>
           );
         })()}
 
