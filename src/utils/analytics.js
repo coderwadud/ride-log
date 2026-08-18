@@ -1,4 +1,3 @@
-import { getCurrentAppVersion } from './appVersion';
 /**
  * Firebase Analytics & Activity Tracking for RideLog BD
  * - Tracks key user events for Firebase Analytics dashboard
@@ -8,6 +7,8 @@ import { getCurrentAppVersion } from './appVersion';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAnalytics, logEvent, isSupported } from 'firebase/analytics';
 import { getFirestore, doc, updateDoc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { getCurrentAppVersion, BASE_APP_VERSION } from './appVersion';
+import { Capacitor } from '@capacitor/core';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAgD2gnEiEoalKfespgnhMA_H2DvPfrD5M",
@@ -55,9 +56,6 @@ export async function logAnalyticsEvent(eventName, params = {}) {
     console.debug('[Analytics] Event skipped:', eventName, e?.message);
   }
 }
-
-import { getCurrentAppVersion, BASE_APP_VERSION } from './appVersion';
-import { Capacitor } from '@capacitor/core';
 
 /**
  * Update `lastActiveAt` timestamp in Firestore user document.
