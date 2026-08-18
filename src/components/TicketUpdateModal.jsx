@@ -58,14 +58,16 @@ export default function TicketUpdateModal({
           border: '1px solid rgba(56, 189, 248, 0.4)',
           borderRadius: '22px',
           padding: '24px 20px',
-          maxWidth: '400px',
+          maxWidth: '420px',
           width: '100%',
+          maxHeight: '85vh',
+          overflowY: 'auto',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 25px rgba(56, 189, 248, 0.15)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           textAlign: 'center',
-          gap: '14px',
+          gap: '12px',
           position: 'relative'
         }}
         onClick={(e) => e.stopPropagation()}
@@ -96,8 +98,8 @@ export default function TicketUpdateModal({
         {/* Header Icon */}
         <div
           style={{
-            width: '58px',
-            height: '58px',
+            width: '52px',
+            height: '52px',
             borderRadius: '50%',
             background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(16, 185, 129, 0.2))',
             border: '2px solid #38bdf8',
@@ -105,14 +107,15 @@ export default function TicketUpdateModal({
             alignItems: 'center',
             justifyContent: 'center',
             color: '#38bdf8',
-            boxShadow: '0 4px 16px rgba(56, 189, 248, 0.3)'
+            boxShadow: '0 4px 16px rgba(56, 189, 248, 0.3)',
+            flexShrink: 0
           }}
         >
-          <MessageCircle size={28} />
+          <MessageCircle size={26} />
         </div>
 
         {/* Status Badge */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+        <div style={{ display: 'flex', items: 'center', gap: '8px', marginTop: '2px' }}>
           <span
             style={{
               fontSize: '0.74rem',
@@ -143,7 +146,7 @@ export default function TicketUpdateModal({
         </div>
 
         {/* Title */}
-        <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f8fafc', margin: 0, lineHeight: '1.3' }}>
+        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f8fafc', margin: 0, lineHeight: '1.3' }}>
           {isBn ? 'আপনার টিকিটে নতুন আপডেট এসেছে!' : 'Support Ticket Updated!'}
         </h3>
 
@@ -154,12 +157,12 @@ export default function TicketUpdateModal({
               background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(16, 185, 129, 0.12))',
               border: '1px solid rgba(56, 189, 248, 0.35)',
               borderRadius: '14px',
-              padding: '14px',
+              padding: '12px 14px',
               textAlign: 'left',
               width: '100%',
               display: 'flex',
               flexDirection: 'column',
-              gap: '10px'
+              gap: '8px'
             }}
           >
             <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -168,7 +171,15 @@ export default function TicketUpdateModal({
             </span>
 
             {adminMessage && (
-              <p style={{ fontSize: '0.86rem', color: '#f1f5f9', margin: 0, lineHeight: '1.45', fontWeight: 500 }}>
+              <p style={{
+                fontSize: '0.84rem',
+                color: '#f1f5f9',
+                margin: 0,
+                lineHeight: '1.45',
+                fontWeight: 500,
+                maxHeight: '140px',
+                overflowY: 'auto'
+              }}>
                 "{adminMessage}"
               </p>
             )}
