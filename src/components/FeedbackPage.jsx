@@ -676,6 +676,65 @@ export default function FeedbackPage({
                   )}
                 </div>
               )}
+
+              {/* 💬 Follow-up Reply Input Box for Rider */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '16px',
+                padding: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+                marginTop: '4px'
+              }}>
+                <label style={{ fontSize: '0.84rem', fontWeight: 800, color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Send size={15} />
+                  <span>{isBn ? 'অ্যাডমিনকে বার্তা বা উত্তর পাঠান (Send Reply to Admin):' : 'Reply to Support Team:'}</span>
+                </label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <input
+                    type="text"
+                    value={userFollowupText}
+                    onChange={(e) => setUserFollowupText(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleSendFollowup(); }}
+                    placeholder={isBn ? 'অ্যাডমিনকে উত্তর পাঠাতে এখানে লিখুন...' : 'Type a reply to the support team...'}
+                    style={{
+                      flex: 1,
+                      minWidth: '220px',
+                      padding: '12px 14px',
+                      borderRadius: '12px',
+                      background: 'rgba(0, 0, 0, 0.35)',
+                      border: '1px solid var(--border-color)',
+                      color: '#f8fafc',
+                      fontSize: '0.88rem',
+                      outline: 'none'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSendFollowup}
+                    disabled={sendingFollowup || !userFollowupText.trim()}
+                    style={{
+                      padding: '12px 20px',
+                      borderRadius: '12px',
+                      background: sendingFollowup || !userFollowupText.trim() ? 'rgba(255, 255, 255, 0.1)' : 'linear-gradient(135deg, #0284c7, #0ea5e9)',
+                      color: '#ffffff',
+                      fontWeight: 800,
+                      fontSize: '0.88rem',
+                      border: 'none',
+                      cursor: sendingFollowup || !userFollowupText.trim() ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxShadow: sendingFollowup || !userFollowupText.trim() ? 'none' : '0 4px 14px rgba(14, 165, 233, 0.4)'
+                    }}
+                  >
+                    <Send size={16} />
+                    <span>{sendingFollowup ? (isBn ? 'পাঠানো হচ্ছে...' : 'Sending...') : (isBn ? 'উত্তর পাঠান' : 'Send Reply')}</span>
+                  </button>
+                </div>
+              </div>
             </div>
           );
         })()}
