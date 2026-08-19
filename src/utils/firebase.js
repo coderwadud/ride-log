@@ -15,13 +15,13 @@ import { getFirestore } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAgD2gnEiEoalKfespgnhMA_H2DvPfrD5M",
-  authDomain: "ridelogbd1.firebaseapp.com",
-  projectId: "ridelogbd1",
-  storageBucket: "ridelogbd1.firebasestorage.app",
-  messagingSenderId: "4274608297",
-  appId: "1:4274608297:web:6eff7fd5886eb238f1f1b8",
-  measurementId: "G-7Z8T060VYV"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDw1fKp9qDmicU_--gY-ohPvg3QHvfXPmg",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "ridelogbd1.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "ridelogbd1",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "ridelogbd1.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "4274608297",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:4274608297:web:6eff7fd5886eb238f1f1b8",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-7Z8T060VYV"
 };
 
 const app = initializeApp(firebaseConfig);

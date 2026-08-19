@@ -4,13 +4,13 @@ import {
 } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAgD2gnEiEoalKfespgnhMA_H2DvPfrD5M",
-  authDomain: "ridelogbd1.firebaseapp.com",
-  projectId: "ridelogbd1",
-  storageBucket: "ridelogbd1.firebasestorage.app",
-  messagingSenderId: "4274608297",
-  appId: "1:4274608297:web:6eff7fd5886eb238f1f1b8",
-  measurementId: "G-7Z8T060VYV"
+  apiKey: "AIzaSyBmFLLRdpGmwW0fNaOw76AnzUOfItkMJkA",
+  authDomain: "ride-log-8511a.firebaseapp.com",
+  projectId: "ride-log-8511a",
+  storageBucket: "ride-log-8511a.firebasestorage.app",
+  messagingSenderId: "757251174457",
+  appId: "1:757251174457:web:08b7aead9de1f2cbe2dde8",
+  measurementId: "G-3VYKY7458H"
 };
 
 const app = initializeApp(firebaseConfig);
