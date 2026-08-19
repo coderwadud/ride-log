@@ -85,7 +85,7 @@ jobs:
       - name: Install CocoaPods Dependencies
         run: |
           cd ios/App
-          pod install
+          pod install --repo-update
 
       - name: Build iOS Application (Unsigned Native Binary)
         run: |
