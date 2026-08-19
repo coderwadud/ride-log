@@ -1,4 +1,4 @@
-name: Build Native Android APK
+name: Build & Release Multi-Platform (Android APK & iOS App)
 
 on:
   push:
@@ -10,7 +10,8 @@ permissions:
   contents: write
 
 jobs:
-  build-apk:
+  build-android:
+    name: 🤖 Build Android APK
     runs-on: ubuntu-latest
 
     steps:
@@ -48,29 +49,110 @@ jobs:
           cd android
           ./gradlew assembleRelease --stacktrace
 
-      - name: Rename APK Asset
+      - name: Prepare Android Asset
         run: |
-          mkdir -p android/app/build/outputs/apk/release/
-          find android/app/build/outputs/apk/ -name "*.apk" -exec cp {} android/app/build/outputs/apk/release/Ride-Log-BD.apk \;
+          mkdir -p build-artifacts/
+          find android/app/build/outputs/apk/ -name "*.apk" -exec cp {} build-artifacts/Ride-Log-BD.apk \;
 
-      - name: Upload APK Artifact
+      - name: Upload Android Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RideLog-BD-Android-App
-          path: android/app/build/outputs/apk/release/Ride-Log-BD.apk
+          name: android-apk
+          path: build-artifacts/Ride-Log-BD.apk
 
-      - name: Create GitHub Release
+  build-ios:
+    name: 🍏 Build iOS IPA
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Node Dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Build Web Assets
+        run: npm run build
+
+      - name: Sync Capacitor iOS Project
+        run: npx cap sync ios
+
+      - name: Install CocoaPods
+        run: |
+          cd ios/App
+          pod install
+
+      - name: Build iOS Archive (Release)
+        run: |
+          cd ios/App
+          xcodebuild -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/App.xcarchive \
+            archive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Package iOS IPA
+        run: |
+          cd ios/App
+          mkdir -p Payload
+          cp -r build/App.xcarchive/Products/Applications/App.app Payload/
+          zip -r ../../Ride-Log-BD-iOS.ipa Payload
+
+      - name: Upload iOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: Ride-Log-BD-iOS.ipa
+
+  publish-release:
+    name: 🚀 Publish Multi-Platform Release
+    needs: [build-android, build-ios]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Android Artifact
+        uses: actions/download-artifact@v4
         continue-on-error: true
+        with:
+          name: android-apk
+          path: release-assets/
+
+      - name: Download iOS Artifact
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: ios-ipa
+          path: release-assets/
+
+      - name: Create or Update GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           APP_VERSION=$(node -p "require('./package.json').version")
           TAG="v${APP_VERSION}"
-          TITLE="RideLog BD v${APP_VERSION}"
+          TITLE="RideLog BD v${APP_VERSION} (Android & iOS)"
 
-          NOTES="### 🚀 RideLog BD v${APP_VERSION} Release
+          NOTES="### 🚀 RideLog BD v${APP_VERSION} Multi-Platform Release
+
+          **Included Release Downloads:**
+          - 🤖 **Android App:** \`Ride-Log-BD.apk\`
+          - 🍏 **iOS (iPhone) App:** \`Ride-Log-BD-iOS.ipa\`
 
           **Latest Features & Improvements:**
+          - Full Apple (iOS) & Android Native Runtime Support
           - Dedicated full-page Support & Ticket Details system
           - Date & Date Range filtering with quick presets
           - Search, sorting (Highest & Lowest cost), and pagination
@@ -79,18 +161,24 @@ jobs:
 
           Commit: ${{ github.sha }}"
 
-          # Delete existing tag/release if it exists to allow clean overwrite
+          # Delete existing release/tag if any to allow fresh multi-asset upload
           gh release delete "$TAG" --yes 2>/dev/null || true
           git push --delete origin "$TAG" 2>/dev/null || true
 
-          # Retry up to 3 times in case of temporary network glitches
+          # Find available assets to upload
+          ASSETS=$(find release-assets/ -type f \( -name "*.apk" -o -name "*.ipa" \) 2>/dev/null)
+
+          if [ -z "$ASSETS" ]; then
+            echo "No assets found to publish."
+            exit 1
+          fi
+
           for i in 1 2 3; do
             gh release create "$TAG" \
               --title "$TITLE" \
               --notes "$NOTES" \
               --latest \
-              android/app/build/outputs/apk/release/Ride-Log-BD.apk && break
+              $ASSETS && break
             echo "Attempt $i failed, retrying in 15s..."
             sleep 15
           done
-

@@ -17,6 +17,7 @@
     "@capacitor/core": "^7.6.8",
     "@capacitor/filesystem": "^7.1.8",
     "@capacitor/geolocation": "^8.2.2",
+    "@capacitor/ios": "^7.6.8",
     "@capacitor/push-notifications": "^8.1.2",
     "@capacitor/share": "^7.0.4",
     "chart.js": "^4.5.1",
