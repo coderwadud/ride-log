@@ -586,3 +586,62 @@ function compareVersions(v1, v2) {
   return 0;
 }
 
+/**
+ * Save document metadata in user's subcollection for smart sync
+ */
+export async function saveUserDocumentMeta(uid, docMeta) {
+  if (!uid || uid === 'guest' || !docMeta || !docMeta.id) return;
+  try {
+    const docRef = doc(db, 'users', uid, 'documents_meta', docMeta.id);
+    const cleanMeta = {
+      id: docMeta.id,
+      userId: uid,
+      bikeId: docMeta.bikeId || 'bike_1',
+      title: docMeta.title || '',
+      docType: docMeta.docType || 'other',
+      expiryDate: docMeta.expiryDate || '',
+      fileName: docMeta.fileName || '',
+      fileType: docMeta.fileType || '',
+      fileSize: docMeta.fileSize || 0,
+      createdAt: docMeta.createdAt || new Date().toISOString(),
+      cloudUrl: docMeta.cloudUrl || '',
+      publicId: docMeta.publicId || ''
+    };
+    await setDoc(docRef, cleanMeta, { merge: true });
+  } catch (err) {
+    console.debug('Save doc metadata skipped:', err);
+  }
+}
+
+/**
+ * Delete document metadata from user's subcollection
+ */
+export async function deleteUserDocumentMeta(uid, docId) {
+  if (!uid || uid === 'guest' || !docId) return;
+  try {
+    const docRef = doc(db, 'users', uid, 'documents_meta', docId);
+    await deleteDoc(docRef);
+  } catch (err) {
+    console.debug('Delete doc metadata skipped:', err);
+  }
+}
+
+/**
+ * Fetch all document metadata for a user (used when local IndexedDB is empty)
+ */
+export async function getUserDocumentsMeta(uid) {
+  if (!uid || uid === 'guest') return [];
+  try {
+    const colRef = collection(db, 'users', uid, 'documents_meta');
+    const snap = await getDocs(colRef);
+    if (!snap.empty) {
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    }
+    return [];
+  } catch (err) {
+    console.debug('Fetch doc metadata skipped:', err);
+    return [];
+  }
+}
+
+

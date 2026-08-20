@@ -4,7 +4,7 @@ import {
   Eye, LogOut, Check, FileCheck, FileCode2, Image as ImageIcon,
   CreditCard, ShieldCheck, AlertCircle, FileSpreadsheet, Download, UserX,
   MessageSquare, Calendar, Send, Clock, Ticket, CheckCircle2, Clock3, MessageCircle,
-  ArrowLeft, ChevronRight
+  ArrowLeft, ChevronRight, ExternalLink
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import {
@@ -12,7 +12,8 @@ import {
   addPrivateDocument,
   updatePrivateDocument,
   deletePrivateDocument,
-  downloadOrShareDocument
+  downloadOrShareDocument,
+  validateDocumentFile
 } from '../utils/documentStorage';
 import { trackDocumentUploaded, updateLastActiveAt } from '../utils/analytics';
 import { deleteUserAllData, submitUserFeedback, listenToUserTickets } from '../utils/firestoreDB';
@@ -104,8 +105,11 @@ export default function ProfileModal({
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 25 * 1024 * 1024) {
-        alert(isBn ? '❌ ফাইলের সাইজ ২৫MB এর নিচে হতে হবে!' : '❌ File size must be under 25MB!');
+      const validation = validateDocumentFile(file);
+      if (!validation.valid) {
+        alert(validation.message);
+        e.target.value = '';
+        setSelectedFile(null);
         return;
       }
       setSelectedFile(file);
@@ -145,7 +149,7 @@ export default function ProfileModal({
       if (userId && userId !== 'guest') updateLastActiveAt(userId);
     } catch (err) {
       console.error('Document upload error:', err);
-      alert(isBn ? '❌ ফাইল আপলোড ব্যর্থ হয়েছে' : '❌ Document save failed');
+      alert(err?.message || (isBn ? '❌ ফাইল আপলোড ব্যর্থ হয়েছে' : '❌ Document save failed'));
     } finally {
       setIsUploading(false);
     }
@@ -187,10 +191,10 @@ export default function ProfileModal({
         ticketId: `#${assignedTicketId}`,
         name: user?.displayName || 'App User',
         email: user?.email || 'not_provided',
-        type: feedbackType === 'bug' 
-          ? 'Bug / Problem Report (সমস্যা)' 
-          : feedbackType === 'feature_request' 
-            ? 'Feature Request (নতুন ফিচার)' 
+        type: feedbackType === 'bug'
+          ? 'Bug / Problem Report (সমস্যা)'
+          : feedbackType === 'feature_request'
+            ? 'Feature Request (নতুন ফিচার)'
             : 'General Feedback (মতামত)',
         message: feedbackMessage.trim(),
         createdAt: new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'medium' }),
@@ -296,6 +300,31 @@ export default function ProfileModal({
     const kb = bytes / 1024;
     if (kb < 1024) return `${kb.toFixed(1)} KB`;
     return `${(kb / 1024).toFixed(1)} MB`;
+  };
+
+  const getDocumentPreviewUrl = (doc) => {
+    if (!doc) return '';
+    const fileSrc = doc.fileData || doc.cloudUrl || doc.localUri || '';
+    if (typeof fileSrc === 'string' && fileSrc.startsWith('data:application/pdf')) {
+      try {
+        const cleanBase64 = fileSrc.replace(/^data:.*?;base64,/, '');
+        const byteCharacters = atob(cleanBase64);
+        const byteArrays = [];
+        for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+          const slice = byteCharacters.slice(offset, offset + 512);
+          const byteNumbers = new Array(slice.length);
+          for (let i = 0; i < slice.length; i++) {
+            byteNumbers[i] = slice.charCodeAt(i);
+          }
+          byteArrays.push(new Uint8Array(byteNumbers));
+        }
+        const blob = new Blob(byteArrays, { type: 'application/pdf' });
+        return URL.createObjectURL(blob);
+      } catch (e) {
+        console.warn('PDF blob generation fallback:', e);
+      }
+    }
+    return fileSrc;
   };
 
   return (
@@ -473,10 +502,12 @@ export default function ProfileModal({
             </div>
 
             <div className="form-group" style={{ marginBottom: '14px' }}>
-              <label className="form-label">{isBn ? 'ফাইল সিলেক্ট করুন (ছবি/PDF)' : 'Select File (Image/PDF)'}</label>
+              <label className="form-label">
+                {isBn ? 'ফাইল সিলেক্ট করুন (সর্বোচ্চ ৫০০ KB - JPG, PNG, WEBP, PDF)' : 'Select File (Max 500 KB - JPG, PNG, WEBP, PDF)'}
+              </label>
               <input
                 type="file"
-                accept="image/*,application/pdf"
+                accept="image/jpeg,image/png,image/webp,application/pdf,.jpg,.jpeg,.png,.webp,.pdf"
                 className="form-input"
                 onChange={handleFileChange}
                 required
@@ -523,7 +554,6 @@ export default function ProfileModal({
             {filteredDocs.map(doc => {
               const categoryInfo = DOC_TYPES.find(t => t.key === doc.docType) || DOC_TYPES[5];
               const IconComp = categoryInfo.icon;
-              const isImage = doc.fileType?.startsWith('image/') || doc.fileData?.startsWith('data:image/');
               const isEditing = editingDocId === doc.id;
               const expBadge = getExpiryBadge(doc.expiryDate);
 
@@ -921,145 +951,134 @@ export default function ProfileModal({
         )}
 
         {/* ===== Document Preview Sub-Modal ===== */}
-        {previewDoc && (
-          <div
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'rgba(0, 0, 0, 0.9)',
-              zIndex: 99999,
-              display: 'flex',
-              flexDirection: 'column',
-              padding: '16px'
-            }}
-            onClick={() => setPreviewDoc(null)}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <div>
-                <h4 style={{ fontSize: '1rem', color: '#ffffff', margin: 0 }}>
-                  {previewDoc.title}
-                </h4>
-                <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '2px 0 0' }}>
-                  {formatFileSize(previewDoc.fileSize)}
-                </p>
-              </div>
+        {previewDoc && (() => {
+          const isPdf = previewDoc.fileType?.includes('pdf') || previewDoc.fileData?.startsWith('data:application/pdf') || previewDoc.fileName?.toLowerCase().endsWith('.pdf');
+          const displayUrl = getDocumentPreviewUrl(previewDoc);
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <button
-                  type="button"
-                  className="btn btn-icon"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    downloadOrShareDocument(previewDoc);
-                  }}
-                  title={isBn ? 'ডাউনলোড করুন' : 'Download Document'}
-                  style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.4)' }}
-                >
-                  <Download size={18} />
-                </button>
-
-                <button
-                  type="button"
-                  className="btn btn-icon"
-                  onClick={() => setPreviewDoc(null)}
-                  style={{ background: 'rgba(255,255,255,0.1)', color: '#ffffff' }}
-                >
-                  <X size={20} />
-                </button>
-              </div>
-            </div>
-
+          return (
             <div
               style={{
-                flex: 1,
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0, 0, 0, 0.94)',
+                zIndex: 99999,
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                overflow: 'hidden',
-                width: '100%'
+                flexDirection: 'column',
+                padding: '12px'
               }}
-              onClick={(e) => e.stopPropagation()}
+              onClick={() => setPreviewDoc(null)}
             >
-              {previewDoc.fileData?.startsWith('data:image/') || previewDoc.fileType?.startsWith('image/') ? (
-                <img
-                  src={previewDoc.fileData || previewDoc.localUri}
-                  alt={previewDoc.title}
-                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px' }}
-                />
-              ) : (
-                <div style={{
-                  width: '100%',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '16px',
-                  background: 'rgba(15, 23, 42, 0.8)',
-                  borderRadius: '12px',
-                  padding: '24px',
-                  border: '1px solid var(--border-color)'
-                }}>
-                  <div style={{
-                    width: 64,
-                    height: 64,
-                    borderRadius: '16px',
-                    background: 'rgba(239, 68, 68, 0.15)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#ef4444'
-                  }}>
-                    <FileText size={36} />
-                  </div>
+              {/* Preview Header */}
+              <div style={{ paddingTop: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <div style={{ minWidth: 0, flex: 1, marginRight: '10px' }}>
+                  <h4 style={{ fontSize: '0.98rem', color: '#ffffff', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {previewDoc.title}
+                  </h4>
+                  <p style={{ fontSize: '0.72rem', color: '#94a3b8', margin: '2px 0 0' }}>
+                    {isPdf ? '📄 PDF Document' : '🖼️ Image Document'} • {formatFileSize(previewDoc.fileSize)}
+                  </p>
+                </div>
 
-                  <div style={{ textAlign: 'center', maxWidth: '320px' }}>
-                    <h4 style={{ fontSize: '1.05rem', color: '#ffffff', margin: '0 0 6px 0', fontWeight: 700 }}>
-                      {previewDoc.title}
-                    </h4>
-                    <p style={{ fontSize: '0.82rem', color: '#94a3b8', margin: 0 }}>
-                      📄 {isBn ? 'এটি একটি PDF ডকুমেন্ট' : 'This is a PDF Document'} ({formatFileSize(previewDoc.fileSize)})
-                    </p>
-                  </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                  {/* Open in PDF Reader / Native App on Mobile or New Tab on Web */}
+                  {isPdf && (
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (Capacitor.isNativePlatform()) {
+                          downloadOrShareDocument(previewDoc);
+                        } else {
+                          window.open(displayUrl, '_blank');
+                        }
+                      }}
+                      title={isBn ? 'PDF রিডার দিয়ে খুলুন' : 'Open in PDF Reader'}
+                      style={{
+                        padding: '6px 12px',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        background: 'rgba(56, 189, 248, 0.18)',
+                        color: '#38bdf8',
+                        border: '1px solid rgba(56, 189, 248, 0.4)',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px'
+                      }}
+                    >
+                      <ExternalLink size={14} />
+                      <span>{isBn ? 'PDF রিডারে খুলুন' : 'Open PDF'}</span>
+                    </button>
+                  )}
 
                   <button
                     type="button"
-                    className="btn"
-                    onClick={() => downloadOrShareDocument(previewDoc)}
-                    style={{
-                      padding: '12px 24px',
-                      fontSize: '0.9rem',
-                      fontWeight: 700,
-                      borderRadius: '12px',
-                      background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-                      color: '#ffffff',
-                      boxShadow: '0 4px 14px rgba(239, 68, 68, 0.4)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      border: 'none',
-                      cursor: 'pointer'
+                    className="btn btn-icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      downloadOrShareDocument(previewDoc);
                     }}
+                    title={isBn ? 'ডাউনলোড / শেয়ার' : 'Download / Share'}
+                    style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.4)' }}
                   >
-                    <Download size={18} />
-                    <span>{isBn ? 'PDF রিডার দিয়ে খুলুন / সেভ করুন' : 'Open / Save PDF'}</span>
+                    <Download size={17} />
                   </button>
 
-                  {!Capacitor.isNativePlatform() && (
-                    <iframe
-                      src={previewDoc.fileData || previewDoc.localUri}
-                      title={previewDoc.title}
-                      style={{ width: '100%', height: '350px', border: 'none', background: '#ffffff', borderRadius: '8px', marginTop: '12px' }}
-                    />
-                  )}
+                  <button
+                    type="button"
+                    className="btn btn-icon"
+                    onClick={() => setPreviewDoc(null)}
+                    style={{ background: 'rgba(255,255,255,0.1)', color: '#ffffff' }}
+                  >
+                    <X size={18} />
+                  </button>
                 </div>
-              )}
+              </div>
+
+              {/* Preview Body */}
+              <div
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden',
+                  width: '100%',
+                  height: 'calc(100% - 50px)',
+                  borderRadius: '12px',
+                  background: isPdf ? '#0f172a' : 'transparent'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {isPdf ? (
+                  <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+                    <iframe
+                      src={displayUrl}
+                      title={previewDoc.title}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        border: 'none',
+                        background: '#ffffff',
+                        borderRadius: '10px'
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <img
+                    src={displayUrl}
+                    alt={previewDoc.title}
+                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px' }}
+                  />
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );
