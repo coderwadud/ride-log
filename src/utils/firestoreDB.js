@@ -673,4 +673,74 @@ export function listenToAppFeatures(callback) {
   }
 }
 
+/**
+ * Save GPS Ride Trip to Firestore under users/{uid}/trips/{tripId}
+ */
+export async function saveUserTripToFirestore(uid, trip) {
+  if (!uid || uid === 'guest' || !trip?.id) return;
+  try {
+    const tripDocRef = doc(db, 'users', uid, 'trips', trip.id);
+    // Sanitize points to avoid undefined fields
+    const sanitizedPoints = (trip.points || []).map(p => ({
+      lat: Number(p.lat) || 0,
+      lng: Number(p.lng) || 0,
+      speed: Number(p.speed) || 0,
+      accuracy: Number(p.accuracy) || 0,
+      altitude: Number(p.altitude) || 0,
+      timestamp: Number(p.timestamp) || Date.now()
+    }));
 
+    const payload = {
+      id: trip.id,
+      userId: uid,
+      bikeId: trip.bikeId || 'bike_1',
+      bikeName: trip.bikeName || 'My Bike',
+      title: trip.title || 'Bike Ride',
+      startTime: trip.startTime || new Date().toISOString(),
+      endTime: trip.endTime || new Date().toISOString(),
+      durationSeconds: Number(trip.durationSeconds) || 0,
+      distanceKm: Number(trip.distanceKm) || 0,
+      maxSpeedKmH: Number(trip.maxSpeedKmH) || 0,
+      avgSpeedKmH: Number(trip.avgSpeedKmH) || 0,
+      points: sanitizedPoints,
+      updatedAt: new Date().toISOString()
+    };
+
+    await setDoc(tripDocRef, payload, { merge: true });
+  } catch (err) {
+    console.warn('Trip Firestore cloud sync skipped (offline or network error):', err.message);
+  }
+}
+
+/**
+ * Fetch all GPS Ride Trips for a user from Firestore (used for sync & merge)
+ */
+export async function getUserTripsFromFirestore(uid) {
+  if (!uid || uid === 'guest') return [];
+  try {
+    const colRef = collection(db, 'users', uid, 'trips');
+    const snap = await getDocs(colRef);
+    if (!snap.empty) {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      list.sort((a, b) => new Date(b.startTime || 0) - new Date(a.startTime || 0));
+      return list;
+    }
+    return [];
+  } catch (err) {
+    console.warn('Get user trips from Firestore skipped:', err.message);
+    return [];
+  }
+}
+
+/**
+ * Delete a GPS Ride Trip from Firestore
+ */
+export async function deleteUserTripFromFirestore(uid, tripId) {
+  if (!uid || uid === 'guest' || !tripId) return;
+  try {
+    const tripDocRef = doc(db, 'users', uid, 'trips', tripId);
+    await deleteDoc(tripDocRef);
+  } catch (err) {
+    console.warn('Delete trip from Firestore skipped:', err.message);
+  }
+}

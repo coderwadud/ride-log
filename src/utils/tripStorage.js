@@ -1,7 +1,14 @@
 /**
- * Trip & GPS Storage using IndexedDB (100% Free & Local)
+ * Trip & GPS Storage using IndexedDB (100% Free & Local) + Firestore Cloud Sync
  * Stores full GPS coordinates, speeds, distances, and timestamps for route playback.
+ * 
+ * Architecture:
+ * 1. Read & Write locally first (IndexedDB / localStorage) for instant 0ms offline-first UX.
+ * 2. Asynchronously syncs / uploads saved trips to Firebase Firestore.
+ * 3. On load / sync, if local storage is missing trips, fetches from Firestore and merges seamlessly.
  */
+
+import { saveUserTripToFirestore, getUserTripsFromFirestore, deleteUserTripFromFirestore } from './firestoreDB';
 
 const DB_NAME = 'RideLogTripsDB';
 const DB_VERSION = 1;
@@ -48,12 +55,13 @@ export function calculateDistanceKm(lat1, lon1, lat2, lon2) {
 }
 
 /**
- * Save a completed trip to IndexedDB
+ * Save a completed trip to IndexedDB and sync to Firestore
  */
 export async function saveTrip(trip) {
+  // 1. Write to local storage first (instant response)
   try {
     const db = await openDB();
-    return new Promise((resolve, reject) => {
+    await new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
       const request = store.put(trip);
@@ -61,20 +69,30 @@ export async function saveTrip(trip) {
       request.onerror = (e) => reject(e.target.error);
     });
   } catch (err) {
-    console.error('Error saving trip to IndexedDB:', err);
-    // Fallback to localStorage
+    console.warn('Saving trip to IndexedDB fallback to localStorage:', err);
     saveTripToLocalStorage(trip);
-    return trip;
   }
+
+  // 2. Background Sync to Cloud Firestore if logged in
+  if (trip.userId && trip.userId !== 'guest') {
+    saveUserTripToFirestore(trip.userId, trip).catch((e) => {
+      console.debug('Background trip upload notice:', e?.message);
+    });
+  }
+
+  return trip;
 }
 
 /**
- * Get all recorded trips for user
+ * Get all recorded trips for user (Local-first, with background Firestore sync & merge)
  */
-export async function getTrips(userId = 'guest') {
+export async function getTrips(userId = 'guest', allowCloudSync = true) {
+  let localTrips = [];
+
+  // 1. Instant local read
   try {
     const db = await openDB();
-    return new Promise((resolve) => {
+    localTrips = await new Promise((resolve) => {
       const tx = db.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
       const request = store.getAll();
@@ -88,8 +106,44 @@ export async function getTrips(userId = 'guest') {
       request.onerror = () => resolve(getTripsFromLocalStorage(userId));
     });
   } catch (err) {
-    return getTripsFromLocalStorage(userId);
+    localTrips = getTripsFromLocalStorage(userId);
   }
+
+  // 2. Background Cloud Sync & Merge (When user is logged in)
+  if (allowCloudSync && userId && userId !== 'guest' && typeof navigator !== 'undefined' && navigator.onLine) {
+    getUserTripsFromFirestore(userId).then(async (cloudTrips) => {
+      if (!cloudTrips || cloudTrips.length === 0) return;
+
+      const localMap = new Map(localTrips.map(t => [t.id, t]));
+      let hasNewData = false;
+
+      for (const cTrip of cloudTrips) {
+        if (!localMap.has(cTrip.id)) {
+          // Save missing cloud trip to local database
+          try {
+            const db = await openDB();
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            tx.objectStore(STORE_NAME).put(cTrip);
+          } catch (e) {
+            saveTripToLocalStorage(cTrip);
+          }
+          hasNewData = true;
+        }
+      }
+
+      // Also sync local-only trips up to Firestore if missing in cloud
+      const cloudMap = new Map(cloudTrips.map(t => [t.id, t]));
+      for (const lTrip of localTrips) {
+        if (!cloudMap.has(lTrip.id)) {
+          saveUserTripToFirestore(userId, lTrip).catch(() => {});
+        }
+      }
+    }).catch((e) => {
+      console.debug('Cloud trip sync background notice:', e?.message);
+    });
+  }
+
+  return localTrips;
 }
 
 /**
@@ -102,12 +156,12 @@ export async function getTripsLast3Days(userId = 'guest') {
 }
 
 /**
- * Delete a trip
+ * Delete a trip from local storage and Firestore
  */
-export async function deleteTrip(tripId) {
+export async function deleteTrip(tripId, userId = 'guest') {
   try {
     const db = await openDB();
-    return new Promise((resolve, reject) => {
+    await new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
       const request = store.delete(tripId);
@@ -116,8 +170,14 @@ export async function deleteTrip(tripId) {
     });
   } catch (err) {
     deleteTripFromLocalStorage(tripId);
-    return true;
   }
+
+  // Delete from Firestore
+  if (userId && userId !== 'guest') {
+    deleteUserTripFromFirestore(userId, tripId).catch(() => {});
+  }
+
+  return true;
 }
 
 // ── LOCAL STORAGE FALLBACK ──

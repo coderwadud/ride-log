@@ -571,7 +571,7 @@ export default function GpsTrackerTab({
       try {
         if (Capacitor.isNativePlatform()) {
           passiveWatchId = await Geolocation.watchPosition(
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+            { enableHighAccuracy: true, timeout: 4000, maximumAge: 0 },
             (pos, err) => {
               if (err || !pos?.coords) return;
               handlePassiveUpdate(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, pos.coords.heading);
@@ -583,7 +583,7 @@ export default function GpsTrackerTab({
               handlePassiveUpdate(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, pos.coords.heading);
             },
             (err) => console.warn('Passive web watch warning:', err),
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: 4000, maximumAge: 0 }
           );
         }
       } catch (e) {
@@ -669,19 +669,64 @@ export default function GpsTrackerTab({
     };
   }, [isRecording, isPaused]);
 
-  // Listen to App background/foreground transitions to auto-resync
+  // Listen to App background/foreground transitions and Screen Wake/Visibility changes to auto-resync
   useEffect(() => {
     let sub = null;
     if (Capacitor.isNativePlatform()) {
       sub = App.addListener('appStateChange', (state) => {
-        if (state.isActive && isRecording && !isPaused && startTimeEpochRef.current) {
-          const diffSec = Math.floor((Date.now() - startTimeEpochRef.current) / 1000);
-          setElapsedSeconds(Math.max(0, diffSec));
+        if (state.isActive) {
+          if (isRecording && !isPaused && startTimeEpochRef.current) {
+            const diffSec = Math.floor((Date.now() - startTimeEpochRef.current) / 1000);
+            setElapsedSeconds(Math.max(0, diffSec));
+          }
+          // Immediate GPS fix on resume
+          Geolocation.getCurrentPosition({ enableHighAccuracy: true })
+            .then((pos) => {
+              if (pos?.coords) {
+                const { latitude, longitude, speed, accuracy, altitude, heading } = pos.coords;
+                setCurrentPosition([latitude, longitude]);
+                setGpsAccuracy(Math.round(accuracy || 0));
+                if (heading && !isNaN(heading)) currentHeadingRef.current = heading;
+              }
+            })
+            .catch(() => {});
         }
       });
     }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        if (isRecording && !isPaused) {
+          if (startTimeEpochRef.current) {
+            const diffSec = Math.floor((Date.now() - startTimeEpochRef.current) / 1000);
+            setElapsedSeconds(Math.max(0, diffSec));
+          }
+          if ('wakeLock' in navigator && !wakeLockRef.current) {
+            navigator.wakeLock.request('screen').then((lock) => {
+              wakeLockRef.current = lock;
+            }).catch(() => {});
+          }
+        }
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const { latitude, longitude, accuracy, heading } = pos.coords;
+              setCurrentPosition([latitude, longitude]);
+              setGpsAccuracy(Math.round(accuracy || 0));
+              if (heading && !isNaN(heading)) currentHeadingRef.current = heading;
+            },
+            () => {},
+            { enableHighAccuracy: true, timeout: 4000 }
+          );
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       if (sub && typeof sub.remove === 'function') sub.remove();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [isRecording, isPaused]);
 
@@ -781,7 +826,7 @@ export default function GpsTrackerTab({
 
       if (Capacitor.isNativePlatform()) {
         watchIdRef.current = await Geolocation.watchPosition(
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+          { enableHighAccuracy: true, timeout: 4000, maximumAge: 0 },
           (position, err) => {
             if (err || !position) return;
             const { latitude, longitude, speed, accuracy, altitude } = position.coords;
@@ -795,7 +840,7 @@ export default function GpsTrackerTab({
             handleLocationUpdate(latitude, longitude, speed, accuracy, altitude);
           },
           (err) => console.warn('Web geolocation watch warning:', err),
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+          { enableHighAccuracy: true, timeout: 4000, maximumAge: 0 }
         );
       }
     } catch (e) {
@@ -932,7 +977,7 @@ export default function GpsTrackerTab({
 
       if (Capacitor.isNativePlatform()) {
         watchIdRef.current = await Geolocation.watchPosition(
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+          { enableHighAccuracy: true, timeout: 4000, maximumAge: 0 },
           (position, err) => {
             if (err || !position?.coords) return;
             const { latitude, longitude, speed, accuracy, altitude, heading } = position.coords;
@@ -946,7 +991,7 @@ export default function GpsTrackerTab({
             handleLocationUpdate(latitude, longitude, speed, accuracy, altitude, heading);
           },
           (err) => console.warn('Web geolocation watch warning:', err),
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+          { enableHighAccuracy: true, timeout: 4000, maximumAge: 0 }
         );
       }
     } catch (e) {
@@ -1086,6 +1131,17 @@ export default function GpsTrackerTab({
     }
   };
 
+  const handleDeleteCurrentTrip = async (tripId) => {
+    if (!tripId) return;
+    const confirmed = window.confirm(isBn ? 'আপনি কি নিশ্চিতভাবে এই রাইডটি মুছে ফেলতে চান?' : 'Are you sure you want to delete this trip?');
+    if (!confirmed) return;
+
+    await deleteTrip(tripId, userId);
+    const updatedList = tripsList.filter((t) => t.id !== tripId);
+    setTripsList(updatedList);
+    setSelectedTrip(updatedList[0] || null);
+  };
+
   const handleDiscardTrip = () => {
     setIsSaveModalOpen(false);
     setPendingTripData(null);
@@ -1209,14 +1265,6 @@ export default function GpsTrackerTab({
   const handleCenterOnMe = () => {
     if (currentPosition && mapInstanceRef.current) {
       mapInstanceRef.current.setView(currentPosition, 17, { animate: true });
-    }
-  };
-
-  const handleDeleteCurrentTrip = async (tripId) => {
-    if (confirm(isBn ? 'আপনি কি এই রাইড রেকর্ডটি মুছে ফেলতে চান?' : 'Delete this trip record?')) {
-      await deleteTrip(tripId);
-      await loadRecentTrips();
-      setSelectedTrip(null);
     }
   };
 

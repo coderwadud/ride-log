@@ -34,8 +34,8 @@ export function filterGpsJitter(currentPoints, candidatePoint) {
     return { accept: false, reason: 'invalid_coords' };
   }
 
-  // 1. Reject very low accuracy fixes (accuracy > 35m)
-  if (candidatePoint.accuracy && candidatePoint.accuracy > 35) {
+  // 1. Reject very low accuracy fixes (accuracy > 65m)
+  if (candidatePoint.accuracy && candidatePoint.accuracy > 65) {
     return { accept: false, reason: 'low_accuracy' };
   }
 
@@ -49,21 +49,16 @@ export function filterGpsJitter(currentPoints, candidatePoint) {
   const timeDiffSec = Math.max(0.5, (candidatePoint.timestamp - (lastPoint.timestamp || Date.now())) / 1000);
   const calculatedSpeedKmH = (distKm / (timeDiffSec / 3600));
 
-  // 2. Reject impossible speed spikes / GPS teleportation (> 160 km/h jump)
-  if (calculatedSpeedKmH > 160 && distMeters > 50) {
+  // 2. Reject impossible speed spikes / GPS teleportation (> 180 km/h jump)
+  if (calculatedSpeedKmH > 180 && distMeters > 80) {
     return { accept: false, reason: 'speed_spike' };
   }
 
   // 3. Stationary Deadband Filter:
-  // If user is sitting still or moving < 6 meters with speed <= 2 km/h, ignore jitter point
+  // If user is sitting still or moving < 2.5 meters with speed <= 1 km/h, ignore stationary noise
   const currentSpeed = candidatePoint.speed || 0;
-  if (distMeters < 6 && currentSpeed <= 2.5) {
+  if (distMeters < 2.5 && currentSpeed <= 1.0) {
     return { accept: false, reason: 'stationary_jitter' };
-  }
-
-  // If distMeters is very tiny (< 4 meters), ignore unless moving fast
-  if (distMeters < 4 && currentSpeed <= 5) {
-    return { accept: false, reason: 'micro_jitter' };
   }
 
   return { accept: true, reason: 'valid_movement' };
@@ -155,59 +150,100 @@ export function simplifyPathRDP(points, epsilon = 0.00003) {
 }
 
 /**
- * Snap GPS trace coordinates to real OpenStreetMap roads using OSRM Match API
- * Falls back gracefully to local RDP + Moving Average if offline or request fails.
+ * Snap GPS trace coordinates to real OpenStreetMap roads using OSRM Match & Route APIs.
+ * If points are dense, uses Match API.
+ * If points are sparse (e.g. phone screen was off with only start & end waypoints),
+ * uses OSRM Driving Route API to reconstruct the actual street route taken.
+ * Falls back gracefully to local RDP + Moving Average if offline or requests fail.
  */
 export function snapToRoadsOSRM(points) {
   return new Promise(async (resolve) => {
     if (!points || points.length < 2) {
-      resolve(points);
+      resolve(points || []);
       return;
     }
 
     // Limit chunk size for OSRM URL length (max ~80 coordinates per request)
+    let processedPoints = points;
     const MAX_CHUNK = 80;
-    if (points.length > MAX_CHUNK) {
-      // Downsample points first using RDP for large trips
-      points = simplifyPathRDP(points, 0.00004);
+    if (processedPoints.length > MAX_CHUNK) {
+      processedPoints = simplifyPathRDP(processedPoints, 0.00004);
     }
 
-    // Prepare coordinates string: "lng,lat;lng,lat;..."
-    const coordString = points.map((p) => `${p.lng.toFixed(6)},${p.lat.toFixed(6)}`).join(';');
-    const osrmUrl = `https://router.project-osrm.org/match/v1/biking/${coordString}?overview=full&geometries=geojson`;
+    const coordString = processedPoints.map((p) => `${p.lng.toFixed(6)},${p.lat.toFixed(6)}`).join(';');
 
+    // 1. If points are dense (>= 8 points), try Match API first
+    if (processedPoints.length >= 8) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        const matchUrl = `https://router.project-osrm.org/match/v1/driving/${coordString}?overview=full&geometries=geojson`;
+
+        const response = await fetch(matchUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.code === 'Ok' && data.matchings && data.matchings.length > 0) {
+            const matchedCoords = data.matchings[0].geometry.coordinates; // [[lng, lat], ...]
+            if (matchedCoords && matchedCoords.length > 0) {
+              const roadPoints = matchedCoords.map((coord, idx) => {
+                const orig = processedPoints[Math.min(idx, processedPoints.length - 1)] || processedPoints[0];
+                return {
+                  lat: +coord[1].toFixed(6),
+                  lng: +coord[0].toFixed(6),
+                  speed: orig.speed || 0,
+                  accuracy: 5,
+                  altitude: orig.altitude || 0,
+                  timestamp: orig.timestamp || Date.now()
+                };
+              });
+              resolve(roadPoints);
+              return;
+            }
+          }
+        }
+      } catch (e) {
+        console.debug('OSRM Match API attempt failed, switching to Route API:', e?.message);
+      }
+    }
+
+    // 2. If points are sparse (e.g. 2-7 points recorded during screen off) or Match API failed:
+    // Call OSRM Route API to find the exact road path following street turns between waypoints!
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const routeUrl = `https://router.project-osrm.org/route/v1/driving/${coordString}?overview=full&geometries=geojson`;
 
-      const response = await fetch(osrmUrl, { signal: controller.signal });
+      const response = await fetch(routeUrl, { signal: controller.signal });
       clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json();
-        if (data.code === 'Ok' && data.matchings && data.matchings.length > 0) {
-          // Extract road-matched coordinates from GeoJSON
-          const matchedCoords = data.matchings[0].geometry.coordinates; // [[lng, lat], ...]
-          const roadPoints = matchedCoords.map((coord, idx) => {
-            const orig = points[Math.min(idx, points.length - 1)] || points[0];
-            return {
-              lat: +coord[1].toFixed(6),
-              lng: +coord[0].toFixed(6),
-              speed: orig.speed || 0,
-              accuracy: 5,
-              altitude: orig.altitude || 0,
-              timestamp: orig.timestamp || Date.now()
-            };
-          });
-          resolve(roadPoints);
-          return;
+        if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+          const routeCoords = data.routes[0].geometry.coordinates; // [[lng, lat], ...]
+          if (routeCoords && routeCoords.length > 0) {
+            const roadPoints = routeCoords.map((coord, idx) => {
+              const orig = processedPoints[Math.min(idx, processedPoints.length - 1)] || processedPoints[0];
+              return {
+                lat: +coord[1].toFixed(6),
+                lng: +coord[0].toFixed(6),
+                speed: orig.speed || 0,
+                accuracy: 5,
+                altitude: orig.altitude || 0,
+                timestamp: orig.timestamp || Date.now()
+              };
+            });
+            resolve(roadPoints);
+            return;
+          }
         }
       }
     } catch (e) {
-      console.warn('OSRM Match API unavailable, fallback to local path smoothing:', e);
+      console.debug('OSRM Route API attempt failed, fallback to local smoothing:', e?.message);
     }
 
-    // Fallback: Local RDP simplification + moving average filter
+    // 3. Fallback: Local RDP simplification + moving average filter
     const simplified = simplifyPathRDP(points, 0.000025);
     const smoothed = smoothPathMovingAverage(simplified);
     resolve(smoothed);
