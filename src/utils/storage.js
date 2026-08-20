@@ -313,12 +313,167 @@ export async function exportBackupData(customData) {
 }
 
 /**
- * Import backup and MERGE with existing data (add entries, don't replace)
- * Duplicate entries (same id) are skipped
+ * Helper to parse a CSV line properly handling double quotes and commas
  */
-export function mergeImportBackupData(jsonString, currentData) {
+function parseCSVLine(line) {
+  const result = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      result.push(cur.trim());
+      cur = '';
+    } else {
+      cur += char;
+    }
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+/**
+ * Parses CSV format (e.g. from fuel logs / excel export) to RideLog standard structure
+ * CSV columns supported: type, odo/odometer, date, total cost/amount, volume/liters, unit price/price, notes/station
+ */
+export function parseCSVToRideLogData(csvString, bikeId = 'bike_1') {
+  if (!csvString || typeof csvString !== 'string') return null;
+
+  const lines = csvString
+    .split(/\r?\n/)
+    .map(l => l.trim())
+    .filter(l => l.length > 0);
+
+  if (lines.length === 0) return null;
+
+  const headerLine = lines[0].toLowerCase();
+  const isCSVHeader = headerLine.includes('type') && (headerLine.includes('odo') || headerLine.includes('date') || headerLine.includes('cost'));
+  const dataLines = isCSVHeader ? lines.slice(1) : lines;
+
+  let colIndex = {
+    type: 0,
+    odo: 1,
+    date: 2,
+    totalCost: 3,
+    volume: 4,
+    unitPrice: 5,
+    notes: 6
+  };
+
+  if (isCSVHeader) {
+    const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().replace(/[\s_-]+/g, ''));
+    headers.forEach((h, idx) => {
+      if (h === 'type') colIndex.type = idx;
+      else if (h === 'odo' || h === 'odometer') colIndex.odo = idx;
+      else if (h === 'date') colIndex.date = idx;
+      else if (h === 'totalcost' || h === 'total' || h === 'amount' || h === 'cost') colIndex.totalCost = idx;
+      else if (h === 'volume' || h === 'liters' || h === 'litre' || h === 'litres' || h === 'quantity') colIndex.volume = idx;
+      else if (h === 'unitprice' || h === 'price' || h === 'priceperliter' || h === 'rate') colIndex.unitPrice = idx;
+      else if (h === 'notes' || h === 'note' || h === 'station' || h === 'stationname' || h === 'comment') colIndex.notes = idx;
+    });
+  }
+
+  const fuelLogs = [];
+  const serviceLogs = [];
+  const baseTimestamp = Date.now();
+
+  dataLines.forEach((line, index) => {
+    const cols = parseCSVLine(line);
+    if (!cols || cols.length === 0) return;
+
+    const rowType = (cols[colIndex.type] || 'fuel').toLowerCase().trim();
+    const rawOdo = parseFloat(cols[colIndex.odo]) || 0;
+    const rawDate = (cols[colIndex.date] || new Date().toISOString().slice(0, 10)).trim();
+    const rawTotalCost = parseFloat(cols[colIndex.totalCost]) || 0;
+    const rawVolume = parseFloat(cols[colIndex.volume]) || 0;
+    const rawUnitPrice = parseFloat(cols[colIndex.unitPrice]) || 0;
+    const rawNotes = (cols[colIndex.notes] || '').trim();
+
+    const uniqueIdSuffix = `${baseTimestamp - (index * 1000)}`;
+
+    if (rowType === 'fuel') {
+      let liters = rawVolume;
+      let unitPrice = rawUnitPrice;
+      let total = rawTotalCost;
+
+      if (!unitPrice && liters && total) {
+        unitPrice = parseFloat((total / liters).toFixed(2));
+      }
+      if (!total && liters && unitPrice) {
+        total = parseFloat((liters * unitPrice).toFixed(2));
+      }
+      if (!liters && total && unitPrice) {
+        liters = parseFloat((total / unitPrice).toFixed(2));
+      }
+
+      fuelLogs.push({
+        id: `fuel_${uniqueIdSuffix}`,
+        bikeId: bikeId || 'bike_1',
+        date: rawDate,
+        odometer: rawOdo,
+        liters: liters || 0,
+        pricePerLiter: unitPrice || 145,
+        totalAmount: total || 0,
+        isFullTank: true,
+        stationName: rawNotes,
+        notes: rawNotes
+      });
+    } else if (rowType === 'service') {
+      const isOil = /oil|10w|20w|mobil|lubricant/i.test(rawNotes);
+      serviceLogs.push({
+        id: `service_${uniqueIdSuffix}`,
+        bikeId: bikeId || 'bike_1',
+        date: rawDate,
+        odometer: rawOdo,
+        serviceCost: rawTotalCost || 0,
+        partsCost: 0,
+        garageName: rawNotes,
+        types: isOil ? ['catEngineOil'] : ['catOther'],
+        isEngineOilChange: isOil,
+        notes: rawNotes
+      });
+    }
+  });
+
+  return { fuelLogs, serviceLogs };
+}
+
+/**
+ * Import backup (JSON or CSV) and MERGE with existing data (add entries, don't replace)
+ * Duplicate entries (same id or same date + odometer + totalAmount + bikeId) are skipped
+ */
+export function mergeImportBackupData(fileContent, currentData) {
   try {
-    const backup = typeof jsonString === 'string' ? JSON.parse(jsonString) : jsonString;
+    let backup = null;
+    const activeBikeId = (currentData && currentData.activeBikeId) || loadActiveBikeId();
+
+    if (typeof fileContent === 'object' && fileContent !== null) {
+      backup = fileContent;
+    } else if (typeof fileContent === 'string') {
+      const trimmed = fileContent.trim();
+      if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        backup = JSON.parse(trimmed);
+      } else {
+        // Parse as CSV
+        const csvData = parseCSVToRideLogData(trimmed, activeBikeId);
+        if (csvData && (csvData.fuelLogs?.length > 0 || csvData.serviceLogs?.length > 0)) {
+          backup = {
+            fuelLogs: csvData.fuelLogs,
+            serviceLogs: csvData.serviceLogs
+          };
+        } else {
+          return { success: false, message: 'Invalid CSV or JSON backup file' };
+        }
+      }
+    }
+
     if (!backup || typeof backup !== 'object') {
       return { success: false, message: 'Invalid backup file' };
     }
@@ -350,23 +505,51 @@ export function mergeImportBackupData(jsonString, currentData) {
       mergedActiveBikeId = backup.activeBikeId;
     }
 
-    // Merge fuel logs - skip duplicates by id
+    // Merge fuel logs - skip duplicates by id or exact match (date + odometer + totalAmount + bikeId)
     if (backup.fuelLogs && Array.isArray(backup.fuelLogs)) {
       const existingIds = new Set(mergedFuelLogs.map(l => l.id));
       const newLogs = backup.fuelLogs
-        .filter(l => l && l.id && !existingIds.has(l.id))
-        .map(l => ({ ...l, bikeId: l.bikeId || 'bike_1' }));
+        .filter(l => {
+          if (!l) return false;
+          if (l.id && existingIds.has(l.id)) return false;
+          const targetBikeId = l.bikeId || mergedActiveBikeId;
+          const isDuplicate = mergedFuelLogs.some(ef => 
+            (ef.bikeId || 'bike_1') === targetBikeId &&
+            ef.date === l.date &&
+            Number(ef.odometer) === Number(l.odometer) &&
+            Math.abs(Number(ef.totalAmount) - Number(l.totalAmount)) < 0.01
+          );
+          return !isDuplicate;
+        })
+        .map(l => ({ ...l, bikeId: l.bikeId || mergedActiveBikeId }));
+
       mergedFuelLogs = [...mergedFuelLogs, ...newLogs];
     }
     
-    // Merge service logs - skip duplicates by id
+    // Merge service logs - skip duplicates by id or exact match (date + odometer + serviceCost + bikeId)
     if (backup.serviceLogs && Array.isArray(backup.serviceLogs)) {
       const existingIds = new Set(mergedServiceLogs.map(l => l.id));
       const newLogs = backup.serviceLogs
-        .filter(l => l && l.id && !existingIds.has(l.id))
-        .map(l => ({ ...l, bikeId: l.bikeId || 'bike_1' }));
+        .filter(l => {
+          if (!l) return false;
+          if (l.id && existingIds.has(l.id)) return false;
+          const targetBikeId = l.bikeId || mergedActiveBikeId;
+          const isDuplicate = mergedServiceLogs.some(es => 
+            (es.bikeId || 'bike_1') === targetBikeId &&
+            es.date === l.date &&
+            Number(es.odometer) === Number(l.odometer) &&
+            Math.abs(Number(es.serviceCost || 0) - Number(l.serviceCost || 0)) < 0.01
+          );
+          return !isDuplicate;
+        })
+        .map(l => ({ ...l, bikeId: l.bikeId || mergedActiveBikeId }));
+
       mergedServiceLogs = [...mergedServiceLogs, ...newLogs];
     }
+
+    // Sort logs newest first
+    mergedFuelLogs.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    mergedServiceLogs.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
 
     // Save to LocalStorage
     saveBikes(mergedBikes);

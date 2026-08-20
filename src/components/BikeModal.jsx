@@ -324,12 +324,12 @@ export default function BikeModal({
               onClick={() => fileInputRef.current?.click()}
             >
               <Upload size={15} />
-              <span>{lang === 'bn' ? 'ইম্পোর্ট' : 'Import'}</span>
+              <span>{lang === 'bn' ? 'ইম্পোর্ট (JSON/CSV)' : 'Import (JSON/CSV)'}</span>
             </button>
             <input
               ref={fileInputRef}
               type="file"
-              accept=".json"
+              accept=".json,.csv,text/csv,application/json"
               style={{ display: 'none' }}
               onChange={handleImportFile}
             />
@@ -379,7 +379,7 @@ export default function BikeModal({
                 gap: '5px'
               }}
               onClick={() => {
-                const pasted = prompt(lang === 'bn' ? 'আপনার ব্যাকআপ কোড পেস্ট করুন:' : 'Paste your backup JSON code:');
+                const pasted = prompt(lang === 'bn' ? 'আপনার ব্যাকআপ কোড (JSON বা CSV) পেস্ট করুন:' : 'Paste your backup code (JSON or CSV):');
                 if (pasted) {
                   const result = onImportData(pasted);
                   if (result?.success === false) {
