@@ -84,7 +84,7 @@ export async function saveTrip(trip) {
 }
 
 /**
- * Get all recorded trips for user (Local-first, with background Firestore sync & merge)
+ * Get all recorded trips for user (Local-first, with instant Firestore restore on new devices & background sync)
  */
 export async function getTrips(userId = 'guest', allowCloudSync = true) {
   let localTrips = [];
@@ -109,13 +109,34 @@ export async function getTrips(userId = 'guest', allowCloudSync = true) {
     localTrips = getTripsFromLocalStorage(userId);
   }
 
-  // 2. Background Cloud Sync & Merge (When user is logged in)
+  // 2. If local trips are empty (e.g. newly opened on PC / new phone), fetch immediately from Firestore
+  if (localTrips.length === 0 && allowCloudSync && userId && userId !== 'guest' && typeof navigator !== 'undefined' && navigator.onLine) {
+    try {
+      const cloudTrips = await getUserTripsFromFirestore(userId);
+      if (cloudTrips && cloudTrips.length > 0) {
+        cloudTrips.sort((a, b) => new Date(b.startTime || 0) - new Date(a.startTime || 0));
+        for (const cTrip of cloudTrips) {
+          try {
+            const db = await openDB();
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            tx.objectStore(STORE_NAME).put(cTrip);
+          } catch (e) {
+            saveTripToLocalStorage(cTrip);
+          }
+        }
+        return cloudTrips;
+      }
+    } catch (e) {
+      console.debug('Direct cloud restore notice:', e?.message);
+    }
+  }
+
+  // 3. Background Cloud Sync & Merge (When user already has local items)
   if (allowCloudSync && userId && userId !== 'guest' && typeof navigator !== 'undefined' && navigator.onLine) {
     getUserTripsFromFirestore(userId).then(async (cloudTrips) => {
       if (!cloudTrips || cloudTrips.length === 0) return;
 
       const localMap = new Map(localTrips.map(t => [t.id, t]));
-      let hasNewData = false;
 
       for (const cTrip of cloudTrips) {
         if (!localMap.has(cTrip.id)) {
@@ -127,7 +148,6 @@ export async function getTrips(userId = 'guest', allowCloudSync = true) {
           } catch (e) {
             saveTripToLocalStorage(cTrip);
           }
-          hasNewData = true;
         }
       }
 

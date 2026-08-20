@@ -1169,30 +1169,61 @@ export default function GpsTrackerTab({
       if (playbackStartMarkerRef.current) playbackStartMarkerRef.current.remove();
       if (playbackEndMarkerRef.current) playbackEndMarkerRef.current.remove();
 
-      const latLngs = points.map((p) => [p.lat, p.lng]);
+      let active = true;
 
-      // Draw full route polyline with gradient style
-      playbackPolylineRef.current = L.polyline(latLngs, {
-        color: '#38bdf8',
-        weight: 6,
-        opacity: 0.9,
-        lineCap: 'round',
-        lineJoin: 'round'
-      }).addTo(map);
+      const renderPlaybackRoute = async () => {
+        let displayPoints = points;
 
-      // Start Pin & Finish Pin markers
-      playbackStartMarkerRef.current = L.marker(latLngs[0], { icon: createStartPinIcon() }).addTo(map);
-      playbackEndMarkerRef.current = L.marker(latLngs[latLngs.length - 1], { icon: createFinishPinIcon() }).addTo(map);
+        // 🛣️ If trip points are sparse (e.g. 2-7 points from screen-off or older test trip),
+        // auto-reconstruct the real street road geometry via OSRM / Valhalla!
+        if (displayPoints.length >= 2 && displayPoints.length < 10) {
+          try {
+            const snapped = await snapToRoadsOSRM(displayPoints);
+            if (active && snapped && snapped.length > displayPoints.length) {
+              displayPoints = snapped;
+            }
+          } catch (e) {}
+        }
 
-      // Moving Bike Marker
-      const initialBearing = points.length > 1 ? calculateBearing(points[0].lat, points[0].lng, points[1].lat, points[1].lng) : 0;
-      playbackBikeMarkerRef.current = L.marker(latLngs[0], { icon: createBikePlaybackIcon(initialBearing) }).addTo(map);
+        if (!active || !mapInstanceRef.current) return;
 
-      // Fit map bounds to show full route
-      map.fitBounds(playbackPolylineRef.current.getBounds(), { padding: [40, 40] });
+        const latLngs = displayPoints.map((p) => [p.lat, p.lng]);
 
-      setPlaybackIndex(0);
-      setIsPlaying(false);
+        // Draw full route polyline with gradient style
+        if (playbackPolylineRef.current) playbackPolylineRef.current.remove();
+        playbackPolylineRef.current = L.polyline(latLngs, {
+          color: '#38bdf8',
+          weight: 6,
+          opacity: 0.9,
+          lineCap: 'round',
+          lineJoin: 'round'
+        }).addTo(map);
+
+        // Start Pin & Finish Pin markers
+        if (playbackStartMarkerRef.current) playbackStartMarkerRef.current.remove();
+        if (playbackEndMarkerRef.current) playbackEndMarkerRef.current.remove();
+        playbackStartMarkerRef.current = L.marker(latLngs[0], { icon: createStartPinIcon() }).addTo(map);
+        playbackEndMarkerRef.current = L.marker(latLngs[latLngs.length - 1], { icon: createFinishPinIcon() }).addTo(map);
+
+        // Moving Bike Marker
+        const initialBearing = displayPoints.length > 1 ? calculateBearing(displayPoints[0].lat, displayPoints[0].lng, displayPoints[1].lat, displayPoints[1].lng) : 0;
+        if (playbackBikeMarkerRef.current) playbackBikeMarkerRef.current.remove();
+        playbackBikeMarkerRef.current = L.marker(latLngs[0], { icon: createBikePlaybackIcon(initialBearing) }).addTo(map);
+
+        // Fit map bounds to show full route
+        try {
+          map.fitBounds(playbackPolylineRef.current.getBounds(), { padding: [40, 40] });
+        } catch (e) {}
+
+        setPlaybackIndex(0);
+        setIsPlaying(false);
+      };
+
+      renderPlaybackRoute();
+
+      return () => {
+        active = false;
+      };
     } else {
       // 🟢 Restoring Live Mode
       // Clear playback markers

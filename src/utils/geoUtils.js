@@ -150,11 +150,60 @@ export function simplifyPathRDP(points, epsilon = 0.00003) {
 }
 
 /**
- * Snap GPS trace coordinates to real OpenStreetMap roads using OSRM Match & Route APIs.
- * If points are dense, uses Match API.
- * If points are sparse (e.g. phone screen was off with only start & end waypoints),
- * uses OSRM Driving Route API to reconstruct the actual street route taken.
- * Falls back gracefully to local RDP + Moving Average if offline or requests fail.
+ * Decode Polyline6 string format (used by Valhalla / Mapbox)
+ */
+export function decodePolyline6(str) {
+  if (!str) return [];
+  let index = 0,
+    lat = 0,
+    lng = 0,
+    coordinates = [],
+    shift = 0,
+    result = 0,
+    byte = null,
+    latitude_change,
+    longitude_change,
+    factor = Math.pow(10, 6);
+
+  while (index < str.length) {
+    byte = null;
+    shift = 0;
+    result = 0;
+
+    do {
+      byte = str.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+
+    latitude_change = (result & 1) ? ~(result >> 1) : (result >> 1);
+
+    shift = 0;
+    result = 0;
+
+    do {
+      byte = str.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+
+    longitude_change = (result & 1) ? ~(result >> 1) : (result >> 1);
+
+    lat += latitude_change;
+    lng += longitude_change;
+
+    coordinates.push([lat / factor, lng / factor]);
+  }
+
+  return coordinates;
+}
+
+/**
+ * Snap GPS trace coordinates to real OpenStreetMap roads using:
+ * 1. OSRM Match API (dense GPS points)
+ * 2. OSRM Driving Route API (sparse / screen-off GPS waypoints)
+ * 3. Valhalla OpenStreetMap Motorcycle Routing API (fallback)
+ * 4. Local RDP + Moving Average Filter (offline fallback)
  */
 export function snapToRoadsOSRM(points) {
   return new Promise(async (resolve) => {
@@ -172,7 +221,7 @@ export function snapToRoadsOSRM(points) {
 
     const coordString = processedPoints.map((p) => `${p.lng.toFixed(6)},${p.lat.toFixed(6)}`).join(';');
 
-    // 1. If points are dense (>= 8 points), try Match API first
+    // 1. If points are dense (>= 8 points), try OSRM Match API first
     if (processedPoints.length >= 8) {
       try {
         const controller = new AbortController();
@@ -240,10 +289,56 @@ export function snapToRoadsOSRM(points) {
         }
       }
     } catch (e) {
-      console.debug('OSRM Route API attempt failed, fallback to local smoothing:', e?.message);
+      console.debug('OSRM Route API attempt failed, trying Valhalla engine:', e?.message);
     }
 
-    // 3. Fallback: Local RDP simplification + moving average filter
+    // 3. Fallback: Valhalla OpenStreetMap Motorcycle Routing Engine
+    try {
+      const valhallaLocations = processedPoints.map((p) => ({
+        lat: +p.lat.toFixed(6),
+        lon: +p.lng.toFixed(6)
+      }));
+
+      const body = {
+        locations: valhallaLocations,
+        costing: 'motorcycle',
+        directions_options: { units: 'kilometers' }
+      };
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const valhallaUrl = `https://valhalla1.openstreetmap.de/route?json=${encodeURIComponent(JSON.stringify(body))}`;
+
+      const response = await fetch(valhallaUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const data = await response.json();
+        const legShape = data?.trip?.legs?.[0]?.shape;
+        if (legShape) {
+          const decodedCoords = decodePolyline6(legShape);
+          if (decodedCoords && decodedCoords.length > 0) {
+            const roadPoints = decodedCoords.map((coord, idx) => {
+              const orig = processedPoints[Math.min(idx, processedPoints.length - 1)] || processedPoints[0];
+              return {
+                lat: +coord[0].toFixed(6),
+                lng: +coord[1].toFixed(6),
+                speed: orig.speed || 0,
+                accuracy: 5,
+                altitude: orig.altitude || 0,
+                timestamp: orig.timestamp || Date.now()
+              };
+            });
+            resolve(roadPoints);
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      console.debug('Valhalla routing attempt failed, fallback to local smoothing:', e?.message);
+    }
+
+    // 4. Final Fallback: Local RDP simplification + moving average filter (100% Offline)
     const simplified = simplifyPathRDP(points, 0.000025);
     const smoothed = smoothPathMovingAverage(simplified);
     resolve(smoothed);
