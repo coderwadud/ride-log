@@ -28,7 +28,9 @@ const DEFAULT_SERVICE_LOGS = [];
 
 const DEFAULT_SETTINGS = {
   lang: 'bn',
-  theme: 'dark'
+  theme: 'dark',
+  jobHolderMode: false,
+  monthlyConveyance: 7000
 };
 
 /** Load all bikes array with automatic legacy migration */
@@ -168,7 +170,7 @@ export function saveServiceLogs(logs) {
 export function loadSettings() {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-    return data ? JSON.parse(data) : DEFAULT_SETTINGS;
+    return data ? { ...DEFAULT_SETTINGS, ...JSON.parse(data) } : DEFAULT_SETTINGS;
   } catch (e) {
     return DEFAULT_SETTINGS;
   }

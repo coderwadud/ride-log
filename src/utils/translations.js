@@ -124,6 +124,33 @@ export const translations = {
     mileageTrend: "মাইলেজ পারফর্মেন্স ট্রেন্ড (Km/L)",
     monthlyExpenses: "মাসিক খরচের হিসাব (৳)",
     fuelVsService: "ফুয়েল বনাম সার্ভিস খরচ",
+
+    // Corporate Job Holder / Bike Conveyance
+    corporateMode: "কর্পোরেট / জব হোল্ডার মোড",
+    corporateModeDesc: "অফিস থেকে প্রাপ্ত মাসিক বাইক কনভেয়েন্স ভাতা বা যাতায়াত বিল ট্র্যাক করুন",
+    monthlyConveyance: "মাসিক কনভেয়েন্স ভাতা (৳)",
+    monthlyConveyanceTitle: "মাসিক কনভেয়েন্স ও সেভিংস",
+    allowanceIncome: "ভাতা (ইনকাম):",
+    spentFromAllowance: "ভাতা থেকে খরচ:",
+    remainingAllowance: "অবশিষ্ট ভাতা (সাশ্রয়):",
+    overBudget: "অতিরিক্ত খরচ (ঘাটতি):",
+    conveyanceStatusSurplus: "সাশ্রয় হয়েছে",
+    conveyanceStatusDeficit: "ঘাটতি হয়েছে",
+    conveyanceVsExpense: "কনভেয়েন্স ভাতা vs মোট খরচ (৳)",
+    yearlyIncomeVsExpense: "বাৎসরিক ভাতা vs খরচের সারাংশ",
+    totalAllowanceReceived: "মোট প্রাপ্ত ভাতা",
+    totalBikeExpenses: "মোট বাইক খরচ",
+    netSavings: "নিট সাশ্রয় (সেভিংস)",
+    editAllowance: "ভাতা পরিবর্তন",
+    saveAllowance: "সংরক্ষণ",
+
+    // Export & Statement
+    downloadStatement: "স্টেটমেন্ট ও রিপোর্ট ডাউনলোড",
+    downloadStatementDesc: "আপনার বাইকের ফুয়েল, সার্ভিস ও খরচের অফিসিয়াল স্টেটমেন্ট ও ইনভয়েস",
+    pdfStatement: "PDF স্টেটমেন্ট / ইনভয়েস",
+    excelExport: "Excel স্প্রেডশিট (.xls)",
+    csvExport: "CSV ডাটা (.csv)",
+    exportingFile: "প্রস্তুত হচ্ছে...",
   },
   en: {
     appName: "RideLog BD",
@@ -250,5 +277,31 @@ export const translations = {
     mileageTrend: "Mileage Performance Trend (Km/L)",
     monthlyExpenses: "Monthly Expenses (৳)",
     fuelVsService: "Fuel vs Service Spend Breakdown",
+
+    // Corporate Job Holder / Bike Conveyance
+    corporateMode: "Corporate / Job Holder Mode",
+    corporateModeDesc: "Track monthly bike conveyance allowance or transport bill from your workplace",
+    monthlyConveyance: "Monthly Conveyance (৳)",
+    monthlyConveyanceTitle: "Monthly Conveyance & Savings",
+    allowanceIncome: "Allowance (Income):",
+    spentFromAllowance: "Spent from Allowance:",
+    remainingAllowance: "Remaining (Savings):",
+    overBudget: "Over Budget (Deficit):",
+    conveyanceStatusSurplus: "Saved / Surplus",
+    conveyanceStatusDeficit: "Deficit / Extra Cost",
+    conveyanceVsExpense: "Conveyance Allowance vs Total Cost (৳)",
+    yearlyIncomeVsExpense: "Annual Allowance vs Cost Summary",
+    totalAllowanceReceived: "Total Allowance Received",
+    totalBikeExpenses: "Total Bike Expenses",
+    editAllowance: "Edit Allowance",
+    saveAllowance: "Save",
+
+    // Export & Statement
+    downloadStatement: "Download Statement & Reports",
+    downloadStatementDesc: "Official statement and expense invoice of your bike fuel, service & maintenance",
+    pdfStatement: "PDF Statement / Invoice",
+    excelExport: "Excel Spreadsheet (.xls)",
+    csvExport: "CSV Data (.csv)",
+    exportingFile: "Generating...",
   }
 };

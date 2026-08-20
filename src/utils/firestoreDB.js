@@ -14,7 +14,7 @@ const DEFAULT_BIKE = {
 };
 
 const DEFAULT_DATA = {
-  settings: { lang: 'bn', theme: 'dark' },
+  settings: { lang: 'bn', theme: 'dark', jobHolderMode: false, monthlyConveyance: 7000 },
   activeBikeId: 'bike_1',
   bikes: [DEFAULT_BIKE],
   fuelLogs: [],
@@ -65,7 +65,8 @@ export async function loadUserData(uid) {
         activeBikeId,
         bikes: bikes.length > 0 ? bikes : [DEFAULT_BIKE],
         fuelLogs,
-        serviceLogs
+        serviceLogs,
+        featurePermissions: rootData.featurePermissions || {}
       };
     }
 
@@ -108,7 +109,8 @@ export async function loadUserData(uid) {
       activeBikeId,
       bikes: bikes.length > 0 ? bikes : [DEFAULT_BIKE],
       fuelLogs,
-      serviceLogs
+      serviceLogs,
+      featurePermissions: rootData.featurePermissions || {}
     };
   } catch (err) {
     console.error('Error loading Firestore data for user:', uid, err);
@@ -641,6 +643,33 @@ export async function getUserDocumentsMeta(uid) {
   } catch (err) {
     console.debug('Fetch doc metadata skipped:', err);
     return [];
+  }
+}
+
+/**
+ * Real-time listener for global app features from 'app_config/features'
+ */
+export function listenToAppFeatures(callback) {
+  try {
+    const configDocRef = doc(db, 'app_config', 'features');
+    return onSnapshot(configDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        callback({
+          enableJobHolderFeature: data.enableJobHolderFeature === true,
+          allowedUserIds: Array.isArray(data.allowedUserIds) ? data.allowedUserIds : []
+        });
+      } else {
+        callback({ enableJobHolderFeature: false, allowedUserIds: [] });
+      }
+    }, (err) => {
+      console.warn('App features listener notice (offline fallback active):', err.message);
+      callback({ enableJobHolderFeature: false, allowedUserIds: [] });
+    });
+  } catch (e) {
+    console.warn('Failed to listen to app features:', e);
+    callback({ enableJobHolderFeature: false, allowedUserIds: [] });
+    return () => {};
   }
 }
 

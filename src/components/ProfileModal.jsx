@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   X, User, Shield, Lock, FileText, Upload, Plus, Trash2, Edit3,
   Eye, LogOut, Check, FileCheck, FileCode2, Image as ImageIcon,
-  CreditCard, ShieldCheck, AlertCircle, FileSpreadsheet, Download, UserX,
+  CreditCard, ShieldCheck, AlertCircle, FileSpreadsheet, Download,
   MessageSquare, Calendar, Send, Clock, Ticket, CheckCircle2, Clock3, MessageCircle,
-  ArrowLeft, ChevronRight, ExternalLink
+  ArrowLeft, ChevronRight, ExternalLink, Briefcase
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import {
@@ -16,9 +16,9 @@ import {
   validateDocumentFile
 } from '../utils/documentStorage';
 import { trackDocumentUploaded, updateLastActiveAt } from '../utils/analytics';
-import { deleteUserAllData, submitUserFeedback, listenToUserTickets } from '../utils/firestoreDB';
-import { deleteUserAccount } from '../utils/firebase';
+import { submitUserFeedback, listenToUserTickets } from '../utils/firestoreDB';
 import { getCurrentAppVersion } from '../utils/appVersion';
+import PDFViewerModal from './PDFViewerModal';
 
 const DOC_TYPES = [
   { key: 'license', label: 'ড্রাইভিং লাইসেন্স', labelEn: 'Driving License', icon: CreditCard, color: '#38bdf8' },
@@ -34,6 +34,10 @@ export default function ProfileModal({
   isOpen,
   onClose,
   user,
+  settings,
+  onUpdateSettings,
+  hasJobHolderAccess,
+  remoteFeatures,
   bikes = [],
   activeBikeId,
   onLogout,
@@ -64,11 +68,6 @@ export default function ProfileModal({
 
   // Preview Modal state
   const [previewDoc, setPreviewDoc] = useState(null);
-
-  // Account Deactivation states
-  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
-  const [deactivateLoading, setDeactivateLoading] = useState(false);
-  const [deactivateStep, setDeactivateStep] = useState(1); // 1 = warning, 2 = final confirm
 
   useEffect(() => {
     if (isOpen) {
@@ -266,35 +265,6 @@ export default function ProfileModal({
     }
   };
 
-  const handleDeactivateAccount = async () => {
-    if (deactivateStep === 1) {
-      setDeactivateStep(2);
-      return;
-    }
-
-    setDeactivateLoading(true);
-    try {
-      // Step 1: Delete all Firestore user data
-      await deleteUserAllData(userId);
-      // Step 2: Delete Firebase Auth account
-      await deleteUserAccount();
-      // onAuthChange in App.jsx will auto-detect logout and navigate to login screen
-    } catch (err) {
-      console.error('Account deletion error:', err);
-      if (err?.code === 'auth/requires-recent-login') {
-        alert(isBn
-          ? '⚠️ নিরাপত্তার জন্য, অনুগ্রহ করে লগআউট করে আবার লগইন করুন, তারপর আবার চেষ্টা করুন।'
-          : '⚠️ For security, please logout and login again, then retry account deletion.');
-        setShowDeactivateConfirm(false);
-        setDeactivateStep(1);
-      } else {
-        alert(isBn ? '❌ একাউন্ট ডিলিট ব্যর্থ হয়েছে। আবার চেষ্টা করুন।' : '❌ Account deletion failed. Please try again.');
-      }
-    } finally {
-      setDeactivateLoading(false);
-    }
-  };
-
   const formatFileSize = (bytes) => {
     if (!bytes) return '0 KB';
     const kb = bytes / 1024;
@@ -398,6 +368,8 @@ export default function ProfileModal({
             </p>
           </div>
         </div>
+
+
 
         {/* ===== Storage Privacy Notice Card ===== */}
         <div style={{
@@ -713,6 +685,141 @@ export default function ProfileModal({
           </div>
         )}
 
+        {/* ===== Corporate Job Holder Mode Settings (Only visible if Admin granted access or Master is ON) ===== */}
+        {hasJobHolderAccess && (
+          <div style={{
+            background: 'var(--card-bg, rgba(255,255,255,0.04))',
+            border: '1px solid var(--border-color, rgba(255,255,255,0.08))',
+            borderRadius: '16px',
+            padding: '16px',
+            marginBottom: '16px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: settings?.jobHolderMode ? '14px' : '0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '10px',
+                  background: 'rgba(56, 189, 248, 0.15)',
+                  color: '#38bdf8',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Briefcase size={18} />
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                    {isBn ? '💼 কর্পোরেট / জব হোল্ডার মোড' : '💼 Corporate / Job Holder Mode'}
+                  </h4>
+                  <p style={{ margin: '2px 0 0', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                    {isBn ? 'মাসিক কনভেয়েন্স ভাতা ও সেভিংস ট্র্যাকিং' : 'Monthly Conveyance Allowance & Savings'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Toggle Switch */}
+              <label style={{ position: 'relative', display: 'inline-block', width: 44, height: 24, margin: 0, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(settings?.jobHolderMode)}
+                  onChange={(e) => {
+                    const isChecked = e.target.checked;
+                    onUpdateSettings?.({
+                      ...settings,
+                      jobHolderMode: isChecked,
+                      monthlyConveyance: settings?.monthlyConveyance || 7000
+                    });
+                  }}
+                  style={{ opacity: 0, width: 0, height: 0 }}
+                />
+                <span style={{
+                  position: 'absolute',
+                  cursor: 'pointer',
+                  top: 0, left: 0, right: 0, bottom: 0,
+                  backgroundColor: settings?.jobHolderMode ? '#10b981' : 'rgba(148, 163, 184, 0.3)',
+                  transition: '0.3s',
+                  borderRadius: 24
+                }}>
+                  <span style={{
+                    position: 'absolute',
+                    content: '""',
+                    height: 18,
+                    width: 18,
+                    left: settings?.jobHolderMode ? 23 : 3,
+                    bottom: 3,
+                    backgroundColor: '#ffffff',
+                    transition: '0.3s',
+                    borderRadius: '50%',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                  }} />
+                </span>
+              </label>
+            </div>
+
+            {/* Allowance Input (Only shown when mode is ON) */}
+            {settings?.jobHolderMode && (
+              <div style={{
+                marginTop: '12px',
+                paddingTop: '12px',
+                borderTop: '1px solid rgba(255,255,255,0.06)'
+              }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px' }}>
+                  {isBn ? 'অফিস থেকে প্রাপ্ত মাসিক বাইক কনভেয়েন্স ভাতা (টাকা):' : 'Monthly Bike Conveyance Allowance (৳):'}
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: '#38bdf8' }}>৳</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="500"
+                    value={settings?.monthlyConveyance || ''}
+                    placeholder="7000"
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0;
+                      onUpdateSettings?.({ ...settings, monthlyConveyance: val });
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px 8px 30px',
+                      background: 'var(--bg-main, rgba(0,0,0,0.2))',
+                      border: '1px solid var(--border-color, rgba(255,255,255,0.15))',
+                      borderRadius: '10px',
+                      color: 'var(--text-main)',
+                      fontSize: '0.9rem',
+                      fontWeight: 700,
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+
+                {/* Quick select presets */}
+                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                  {[7000, 10000, 15000].map(amt => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => onUpdateSettings?.({ ...settings, monthlyConveyance: amt })}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '8px',
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        background: settings?.monthlyConveyance === amt ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255,255,255,0.05)',
+                        color: settings?.monthlyConveyance === amt ? '#38bdf8' : 'var(--text-muted)',
+                        border: settings?.monthlyConveyance === amt ? '1px solid #38bdf8' : '1px solid transparent',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ৳{amt.toLocaleString('en-IN')}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ===== Support & Tickets Action Row ===== */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
           {/* Button 1: Send Feedback / New Ticket */}
@@ -786,10 +893,9 @@ export default function ProfileModal({
           )}
         </div>
 
-        {/* ===== Logout & Deactivate Section ===== */}
+        {/* ===== Logout Section ===== */}
         {onLogout && (
-          <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {/* Logout Button */}
+          <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
             <button
               type="button"
               className="btn"
@@ -813,146 +919,25 @@ export default function ProfileModal({
               <LogOut size={17} />
               <span>{isBn ? 'অ্যাকাউন্ট লগআউট করুন' : 'Logout Account'}</span>
             </button>
-
-            {/* Deactivate Account Button */}
-            {user && (
-              <button
-                type="button"
-                className="btn"
-                onClick={() => { setShowDeactivateConfirm(true); setDeactivateStep(1); }}
-                style={{
-                  width: '100%',
-                  background: 'transparent',
-                  color: '#6b7280',
-                  border: '1px solid rgba(107, 114, 128, 0.25)',
-                  borderRadius: '12px',
-                  fontSize: '0.78rem',
-                  fontWeight: 600,
-                  padding: '9px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '7px',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                <UserX size={15} />
-                <span>{isBn ? 'একাউন্ট স্থায়ীভাবে মুছে ফেলুন' : 'Permanently Delete Account'}</span>
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* ===== Account Deactivation Confirm Modal ===== */}
-        {showDeactivateConfirm && (
-          <div
-            style={{
-              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-              background: 'rgba(0,0,0,0.85)', zIndex: 99999,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              padding: '20px'
-            }}
-            onClick={() => { setShowDeactivateConfirm(false); setDeactivateStep(1); }}
-          >
-            <div
-              style={{
-                background: 'linear-gradient(135deg, #1e293b, #0f172a)',
-                border: '1px solid rgba(239, 68, 68, 0.4)',
-                borderRadius: '20px',
-                padding: '28px 24px',
-                maxWidth: '380px',
-                width: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '16px'
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Icon */}
-              <div style={{ display: 'flex', justifyContent: 'center' }}>
-                <div style={{
-                  width: 64, height: 64, borderRadius: '50%',
-                  background: 'rgba(239, 68, 68, 0.15)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}>
-                  <UserX size={32} color="#ef4444" />
-                </div>
-              </div>
-
-              {/* Title */}
-              <div style={{ textAlign: 'center' }}>
-                <h4 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f87171', margin: '0 0 8px 0' }}>
-                  {deactivateStep === 1
-                    ? (isBn ? '⚠️ একাউন্ট ডিলিট করবেন?' : '⚠️ Delete Account?')
-                    : (isBn ? '🚨 শেষ সুযোগ!' : '🚨 Last Warning!')
-                  }
-                </h4>
-                <p style={{ fontSize: '0.82rem', color: '#94a3b8', margin: 0, lineHeight: '1.6' }}>
-                  {deactivateStep === 1
-                    ? (isBn
-                      ? 'এই অ্যাকশনটি সম্পূর্ণ অপরিবর্তনীয়। আপনার সমস্ত বাইক ডাটা, ফুয়েল লগ, সার্ভিস লগ ও ডকুমেন্ট চিরতরে মুছে যাবে।'
-                      : 'This action is completely irreversible. All your bike data, fuel logs, service logs, and documents will be permanently erased.')
-                    : (isBn
-                      ? 'আপনি কি সত্যিই নিশ্চিত? "হ্যাঁ, ডিলিট করুন" চাপলে আর ফিরিয়ে আনা সম্ভব হবে না।'
-                      : 'Are you absolutely sure? Pressing "Yes, Delete" cannot be undone. Ever.')
-                  }
-                </p>
-              </div>
-
-              {/* Action Buttons */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <button
-                  type="button"
-                  disabled={deactivateLoading}
-                  onClick={handleDeactivateAccount}
-                  style={{
-                    padding: '12px',
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, #ef4444, #b91c1c)',
-                    color: '#ffffff',
-                    fontWeight: 800,
-                    fontSize: '0.88rem',
-                    border: 'none',
-                    cursor: deactivateLoading ? 'not-allowed' : 'pointer',
-                    opacity: deactivateLoading ? 0.7 : 1,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
-                  }}
-                >
-                  <UserX size={17} />
-                  <span>
-                    {deactivateLoading
-                      ? (isBn ? 'মুছে ফেলা হচ্ছে...' : 'Deleting...')
-                      : deactivateStep === 1
-                        ? (isBn ? 'পরের ধাপ →' : 'Next Step →')
-                        : (isBn ? 'হ্যাঁ, চিরতরে ডিলিট করুন' : 'Yes, Permanently Delete')
-                    }
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => { setShowDeactivateConfirm(false); setDeactivateStep(1); }}
-                  style={{
-                    padding: '11px',
-                    borderRadius: '12px',
-                    background: 'rgba(255,255,255,0.06)',
-                    color: '#94a3b8',
-                    fontWeight: 600,
-                    fontSize: '0.85rem',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {isBn ? 'বাতিল করুন' : 'Cancel'}
-                </button>
-              </div>
-            </div>
           </div>
         )}
 
         {/* ===== Document Preview Sub-Modal ===== */}
         {previewDoc && (() => {
           const isPdf = previewDoc.fileType?.includes('pdf') || previewDoc.fileData?.startsWith('data:application/pdf') || previewDoc.fileName?.toLowerCase().endsWith('.pdf');
+          
+          if (isPdf) {
+            return (
+              <PDFViewerModal
+                isOpen={!!previewDoc}
+                document={previewDoc}
+                onClose={() => setPreviewDoc(null)}
+                onDownloadOrShare={downloadOrShareDocument}
+                lang={lang}
+              />
+            );
+          }
+
           const displayUrl = getDocumentPreviewUrl(previewDoc);
 
           return (
@@ -978,43 +963,11 @@ export default function ProfileModal({
                     {previewDoc.title}
                   </h4>
                   <p style={{ fontSize: '0.72rem', color: '#94a3b8', margin: '2px 0 0' }}>
-                    {isPdf ? '📄 PDF Document' : '🖼️ Image Document'} • {formatFileSize(previewDoc.fileSize)}
+                    🖼️ Image Document • {formatFileSize(previewDoc.fileSize)}
                   </p>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                  {/* Open in PDF Reader / Native App on Mobile or New Tab on Web */}
-                  {isPdf && (
-                    <button
-                      type="button"
-                      className="btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (Capacitor.isNativePlatform()) {
-                          downloadOrShareDocument(previewDoc);
-                        } else {
-                          window.open(displayUrl, '_blank');
-                        }
-                      }}
-                      title={isBn ? 'PDF রিডার দিয়ে খুলুন' : 'Open in PDF Reader'}
-                      style={{
-                        padding: '6px 12px',
-                        fontSize: '0.78rem',
-                        fontWeight: 600,
-                        background: 'rgba(56, 189, 248, 0.18)',
-                        color: '#38bdf8',
-                        border: '1px solid rgba(56, 189, 248, 0.4)',
-                        borderRadius: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '5px'
-                      }}
-                    >
-                      <ExternalLink size={14} />
-                      <span>{isBn ? 'PDF রিডারে খুলুন' : 'Open PDF'}</span>
-                    </button>
-                  )}
-
                   <button
                     type="button"
                     className="btn btn-icon"
@@ -1050,31 +1003,15 @@ export default function ProfileModal({
                   width: '100%',
                   height: 'calc(100% - 50px)',
                   borderRadius: '12px',
-                  background: isPdf ? '#0f172a' : 'transparent'
+                  background: 'transparent'
                 }}
                 onClick={(e) => e.stopPropagation()}
               >
-                {isPdf ? (
-                  <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-                    <iframe
-                      src={displayUrl}
-                      title={previewDoc.title}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        border: 'none',
-                        background: '#ffffff',
-                        borderRadius: '10px'
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <img
-                    src={displayUrl}
-                    alt={previewDoc.title}
-                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px' }}
-                  />
-                )}
+                <img
+                  src={displayUrl}
+                  alt={previewDoc.title}
+                  style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px' }}
+                />
               </div>
             </div>
           );

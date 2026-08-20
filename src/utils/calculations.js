@@ -224,3 +224,117 @@ export function getMonthlyAnalytics(fuelLogs = [], serviceLogs = []) {
     total: monthsMap[key].fuel + monthsMap[key].service
   }));
 }
+
+/**
+ * Calculate Corporate Job Holder Conveyance & Net Income/Cost statistics
+ * @param {Array} fuelLogs - Array of fuel refill logs
+ * @param {Array} serviceLogs - Array of service & repair logs
+ * @param {number} monthlyAllowance - User's monthly transport allowance (BDT)
+ * @returns {Object} Conveyance statistics for current month and historical yearly aggregation
+ */
+export function calculateConveyanceStats(fuelLogs = [], serviceLogs = [], monthlyAllowance = 0) {
+  const allowance = Number(monthlyAllowance) || 0;
+  const now = new Date();
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const currentYear = now.getFullYear();
+
+  let thisMonthFuel = 0;
+  let thisMonthService = 0;
+
+  // Monthly buckets map for income vs expense analytics
+  const monthlyBuckets = {};
+
+  (fuelLogs || []).forEach(log => {
+    if (!log.date) return;
+    const dateObj = new Date(log.date);
+    const key = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+    const amount = Number(log.totalAmount || 0);
+
+    if (key === currentMonthKey) {
+      thisMonthFuel += amount;
+    }
+
+    if (!monthlyBuckets[key]) {
+      monthlyBuckets[key] = { month: key, fuel: 0, service: 0, allowance };
+    }
+    monthlyBuckets[key].fuel += amount;
+  });
+
+  (serviceLogs || []).forEach(log => {
+    if (!log.date) return;
+    const dateObj = new Date(log.date);
+    const key = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+    const amount = Number(log.serviceCost || 0) + Number(log.partsCost || 0);
+
+    if (key === currentMonthKey) {
+      thisMonthService += amount;
+    }
+
+    if (!monthlyBuckets[key]) {
+      monthlyBuckets[key] = { month: key, fuel: 0, service: 0, allowance };
+    }
+    monthlyBuckets[key].service += amount;
+  });
+
+  // Ensure current month exists in monthly buckets
+  if (!monthlyBuckets[currentMonthKey]) {
+    monthlyBuckets[currentMonthKey] = { month: currentMonthKey, fuel: 0, service: 0, allowance };
+  }
+
+  const thisMonthTotalExpense = thisMonthFuel + thisMonthService;
+  const remaining = allowance - thisMonthTotalExpense;
+  const isSurplus = remaining >= 0;
+  const spentPercentage = allowance > 0 ? Math.min(100, Math.round((thisMonthTotalExpense / allowance) * 100)) : 0;
+  const actualSpentPercentage = allowance > 0 ? Math.round((thisMonthTotalExpense / allowance) * 100) : 0;
+
+  // Yearly Summary (current year)
+  let yearlyTotalAllowance = 0;
+  let yearlyTotalExpense = 0;
+  let activeMonthsInYear = 0;
+
+  // Historical data for charts & tables
+  const sortedMonths = Object.keys(monthlyBuckets).sort();
+  const comparisonHistory = sortedMonths.map(key => {
+    const b = monthlyBuckets[key];
+    const totalExp = b.fuel + b.service;
+    const diff = allowance - totalExp;
+
+    if (key.startsWith(String(currentYear))) {
+      activeMonthsInYear++;
+      yearlyTotalAllowance += allowance;
+      yearlyTotalExpense += totalExp;
+    }
+
+    return {
+      month: key,
+      fuel: b.fuel,
+      service: b.service,
+      totalExpense: totalExp,
+      allowance,
+      netSavings: diff,
+      isSurplus: diff >= 0
+    };
+  });
+
+  const yearlyDiff = yearlyTotalAllowance - yearlyTotalExpense;
+
+  return {
+    allowance,
+    thisMonthFuel,
+    thisMonthService,
+    thisMonthTotalExpense,
+    remainingBalance: Math.abs(remaining),
+    isSurplus,
+    spentPercentage,
+    actualSpentPercentage,
+    currentMonthKey,
+    // Yearly metrics
+    yearlyTotalAllowance,
+    yearlyTotalExpense,
+    yearlyNetSavings: Math.abs(yearlyDiff),
+    isYearlySurplus: yearlyDiff >= 0,
+    activeMonthsInYear: activeMonthsInYear || 1,
+    // Monthly history
+    comparisonHistory
+  };
+}

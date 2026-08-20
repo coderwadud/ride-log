@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Bike, Check, Download, Upload, Plus, Trash2, Edit2, CloudCheck, CloudOff, RefreshCw, LogOut, Copy, ClipboardPaste, AlertTriangle } from 'lucide-react';
+import { X, Bike, Check, Download, Upload, Plus, Trash2, Edit2, CloudCheck, CloudOff, RefreshCw, LogOut, Copy, ClipboardPaste, AlertTriangle, UserX, FileText, FileSpreadsheet } from 'lucide-react';
 import { translations } from '../utils/translations';
+import { deleteUserAllData } from '../utils/firestoreDB';
+import { deleteUserAccount } from '../utils/firebase';
+import { exportRiderComprehensiveStatementPDF, exportFuelAndServiceToExcel } from '../utils/exportUtils';
 
 export default function BikeModal({ 
   lang, 
   isOpen, 
   onClose, 
+  user,
   onSave, 
   bikes = [],
   activeBikeId,
@@ -13,6 +17,10 @@ export default function BikeModal({
   onAddBike,
   onDeleteBike,
   bikeProfile, 
+  fuelLogs = [],
+  serviceLogs = [],
+  fuelStats = {},
+  serviceStats = {},
   onClearAllData, 
   onExportData, 
   onImportData,
@@ -33,6 +41,11 @@ export default function BikeModal({
   const [targetOilKm, setTargetOilKm] = useState(bikeProfile?.targetOilKm || 1000);
 
   const [showConfirmReset, setShowConfirmReset] = useState(false);
+
+  // Account Deactivation states
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
+  const [deactivateLoading, setDeactivateLoading] = useState(false);
+  const [deactivateStep, setDeactivateStep] = useState(1); // 1 = warning, 2 = final confirm
 
   useEffect(() => {
     if (bikeProfile && !isAddingNew) {
@@ -93,6 +106,35 @@ export default function BikeModal({
     };
     reader.readAsText(file);
     e.target.value = '';
+  };
+
+  const handleDeactivateAccount = async () => {
+    if (deactivateStep === 1) {
+      setDeactivateStep(2);
+      return;
+    }
+
+    setDeactivateLoading(true);
+    try {
+      const uid = user?.uid;
+      if (uid && uid !== 'guest') {
+        await deleteUserAllData(uid);
+      }
+      await deleteUserAccount();
+    } catch (err) {
+      console.error('Account deletion error:', err);
+      if (err?.code === 'auth/requires-recent-login') {
+        alert(lang === 'bn'
+          ? '⚠️ নিরাপত্তার জন্য, অনুগ্রহ করে লগআউট করে আবার লগইন করুন, তারপর আবার চেষ্টা করুন।'
+          : '⚠️ For security, please logout and login again, then retry account deletion.');
+        setShowDeactivateConfirm(false);
+        setDeactivateStep(1);
+      } else {
+        alert(lang === 'bn' ? '❌ একাউন্ট ডিলিট ব্যর্থ হয়েছে। আবার চেষ্টা করুন।' : '❌ Account deletion failed. Please try again.');
+      }
+    } finally {
+      setDeactivateLoading(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -396,6 +438,76 @@ export default function BikeModal({
             </button>
           </div>
 
+          {/* Quick PDF Statement & Excel Export Row */}
+          <div style={{ marginTop: '14px', display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                exportRiderComprehensiveStatementPDF({
+                  user,
+                  bike: bikeProfile,
+                  fuelLogs,
+                  serviceLogs,
+                  fuelStats,
+                  serviceStats,
+                  lang
+                });
+              }}
+              style={{
+                flex: 1,
+                background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.15), rgba(3, 105, 161, 0.2))',
+                color: '#38bdf8',
+                border: '1px solid rgba(2, 132, 199, 0.35)',
+                borderRadius: '8px',
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                padding: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '5px',
+                cursor: 'pointer'
+              }}
+            >
+              <FileText size={14} />
+              <span>{lang === 'bn' ? 'PDF স্টেটমেন্ট' : 'PDF Statement'}</span>
+            </button>
+
+            <button
+              type="button"
+              className="btn"
+              onClick={async () => {
+                await exportFuelAndServiceToExcel({
+                  bike: bikeProfile,
+                  fuelLogs,
+                  serviceLogs,
+                  fuelStats,
+                  serviceStats,
+                  lang
+                });
+              }}
+              style={{
+                flex: 1,
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(5, 150, 105, 0.2))',
+                color: '#10b981',
+                border: '1px solid rgba(16, 185, 129, 0.35)',
+                borderRadius: '8px',
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                padding: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '5px',
+                cursor: 'pointer'
+              }}
+            >
+              <FileSpreadsheet size={14} />
+              <span>{lang === 'bn' ? 'Excel রিপোর্ট' : 'Excel Report'}</span>
+            </button>
+          </div>
+
           {/* Clear All Data Button */}
           {onClearAllData && (
             <div style={{ marginTop: '16px', textAlign: 'center' }}>
@@ -467,6 +579,36 @@ export default function BikeModal({
             </div>
           )}
 
+          {/* Permanent Delete Account Option */}
+          {user && (
+            <div style={{ marginTop: '10px', textAlign: 'center' }}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => { setShowDeactivateConfirm(true); setDeactivateStep(1); }}
+                style={{
+                  width: '100%',
+                  background: 'transparent',
+                  color: '#6b7280',
+                  border: '1px solid rgba(107, 114, 128, 0.25)',
+                  borderRadius: '8px',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  padding: '9px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '7px',
+                  transition: 'all 0.2s ease',
+                  cursor: 'pointer'
+                }}
+              >
+                <UserX size={15} />
+                <span>{lang === 'bn' ? 'একাউন্ট স্থায়ীভাবে মুছে ফেলুন' : 'Permanently Delete Account'}</span>
+              </button>
+            </div>
+          )}
+
           {/* Logout Button Section */}
           {onLogout && (
             <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)' }}>
@@ -499,6 +641,113 @@ export default function BikeModal({
           )}
         </div>
       </div>
+
+      {/* ===== Account Deactivation Confirm Modal ===== */}
+      {showDeactivateConfirm && (
+        <div
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.85)', zIndex: 99999,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '20px'
+          }}
+          onClick={() => { setShowDeactivateConfirm(false); setDeactivateStep(1); }}
+        >
+          <div
+            style={{
+              background: 'linear-gradient(135deg, #1e293b, #0f172a)',
+              border: '1px solid rgba(239, 68, 68, 0.4)',
+              borderRadius: '20px',
+              padding: '28px 24px',
+              maxWidth: '380px',
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Icon */}
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <div style={{
+                width: 64, height: 64, borderRadius: '50%',
+                background: 'rgba(239, 68, 68, 0.15)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <UserX size={32} color="#ef4444" />
+              </div>
+            </div>
+
+            {/* Title */}
+            <div style={{ textAlign: 'center' }}>
+              <h4 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f87171', margin: '0 0 8px 0' }}>
+                {deactivateStep === 1
+                  ? (lang === 'bn' ? '⚠️ একাউন্ট ডিলিট করবেন?' : '⚠️ Delete Account?')
+                  : (lang === 'bn' ? '🚨 শেষ সুযোগ!' : '🚨 Last Warning!')
+                }
+              </h4>
+              <p style={{ fontSize: '0.82rem', color: '#94a3b8', margin: 0, lineHeight: '1.6' }}>
+                {deactivateStep === 1
+                  ? (lang === 'bn'
+                    ? 'এই অ্যাকশনটি সম্পূর্ণ অপরিবর্তনীয়। আপনার সমস্ত বাইক ডাটা, ফুয়েল লগ, সার্ভিস লগ ও ডকুমেন্ট চিরতরে মুছে যাবে।'
+                    : 'This action is completely irreversible. All your bike data, fuel logs, service logs, and documents will be permanently erased.')
+                  : (lang === 'bn'
+                    ? 'আপনি কি সত্যিই নিশ্চিত? "হ্যাঁ, ডিলিট করুন" চাপলে আর ফিরিয়ে আনা সম্ভব হবে না।'
+                    : 'Are you absolutely sure? Pressing "Yes, Delete" cannot be undone. Ever.')
+                }
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button
+                type="button"
+                disabled={deactivateLoading}
+                onClick={handleDeactivateAccount}
+                style={{
+                  padding: '12px',
+                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, #ef4444, #b91c1c)',
+                  color: '#ffffff',
+                  fontWeight: 800,
+                  fontSize: '0.88rem',
+                  border: 'none',
+                  cursor: deactivateLoading ? 'not-allowed' : 'pointer',
+                  opacity: deactivateLoading ? 0.7 : 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                }}
+              >
+                <UserX size={17} />
+                <span>
+                  {deactivateLoading
+                    ? (lang === 'bn' ? 'মুছে ফেলা হচ্ছে...' : 'Deleting...')
+                    : deactivateStep === 1
+                      ? (lang === 'bn' ? 'পরের ধাপ →' : 'Next Step →')
+                      : (lang === 'bn' ? 'হ্যাঁ, চিরতরে ডিলিট করুন' : 'Yes, Permanently Delete')
+                  }
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setShowDeactivateConfirm(false); setDeactivateStep(1); }}
+                style={{
+                  padding: '11px',
+                  borderRadius: '12px',
+                  background: 'rgba(255,255,255,0.06)',
+                  color: '#94a3b8',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  cursor: 'pointer'
+                }}
+              >
+                {lang === 'bn' ? 'বাতিল করুন' : 'Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

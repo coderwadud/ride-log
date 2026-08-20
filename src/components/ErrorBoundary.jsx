@@ -40,9 +40,32 @@ export class ErrorBoundary extends React.Component {
           <h2 style={{ fontSize: '1.3rem', fontWeight: 'bold', marginBottom: '8px' }}>
             অ্যাপ চালু করতে সমস্যা হয়েছে
           </h2>
-          <p style={{ fontSize: '0.88rem', color: '#94a3b8', maxWidth: '320px', marginBottom: '24px' }}>
+          <p style={{ fontSize: '0.88rem', color: '#94a3b8', maxWidth: '320px', marginBottom: '16px' }}>
             ক্যাশ বা পুরনো ডাটার কারণে সমস্যা দেখা দিয়েছে। নিচে বাটনে ট্যাপ করে ক্যাশ রিসেট করুন।
           </p>
+          {this.state.error && (
+            <div style={{
+              maxWidth: '90%',
+              margin: '0 auto 20px',
+              padding: '12px',
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              borderRadius: '8px',
+              color: '#f87171',
+              fontSize: '0.78rem',
+              textAlign: 'left',
+              fontFamily: 'monospace',
+              overflowX: 'auto',
+              maxHeight: '180px'
+            }}>
+              <strong>Error:</strong> {this.state.error?.message || String(this.state.error)}
+              {this.state.error?.stack && (
+                <pre style={{ marginTop: '8px', whiteSpace: 'pre-wrap', fontSize: '0.7rem' }}>
+                  {this.state.error.stack}
+                </pre>
+              )}
+            </div>
+          )}
           <button
             onClick={this.handleReset}
             style={{

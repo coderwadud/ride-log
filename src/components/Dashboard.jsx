@@ -1,5 +1,5 @@
 import React from 'react';
-import { Gauge, Fuel, Wrench, Coins, Droplets, ChevronRight } from 'lucide-react';
+import { Gauge, Fuel, Wrench, Coins, Droplets, ChevronRight, Briefcase, TrendingUp, TrendingDown } from 'lucide-react';
 import { translations } from '../utils/translations';
 import { formatCurrency, formatNum } from '../utils/calculations';
 
@@ -7,6 +7,9 @@ export default function Dashboard({
   lang,
   fuelStats,
   serviceStats,
+  conveyanceStats,
+  showConveyanceCard = false,
+  onOpenConveyanceSettings,
   bikeProfile,
   onOpenAddFuel,
   onOpenAddService,
@@ -15,19 +18,136 @@ export default function Dashboard({
 }) {
   const t = translations[lang] || translations.bn;
   const { 
-    avgMileage, 
-    totalFuelSpent, 
-    costPerKm, 
-    totalDistance, 
-    totalLiters,
-    lastFuelLiters,
-    lastFuelCost,
-    lastMileage 
-  } = fuelStats;
-  const { totalServiceSpent, kmUntilNextOilChange, oilHealthPercentage, oilStatus, lastOilChangeKm } = serviceStats;
+    avgMileage = 0, 
+    totalFuelSpent = 0, 
+    costPerKm = 0, 
+    totalDistance = 0, 
+    totalLiters = 0,
+    lastFuelLiters = 0,
+    lastFuelCost = 0,
+    lastMileage = 0 
+  } = fuelStats || {};
+  const { 
+    totalServiceSpent = 0, 
+    kmUntilNextOilChange = 1000, 
+    oilHealthPercentage = 100, 
+    oilStatus = 'good', 
+    lastOilChangeKm = 0 
+  } = serviceStats || {};
 
   return (
     <div className="dashboard-view">
+      {/* Corporate Conveyance Tracker Card */}
+      {showConveyanceCard && conveyanceStats && (
+        <div className="card" style={{
+          background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.95))',
+          border: `1px solid ${conveyanceStats.isSurplus ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`,
+          borderRadius: '16px',
+          padding: '14px 16px',
+          marginBottom: '16px',
+          boxShadow: conveyanceStats.isSurplus ? '0 4px 20px rgba(16, 185, 129, 0.08)' : '0 4px 20px rgba(239, 68, 68, 0.08)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                width: 38,
+                height: 38,
+                borderRadius: '10px',
+                background: 'rgba(56, 189, 248, 0.15)',
+                color: '#38bdf8',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <Briefcase size={20} />
+              </div>
+              <div>
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0, color: '#ffffff' }}>
+                  {t.monthlyConveyanceTitle}
+                </h4>
+                <p style={{ fontSize: '0.74rem', color: '#94a3b8', margin: '2px 0 0' }}>
+                  {t.allowanceIncome} <strong style={{ color: '#38bdf8' }}>{formatCurrency(conveyanceStats.allowance, lang)}</strong>
+                </p>
+              </div>
+            </div>
+
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '4px 10px',
+              borderRadius: '8px',
+              background: conveyanceStats.isSurplus ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+              border: `1px solid ${conveyanceStats.isSurplus ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+              color: conveyanceStats.isSurplus ? '#10b981' : '#ef4444',
+              fontSize: '0.75rem',
+              fontWeight: 700
+            }}>
+              {conveyanceStats.isSurplus ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+              <span>{conveyanceStats.isSurplus ? t.conveyanceStatusSurplus : t.conveyanceStatusDeficit}</span>
+            </div>
+          </div>
+
+          {/* Progress Bar & Stats Row */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.03)',
+            borderRadius: '12px',
+            padding: '10px 12px',
+            border: '1px solid rgba(255, 255, 255, 0.05)'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', fontSize: '0.8rem' }}>
+              <span style={{ color: '#94a3b8' }}>{t.spentFromAllowance} <strong style={{ color: '#ffffff' }}>{formatCurrency(conveyanceStats.thisMonthTotalExpense, lang)}</strong></span>
+              <span style={{ fontWeight: 700, color: conveyanceStats.isSurplus ? '#10b981' : '#ef4444' }}>
+                {conveyanceStats.isSurplus ? t.remainingAllowance : t.overBudget} {formatCurrency(conveyanceStats.remainingBalance, lang)}
+              </span>
+            </div>
+
+            <div style={{
+              height: '8px',
+              width: '100%',
+              background: 'rgba(255, 255, 255, 0.08)',
+              borderRadius: '6px',
+              overflow: 'hidden',
+              position: 'relative'
+            }}>
+              <div style={{
+                height: '100%',
+                width: `${conveyanceStats.spentPercentage}%`,
+                background: conveyanceStats.spentPercentage >= 100
+                  ? '#ef4444'
+                  : conveyanceStats.spentPercentage >= 80
+                    ? '#f59e0b'
+                    : 'linear-gradient(90deg, #10b981, #38bdf8)',
+                borderRadius: '6px',
+                transition: 'width 0.4s ease'
+              }} />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', fontSize: '0.72rem', color: '#64748b' }}>
+              <span>{conveyanceStats.actualSpentPercentage}% {lang === 'bn' ? 'ব্যবহৃত' : 'Used'}</span>
+              <button
+                type="button"
+                onClick={onOpenConveyanceSettings}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--accent-mileage)',
+                  cursor: 'pointer',
+                  padding: 0,
+                  fontSize: '0.72rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <span>⚙️ {t.editAllowance}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Engine Oil Health Banner */}
       <div className={`card oil-health-card ${oilStatus}`}>
         <div className="oil-info-left">

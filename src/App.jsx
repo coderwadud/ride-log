@@ -1,5 +1,5 @@
 import { trackUserIpAndActivity } from './utils/ipTracker';
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import LoginScreen from './components/LoginScreen';
 import { onAuthChange, signOutUser } from './utils/firebase';
 import { loadUserData, saveUserData, resetUserDataInFirestore } from './utils/firestoreDB';
@@ -26,7 +26,7 @@ import {
   saveBikes, saveFuelLogs, saveServiceLogs, saveActiveBikeId,
   loadBikes, loadFuelLogs, loadServiceLogs, loadActiveBikeId
 } from './utils/storage';
-import { calculateFuelLogStats, calculateServiceStats } from './utils/calculations';
+import { calculateFuelLogStats, calculateServiceStats, calculateConveyanceStats } from './utils/calculations';
 import { translations } from './utils/translations';
 import { LayoutDashboard, Fuel, Wrench, BarChart3, Navigation } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
@@ -39,7 +39,7 @@ import {
   trackLanguageChanged
 } from './utils/analytics';
 import { initPushNotifications, syncFCMTokenWithUser } from './utils/pushNotifications';
-import { checkAppUpdate, listenToAppUpdates, listenToActiveCampaign, listenToUserTickets } from './utils/firestoreDB';
+import { checkAppUpdate, listenToAppUpdates, listenToActiveCampaign, listenToUserTickets, listenToAppFeatures } from './utils/firestoreDB';
 import { getCurrentAppVersion } from './utils/appVersion';
 
 const DEFAULT_BIKE = {
@@ -52,6 +52,10 @@ const DEFAULT_BIKE = {
 };
 
 export default function App() {
+  const [settings, setSettings] = useState(() => loadSettings());
+  const [remoteFeatures, setRemoteFeatures] = useState({ enableJobHolderFeature: false, allowedUserIds: [] });
+  const [userFeaturePermissions, setUserFeaturePermissions] = useState({});
+
   const [lang, setLang] = useState(() => {
     try {
       const saved = loadSettings();
@@ -89,8 +93,18 @@ export default function App() {
   // Apply theme to document root and persist settings for instant initial render
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    saveSettings({ lang, theme });
-  }, [lang, theme]);
+    saveSettings({ ...settings, lang, theme });
+  }, [lang, theme, settings]);
+
+  // Listen for global app features (e.g. Job Holder remote toggle) from Firestore
+  useEffect(() => {
+    const unsub = listenToAppFeatures((features) => {
+      setRemoteFeatures(features || { enableJobHolderFeature: true });
+    });
+    return () => {
+      if (typeof unsub === 'function') unsub();
+    };
+  }, []);
 
   // Initialize push notifications on native device
   useEffect(() => {
@@ -292,8 +306,13 @@ export default function App() {
             setActiveBikeId(serverActiveId);
             setFuelLogs(serverFuel);
             setServiceLogs(serverService);
-            if (data.settings?.lang) setLang(data.settings.lang);
-            if (data.settings?.theme) setTheme(data.settings.theme);
+            if (data.featurePermissions) setUserFeaturePermissions(data.featurePermissions);
+            if (data.settings) {
+              const merged = { ...loadSettings(), ...data.settings };
+              setSettings(merged);
+              if (merged.lang) setLang(merged.lang);
+              if (merged.theme) setTheme(merged.theme);
+            }
           } else {
             // 📱 ANDROID APP: Local-First 0ms Speed with Cloud Self-Healing
             const localFuel = loadFuelLogs() || [];
@@ -311,8 +330,13 @@ export default function App() {
             setActiveBikeId(data.activeBikeId || loadActiveBikeId() || 'bike_1');
             setFuelLogs(finalFuel);
             setServiceLogs(finalService);
-            if (data.settings?.lang) setLang(data.settings.lang);
-            if (data.settings?.theme) setTheme(data.settings.theme);
+            if (data.featurePermissions) setUserFeaturePermissions(data.featurePermissions);
+            if (data.settings) {
+              const merged = { ...loadSettings(), ...data.settings };
+              setSettings(merged);
+              if (merged.lang) setLang(merged.lang);
+              if (merged.theme) setTheme(merged.theme);
+            }
 
             // Save to Android local storage
             saveBikes(finalBikes);
@@ -433,6 +457,19 @@ export default function App() {
 
   const serviceStats = calculateServiceStats(activeServiceLogs, currentOdometer, activeBike.targetOilKm || 1000);
 
+  // Corporate Job Holder Conveyance Statistics
+  const hasJobHolderAccess = Boolean(
+    remoteFeatures?.enableJobHolderFeature === true ||
+    (user?.uid && Array.isArray(remoteFeatures?.allowedUserIds) && remoteFeatures.allowedUserIds.includes(user.uid)) ||
+    userFeaturePermissions?.jobHolder === true
+  );
+
+  const conveyanceStats = useMemo(() => {
+    return calculateConveyanceStats(activeFuelLogs, activeServiceLogs, settings?.monthlyConveyance || 7000);
+  }, [activeFuelLogs, activeServiceLogs, settings?.monthlyConveyance]);
+
+  const showConveyance = hasJobHolderAccess && !!settings?.jobHolderMode;
+
   // Combine Recent Activity for active bike
   const recentLogs = [
     ...activeFuelLogs.map(f => ({ ...f, isFuel: true })),
@@ -442,6 +479,22 @@ export default function App() {
   const t = translations[lang] || translations.bn;
 
   // Handlers
+  const handleUpdateSettings = (newSettings) => {
+    setSettings(newSettings);
+    if (newSettings.lang && newSettings.lang !== lang) setLang(newSettings.lang);
+    if (newSettings.theme && newSettings.theme !== theme) setTheme(newSettings.theme);
+    saveSettings(newSettings);
+    if (user && user.uid !== 'guest') {
+      saveUserData(user.uid, {
+        settings: newSettings,
+        activeBikeId,
+        bikes,
+        fuelLogs,
+        serviceLogs
+      });
+    }
+  };
+
   const handleSelectBike = (bikeId) => {
     setActiveBikeId(bikeId);
   };
@@ -623,6 +676,9 @@ export default function App() {
                 lang={lang}
                 fuelStats={fuelStats}
                 serviceStats={serviceStats}
+                conveyanceStats={conveyanceStats}
+                showConveyanceCard={showConveyance}
+                onOpenConveyanceSettings={() => setIsProfileModalOpen(true)}
                 bikeProfile={activeBike}
                 onOpenAddFuel={() => { setEditingFuelData(null); setIsFuelModalOpen(true); }}
                 onOpenAddService={() => { setEditingServiceData(null); setIsServiceModalOpen(true); }}
@@ -661,9 +717,15 @@ export default function App() {
             {activeTab === 'analytics' && (
               <AnalyticsTab
                 lang={lang}
+                user={user}
+                activeBike={activeBike}
                 fuelLogs={activeFuelLogs}
                 serviceLogs={activeServiceLogs}
                 fuelStats={fuelStats}
+                serviceStats={serviceStats}
+                conveyanceStats={conveyanceStats}
+                showConveyanceAnalytics={showConveyance}
+                settings={settings}
               />
             )}
 
@@ -727,6 +789,7 @@ export default function App() {
         lang={lang}
         isOpen={isBikeModalOpen}
         onClose={() => setIsBikeModalOpen(false)}
+        user={user}
         onSave={handleSaveBikeProfile}
         bikes={bikes}
         activeBikeId={activeBikeId}
@@ -734,6 +797,10 @@ export default function App() {
         onAddBike={handleAddBike}
         onDeleteBike={handleDeleteBike}
         bikeProfile={activeBike}
+        fuelLogs={activeFuelLogs}
+        serviceLogs={activeServiceLogs}
+        fuelStats={fuelStats}
+        serviceStats={serviceStats}
         onExportData={() => exportBackupData({ bikes, activeBikeId, fuelLogs, serviceLogs, settings: { lang, theme } })}
         onImportData={(jsonStr) => {
           const result = mergeImportBackupData(jsonStr, { bikes, activeBikeId, fuelLogs, serviceLogs });
@@ -778,6 +845,10 @@ export default function App() {
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
         user={user}
+        settings={settings}
+        onUpdateSettings={handleUpdateSettings}
+        hasJobHolderAccess={hasJobHolderAccess}
+        remoteFeatures={remoteFeatures}
         bikes={bikes}
         activeBikeId={activeBikeId}
         onLogout={handleLogout}
