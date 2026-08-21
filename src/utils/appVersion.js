@@ -1,7 +1,7 @@
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 
-export const BASE_APP_VERSION = '1.6.2';
+export const BASE_APP_VERSION = '1.6.3';
 
 /**
  * Dynamically gets the actual installed APK version from Android OS,

@@ -48,20 +48,27 @@ export default function AnalyticsTab({
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  const handleExportPDF = () => {
-    exportRiderComprehensiveStatementPDF({
-      user,
-      bike: activeBike,
-      fuelLogs,
-      serviceLogs,
-      fuelStats,
-      serviceStats,
-      conveyanceStats,
-      settings,
-      dateFrom,
-      dateTo,
-      lang
-    });
+  const handleExportPDF = async () => {
+    setExportingType('pdf');
+    try {
+      await exportRiderComprehensiveStatementPDF({
+        user,
+        bike: activeBike,
+        fuelLogs,
+        serviceLogs,
+        fuelStats,
+        serviceStats,
+        conveyanceStats,
+        settings,
+        dateFrom,
+        dateTo,
+        lang
+      });
+    } catch (err) {
+      console.error('PDF export error:', err);
+    } finally {
+      setExportingType(null);
+    }
   };
 
   const handleExportExcel = async () => {
@@ -457,6 +464,7 @@ export default function AnalyticsTab({
             <button
               type="button"
               className="btn"
+              disabled={exportingType === 'pdf'}
               onClick={handleExportPDF}
               style={{
                 background: 'linear-gradient(135deg, #0284c7, #0369a1)',
@@ -471,13 +479,14 @@ export default function AnalyticsTab({
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '6px',
-                cursor: 'pointer',
+                cursor: exportingType === 'pdf' ? 'not-allowed' : 'pointer',
+                opacity: exportingType === 'pdf' ? 0.7 : 1,
                 boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)',
                 transition: 'all 0.2s ease'
               }}
             >
-              <FileText size={20} />
-              <span>{t.pdfStatement}</span>
+              <FileText size={20} className={exportingType === 'pdf' ? 'animate-spin' : ''} />
+              <span>{exportingType === 'pdf' ? (isBn ? 'PDF তৈরি হচ্ছে...' : 'Generating PDF...') : t.pdfStatement}</span>
             </button>
 
             {/* Button 2: Excel (.xls) */}

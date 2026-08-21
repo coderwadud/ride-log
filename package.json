@@ -1,7 +1,7 @@
 {
   "name": "fuel-log",
   "private": true,
-  "version": "1.6.2",
+  "version": "1.6.3",
   "type": "module",
   "scripts": {
     "dev": "vite --host --port 3000",
@@ -23,6 +23,8 @@
     "@vercel/analytics": "^2.0.1",
     "chart.js": "^4.5.1",
     "firebase": "^11.10.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.31.0",
     "pdfjs-dist": "^6.2.108",

@@ -443,8 +443,8 @@ export default function BikeModal({
             <button
               type="button"
               className="btn"
-              onClick={() => {
-                exportRiderComprehensiveStatementPDF({
+              onClick={async () => {
+                await exportRiderComprehensiveStatementPDF({
                   user,
                   bike: bikeProfile,
                   fuelLogs,

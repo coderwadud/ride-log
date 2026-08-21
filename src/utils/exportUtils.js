@@ -1,6 +1,8 @@
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 /**
  * Universal Statement & Report Exporter for RideLog BD (Web, Android & iOS)
@@ -17,32 +19,60 @@ import { Share } from '@capacitor/share';
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function deliverExportFile(filename, content, mimeType) {
+  const isPdf = mimeType === 'application/pdf';
+
   if (Capacitor.isNativePlatform()) {
     try {
       const path = `exports/${filename}`;
-      await Filesystem.writeFile({
-        path,
-        data: content,
-        directory: Directory.Cache,
-        encoding: Encoding.UTF8,
-        recursive: true
-      });
+      // For PDF binary data in base64 format, write directly without UTF8 encoding
+      if (isPdf && typeof content === 'string') {
+        await Filesystem.writeFile({
+          path,
+          data: content,
+          directory: Directory.Cache,
+          recursive: true
+        });
+      } else {
+        await Filesystem.writeFile({
+          path,
+          data: content,
+          directory: Directory.Cache,
+          encoding: Encoding.UTF8,
+          recursive: true
+        });
+      }
+
       const uriResult = await Filesystem.getUri({ directory: Directory.Cache, path });
       await Share.share({
         title: filename,
         text: `RideLog BD - ${filename}`,
         url: uriResult.uri,
-        dialogTitle: `Export ${filename}`
+        dialogTitle: `Open ${filename}`
       });
-      return { success: true };
+      return { success: true, uri: uriResult.uri };
     } catch (e) {
       console.warn('Native mobile export share fallback:', e);
     }
   }
 
-  // Web Browser Fallback
+  // Web Browser / Mobile Browser Fallback
   try {
-    const blob = new Blob([content], { type: mimeType });
+    let blob;
+    if (content instanceof Blob) {
+      blob = content;
+    } else if (isPdf && typeof content === 'string') {
+      // Decode Base64 string into Uint8Array for valid PDF blob
+      const byteCharacters = atob(content);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      blob = new Blob([byteArray], { type: 'application/pdf' });
+    } else {
+      blob = new Blob([content], { type: mimeType });
+    }
+
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -50,10 +80,10 @@ async function deliverExportFile(filename, content, mimeType) {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    return { success: true };
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    return { success: true, url };
   } catch (err) {
-    console.error('Web file download error:', err);
+    console.error('File download error:', err);
     return { success: false, error: err.message };
   }
 }
@@ -96,10 +126,10 @@ function buildConveyanceMonthlyRows(fuelLogs, serviceLogs, monthlyAllowance) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  1. PDF STATEMENT
+//  1. OFFICIAL BRANDED PDF STATEMENT GENERATOR
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function exportRiderComprehensiveStatementPDF({
+export async function exportRiderComprehensiveStatementPDF({
   user,
   bike,
   fuelLogs = [],
@@ -117,12 +147,12 @@ export function exportRiderComprehensiveStatementPDF({
   const filteredService = applyDateFilter(serviceLogs, dateFrom, dateTo);
 
   const statementNo   = `RLBD-STM-${(user?.uid || 'USER').slice(0, 8).toUpperCase()}-${Date.now().toString().slice(-4)}`;
-  const statementDate = new Date().toLocaleDateString(isBn ? 'bn-BD' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const statementDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   const activeBike    = bike || { name: 'Motorcycle', regNumber: 'N/A', currentOdometer: 0 };
 
   const periodLabel = (dateFrom || dateTo)
-    ? `${dateFrom || '∞'} → ${dateTo || '∞'}`
-    : (isBn ? 'সমস্ত সময়কাল' : 'All Time');
+    ? `${dateFrom || 'Start'} to ${dateTo || 'Present'}`
+    : 'All Time Records';
 
   const sortedFuel    = [...filteredFuel].sort((a, b) => new Date(b.date) - new Date(a.date));
   const sortedService = [...filteredService].sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -131,35 +161,7 @@ export function exportRiderComprehensiveStatementPDF({
   const totalServiceSpent = filteredService.reduce((s, sv) => s + (Number(sv.partsCost) || 0) + (Number(sv.serviceCost) || 0), 0);
   const grandTotal        = totalFuelSpent + totalServiceSpent;
 
-  const fuelRowsHtml = sortedFuel.length === 0
-    ? `<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:12px;">${isBn ? 'কোন ফুয়েল লগ নেই' : 'No fuel refill records logged.'}</td></tr>`
-    : sortedFuel.map(f => `
-      <tr>
-        <td style="font-weight:600;">${f.date || 'N/A'}</td>
-        <td style="font-weight:700;color:#0f172a;">${f.liters} L</td>
-        <td>৳${f.pricePerLiter || '-'}/L</td>
-        <td style="font-weight:700;color:#059669;">৳${Number(f.totalAmount || (f.liters * f.pricePerLiter) || 0).toLocaleString()}</td>
-        <td>${f.odometer ? f.odometer + ' km' : '-'}</td>
-        <td>${f.stationName || f.notes || '-'}</td>
-        <td style="font-weight:700;color:#0284c7;">${f.calculatedMileage ? f.calculatedMileage + ' km/L' : (f.fullTank ? 'Full Tank' : '-')}</td>
-      </tr>
-    `).join('');
-
-  const serviceRowsHtml = sortedService.length === 0
-    ? `<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:12px;">${isBn ? 'কোন সার্ভিস লগ নেই' : 'No maintenance records logged.'}</td></tr>`
-    : sortedService.map(s => `
-      <tr>
-        <td style="font-weight:600;">${s.date || 'N/A'}</td>
-        <td style="font-weight:700;color:#0f172a;">${s.serviceTypes?.join(', ') || s.notes || 'Routine Servicing'}</td>
-        <td>${s.garageName || 'Service Center'}</td>
-        <td>${s.odometer ? s.odometer + ' km' : '-'}</td>
-        <td>৳${(Number(s.partsCost) || 0).toLocaleString()}</td>
-        <td>৳${(Number(s.serviceCost) || 0).toLocaleString()}</td>
-        <td style="font-weight:700;color:#d97706;">৳${((Number(s.partsCost) || 0) + (Number(s.serviceCost) || 0)).toLocaleString()}</td>
-      </tr>
-    `).join('');
-
-  // ── Conveyance Section (only if job holder mode is active) ──
+  // Conveyance calculations
   const monthlyAllowance = settings?.monthlyConveyance || conveyanceStats?.allowance || 0;
   const showConveyance   = settings?.jobHolderMode && monthlyAllowance > 0;
   const conveyanceRows   = showConveyance ? buildConveyanceMonthlyRows(filteredFuel, filteredService, monthlyAllowance) : [];
@@ -167,229 +169,294 @@ export function exportRiderComprehensiveStatementPDF({
   const yearlyExpense    = conveyanceRows.reduce((s, r) => s + r.totalExpense, 0);
   const yearlySavings    = yearlyAllowance - yearlyExpense;
 
-  const conveyanceTableHtml = showConveyance ? `
-    <div class="section-title" style="border-left-color:#38bdf8;">
-      <span>💼 ${isBn ? 'কর্পোরেট কনভেয়েন্স সারসংক্ষেপ (মাসিক ভাতা: ৳' + monthlyAllowance.toLocaleString() + ')' : 'Corporate Conveyance Summary (Monthly Allowance: ৳' + monthlyAllowance.toLocaleString() + ')'}</span>
-      <span style="font-size:10px;font-weight:normal;color:${yearlySavings >= 0 ? '#059669' : '#dc2626'};">
-        ${isBn ? (yearlySavings >= 0 ? 'মোট সাশ্রয়' : 'মোট ঘাটতি') : (yearlySavings >= 0 ? 'Net Savings' : 'Net Deficit')}: ৳${Math.abs(yearlySavings).toLocaleString()}
-      </span>
-    </div>
-    <table>
-      <thead>
-        <tr>
-          <th>${isBn ? 'মাস' : 'Month'}</th>
-          <th>${isBn ? 'ফুয়েল খরচ' : 'Fuel Cost'}</th>
-          <th>${isBn ? 'সার্ভিস খরচ' : 'Service Cost'}</th>
-          <th>${isBn ? 'মোট খরচ' : 'Total Expense'}</th>
-          <th>${isBn ? 'কনভেয়েন্স ভাতা' : 'Allowance'}</th>
-          <th>${isBn ? 'সাশ্রয় / ঘাটতি' : 'Savings / Deficit'}</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${conveyanceRows.length === 0
-          ? `<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:10px;">${isBn ? 'কোন ডেটা নেই' : 'No data for selected period.'}</td></tr>`
-          : conveyanceRows.map(r => `
-          <tr>
-            <td style="font-weight:700;">${r.month}</td>
-            <td style="color:#059669;">৳${r.fuelCost.toLocaleString()}</td>
-            <td style="color:#d97706;">৳${r.serviceCost.toLocaleString()}</td>
-            <td style="font-weight:700;">৳${r.totalExpense.toLocaleString()}</td>
-            <td style="color:#0284c7;font-weight:700;">৳${r.allowance.toLocaleString()}</td>
-            <td style="font-weight:800;color:${r.savings >= 0 ? '#059669' : '#dc2626'};">
-              ${r.savings >= 0 ? '+' : ''}৳${r.savings.toLocaleString()}
-            </td>
-          </tr>
-        `).join('')}
-        <tr style="background:#f0fdf4;font-weight:800;border-top:2px solid #e2e8f0;">
-          <td><strong>${isBn ? 'মোট' : 'TOTAL'}</strong></td>
-          <td>৳${conveyanceRows.reduce((s,r)=>s+r.fuelCost,0).toLocaleString()}</td>
-          <td>৳${conveyanceRows.reduce((s,r)=>s+r.serviceCost,0).toLocaleString()}</td>
-          <td style="color:#0f172a;font-weight:900;">৳${yearlyExpense.toLocaleString()}</td>
-          <td style="color:#0284c7;font-weight:900;">৳${yearlyAllowance.toLocaleString()}</td>
-          <td style="font-weight:900;color:${yearlySavings >= 0 ? '#059669' : '#dc2626'};">
-            ${yearlySavings >= 0 ? '+' : ''}৳${yearlySavings.toLocaleString()}
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  ` : '';
+  // Create A4 PDF in portrait mode
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+    compress: true
+  });
 
-  const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8" />
-      <title>Vehicle Statement - ${user?.displayName || 'Rider'} (${statementNo})</title>
-      <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-        @page { size: A4; margin: 12mm 14mm; }
-        * { box-sizing: border-box; }
-        body { font-family: 'Inter', -apple-system, sans-serif; color: #0f172a; background: #ffffff; margin: 0; padding: 0; font-size: 11px; line-height: 1.5; }
-        .statement-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #0284c7; padding-bottom: 14px; margin-bottom: 18px; }
-        .brand-logo { display: flex; align-items: center; gap: 10px; }
-        .logo-badge { width: 38px; height: 38px; background: linear-gradient(135deg, #0284c7, #0369a1); border-radius: 10px; color: white; font-size: 20px; font-weight: 900; display: flex; align-items: center; justify-content: center; }
-        .brand-name { font-size: 20px; font-weight: 900; color: #0f172a; margin: 0; letter-spacing: -0.5px; }
-        .brand-sub { font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-        .statement-meta { text-align: right; }
-        .meta-title { font-size: 16px; font-weight: 900; color: #0284c7; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 4px 0; }
-        .meta-row { font-size: 11px; color: #475569; }
-        .meta-bold { font-weight: 700; color: #0f172a; font-family: monospace; }
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
-        .card-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; }
-        .card-title { font-size: 10px; font-weight: 800; color: #0284c7; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 4px; }
-        .info-row { display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 11px; }
-        .info-label { color: #64748b; font-weight: 500; }
-        .info-val { font-weight: 700; color: #0f172a; }
-        .financial-summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
-        .kpi-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 8px 10px; text-align: center; }
-        .kpi-box.cyan { background: #ecfeff; border-color: #a5f3fc; }
-        .kpi-box.amber { background: #fffbeb; border-color: #fde68a; }
-        .kpi-box.purple { background: #faf5ff; border-color: #e9d5ff; }
-        .kpi-box.blue { background: #eff6ff; border-color: #bfdbfe; }
-        .kpi-label { font-size: 9px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
-        .kpi-value { font-size: 14px; font-weight: 900; color: #0f172a; }
-        .section-title { font-size: 12px; font-weight: 900; color: #0f172a; margin: 18px 0 8px 0; display: flex; align-items: center; justify-content: space-between; border-left: 3px solid #0284c7; padding-left: 8px; }
-        table { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 14px; }
-        th { background: #0f172a; color: #ffffff; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; padding: 7px 9px; text-align: left; font-size: 9px; border: 1px solid #1e293b; }
-        td { padding: 6px 9px; border: 1px solid #e2e8f0; color: #334155; }
-        tr:nth-child(even) { background: #f8fafc; }
-        .statement-footer { margin-top: 24px; padding-top: 12px; border-top: 2px solid #e2e8f0; display: flex; justify-content: space-between; align-items: flex-end; }
-        .audit-text { font-size: 9px; color: #64748b; max-width: 65%; }
-        @media print {
-          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .no-print { display: none !important; }
-        }
-      </style>
-    </head>
-    <body>
-      <!-- Top Action Bar (hidden in print) -->
-      <div class="no-print" style="background:#0f172a;color:#fff;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-radius:8px;">
-        <span style="font-weight:700;">📄 RideLog BD Official Vehicle Statement</span>
-        <button onclick="window.print()" style="background:#0284c7;color:#fff;border:none;padding:6px 14px;border-radius:6px;font-weight:700;cursor:pointer;font-size:12px;">
-          🖨️ Print / Save as PDF
-        </button>
-      </div>
+  const pageWidth = 210;
+  const margin = 14;
+  const contentWidth = pageWidth - margin * 2; // 182mm
 
-      <!-- Statement Header -->
-      <div class="statement-header">
-        <div class="brand-logo">
-          <div class="logo-badge">🏍️</div>
-          <div>
-            <div class="brand-name">RideLog BD</div>
-            <div class="brand-sub">Comprehensive Vehicle Expense &amp; Service Statement</div>
-          </div>
-        </div>
-        <div class="statement-meta">
-          <div class="meta-title">Vehicle Statement</div>
-          <div class="meta-row">Statement No: <span class="meta-bold">${statementNo}</span></div>
-          <div class="meta-row">Issue Date: <span class="meta-bold">${statementDate}</span></div>
-          <div class="meta-row">Period: <span class="meta-bold">${periodLabel}</span></div>
-        </div>
-      </div>
+  // ── HEADER BRANDING ──
+  // Top Blue accent line
+  doc.setFillColor(2, 132, 199);
+  doc.rect(margin, 10, contentWidth, 2, 'F');
 
-      <!-- Profile & Vehicle Details -->
-      <div class="grid-2">
-        <div class="card-box">
-          <div class="card-title">Rider Account Details</div>
-          <div class="info-row"><span class="info-label">Rider Name:</span><span class="info-val">${user?.displayName || 'App User'}</span></div>
-          <div class="info-row"><span class="info-label">Email:</span><span class="info-val">${user?.email || 'N/A'}</span></div>
-          <div class="info-row"><span class="info-label">Account ID:</span><span class="info-val" style="font-family:monospace;">${(user?.uid || 'N/A').slice(0, 12)}...</span></div>
-        </div>
-        <div class="card-box">
-          <div class="card-title">Vehicle Profile</div>
-          <div class="info-row"><span class="info-label">Bike Model:</span><span class="info-val">${activeBike.name || 'Motorcycle'}</span></div>
-          <div class="info-row"><span class="info-label">Registration No:</span><span class="info-val">${activeBike.regNumber || 'Not Registered'}</span></div>
-          <div class="info-row"><span class="info-label">Current Odometer:</span><span class="info-val">${(activeBike.currentOdometer || 0).toLocaleString()} km</span></div>
-        </div>
-      </div>
+  // Brand Badge
+  doc.setFillColor(15, 23, 42);
+  doc.roundedRect(margin, 15, 10, 10, 2, 2, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('RL', margin + 2.5, 21.5);
 
-      <!-- Financial & Mileage Summary KPIs -->
-      <div class="financial-summary-grid">
-        <div class="kpi-box">
-          <div class="kpi-label">Total Fuel Cost</div>
-          <div class="kpi-value" style="color:#059669;">৳${totalFuelSpent.toLocaleString()}</div>
-        </div>
-        <div class="kpi-box amber">
-          <div class="kpi-label">Total Service Cost</div>
-          <div class="kpi-value" style="color:#d97706;">৳${totalServiceSpent.toLocaleString()}</div>
-        </div>
-        <div class="kpi-box purple">
-          <div class="kpi-label">Grand Total Spend</div>
-          <div class="kpi-value" style="color:#7c3aed;">৳${grandTotal.toLocaleString()}</div>
-        </div>
-        ${showConveyance ? `
-        <div class="kpi-box blue">
-          <div class="kpi-label">Net Conveyance ${yearlySavings >= 0 ? 'Savings' : 'Deficit'}</div>
-          <div class="kpi-value" style="color:${yearlySavings >= 0 ? '#059669' : '#dc2626'};">${yearlySavings >= 0 ? '+' : ''}৳${Math.abs(yearlySavings).toLocaleString()}</div>
-        </div>
-        ` : `
-        <div class="kpi-box cyan">
-          <div class="kpi-label">Average Mileage</div>
-          <div class="kpi-value" style="color:#0284c7;">${fuelStats.avgMileage ? fuelStats.avgMileage + ' km/L' : 'N/A'}</div>
-        </div>
-        `}
-      </div>
+  // Brand Name & Subtitle
+  doc.setTextColor(15, 23, 42);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15);
+  doc.text('RideLog BD', margin + 13, 20);
 
-      <!-- Corporate Conveyance Section -->
-      ${conveyanceTableHtml}
+  doc.setTextColor(100, 116, 139);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.text('Official Vehicle Telemetry & Expense Statement', margin + 13, 24);
 
-      <!-- Fuel Refills Table -->
-      <div class="section-title">
-        <span>Fuel Refill Logs (${sortedFuel.length} Records)</span>
-        <span style="font-size:10px;font-weight:normal;color:#64748b;">Total: ${filteredFuel.reduce((s,f)=>s+(Number(f.liters)||0),0).toFixed(1)} L</span>
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Date</th><th>Quantity</th><th>Rate</th><th>Total Cost</th><th>Odometer</th><th>Station / Notes</th><th>Mileage</th>
-          </tr>
-        </thead>
-        <tbody>${fuelRowsHtml}</tbody>
-      </table>
+  // Statement Meta Box (Right aligned)
+  const metaRight = pageWidth - margin;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(2, 132, 199);
+  doc.text('VEHICLE STATEMENT', metaRight, 18, { align: 'right' });
 
-      <!-- Service & Maintenance Table -->
-      <div class="section-title">
-        <span>Service &amp; Maintenance History (${sortedService.length} Records)</span>
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Date</th><th>Service Details</th><th>Garage / Center</th><th>Odometer</th><th>Parts Cost</th><th>Labor Cost</th><th>Total Spent</th>
-          </tr>
-        </thead>
-        <tbody>${serviceRowsHtml}</tbody>
-      </table>
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text(`Statement No: ${statementNo}`, metaRight, 22, { align: 'right' });
+  doc.text(`Issue Date: ${statementDate}  |  Period: ${periodLabel}`, metaRight, 25.5, { align: 'right' });
 
-      <!-- Statement Footer -->
-      <div class="statement-footer">
-        <div class="audit-text">
-          <strong>Official Vehicle Audit Report</strong><br />
-          Generated dynamically by RideLog BD System. All logged odometer readings, expenses, and service histories are self-maintained by the vehicle owner.
-        </div>
-        <div style="text-align:right;">
-          <div style="font-size:11px;font-weight:800;color:#0284c7;">RideLog BD Verified</div>
-          <div style="font-size:9px;color:#94a3b8;">ridelog-bd.web.app</div>
-        </div>
-      </div>
+  // Divider line below header
+  doc.setDrawColor(226, 232, 240);
+  doc.setLineWidth(0.4);
+  doc.line(margin, 28, metaRight, 28);
 
-      <script>
-        window.onload = function() {
-          if (!/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-            setTimeout(function() { window.print(); }, 400);
-          }
-        };
-      </script>
-    </body>
-    </html>
-  `;
+  // ── 2-COLUMN PROFILE CARDS ──
+  const cardWidth = (contentWidth - 6) / 2;
+  const cardTop = 31;
+  const cardHeight = 22;
 
-  const printWindow = window.open('', '_blank');
-  if (printWindow) {
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-  } else {
-    deliverExportFile(`RideLog_${(activeBike.name || 'Bike').replace(/\s+/g, '_')}_Statement.html`, htmlContent, 'text/html');
+  // Card 1: Rider Details
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(margin, cardTop, cardWidth, cardHeight, 2, 2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(2, 132, 199);
+  doc.text('RIDER ACCOUNT DETAILS', margin + 4, cardTop + 5);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`Name: ${user?.displayName || 'App User'}`, margin + 4, cardTop + 10);
+  doc.setTextColor(71, 85, 105);
+  doc.setFontSize(7.5);
+  doc.text(`Email: ${user?.email || 'N/A'}`, margin + 4, cardTop + 14.5);
+  doc.text(`Account ID: ${(user?.uid || 'N/A').slice(0, 16)}...`, margin + 4, cardTop + 18.5);
+
+  // Card 2: Vehicle Details
+  const card2Left = margin + cardWidth + 6;
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(card2Left, cardTop, cardWidth, cardHeight, 2, 2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(2, 132, 199);
+  doc.text('VEHICLE PROFILE', card2Left + 4, cardTop + 5);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`Model: ${activeBike.name || 'Motorcycle'}`, card2Left + 4, cardTop + 10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(71, 85, 105);
+  doc.setFontSize(7.5);
+  doc.text(`Reg No: ${activeBike.regNumber || 'Not Registered'}`, card2Left + 4, cardTop + 14.5);
+  doc.text(`Current Odometer: ${(activeBike.currentOdometer || 0).toLocaleString()} km`, card2Left + 4, cardTop + 18.5);
+
+  // ── FINANCIAL SUMMARY KPI BOXES ──
+  const kpiTop = 56;
+  const kpiHeight = 15;
+  const kpiWidth = (contentWidth - 9) / 4;
+
+  const kpis = [
+    { label: 'TOTAL FUEL SPEND', val: `Tk ${totalFuelSpent.toLocaleString()}`, color: [5, 150, 105], bg: [240, 253, 244], border: [187, 247, 208] },
+    { label: 'TOTAL SERVICE SPEND', val: `Tk ${totalServiceSpent.toLocaleString()}`, color: [217, 119, 6], bg: [255, 251, 235], border: [254, 230, 138] },
+    { label: 'GRAND TOTAL EXPENSE', val: `Tk ${grandTotal.toLocaleString()}`, color: [124, 58, 237], bg: [250, 245, 255], border: [233, 213, 255] },
+    showConveyance
+      ? { label: `NET CONVEYANCE ${yearlySavings >= 0 ? 'SAVINGS' : 'DEFICIT'}`, val: `${yearlySavings >= 0 ? '+' : ''}Tk ${Math.abs(yearlySavings).toLocaleString()}`, color: yearlySavings >= 0 ? [5, 150, 105] : [220, 38, 38], bg: [240, 249, 255], border: [186, 230, 253] }
+      : { label: 'AVERAGE MILEAGE', val: fuelStats.avgMileage ? `${fuelStats.avgMileage} km/L` : 'N/A', color: [2, 132, 199], bg: [236, 254, 255], border: [165, 243, 252] }
+  ];
+
+  kpis.forEach((kpi, idx) => {
+    const kpiLeft = margin + idx * (kpiWidth + 3);
+    doc.setFillColor(kpi.bg[0], kpi.bg[1], kpi.bg[2]);
+    doc.setDrawColor(kpi.border[0], kpi.border[1], kpi.border[2]);
+    doc.roundedRect(kpiLeft, kpiTop, kpiWidth, kpiHeight, 1.5, 1.5, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6);
+    doc.setTextColor(71, 85, 105);
+    doc.text(kpi.label, kpiLeft + kpiWidth / 2, kpiTop + 4.5, { align: 'center' });
+
+    doc.setFontSize(9);
+    doc.setTextColor(kpi.color[0], kpi.color[1], kpi.color[2]);
+    doc.text(kpi.val, kpiLeft + kpiWidth / 2, kpiTop + 10.5, { align: 'center' });
+  });
+
+  let currentY = kpiTop + kpiHeight + 6;
+
+  // ── OPTIONAL CONVEYANCE TABLE ──
+  if (showConveyance && conveyanceRows.length > 0) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`Corporate Conveyance Summary (Monthly Allowance: Tk ${monthlyAllowance.toLocaleString()})`, margin, currentY);
+
+    const convHeaders = [['Month', 'Fuel Cost (Tk)', 'Service Cost (Tk)', 'Total Expense (Tk)', 'Allowance (Tk)', 'Savings / Deficit (Tk)']];
+    const convBody = conveyanceRows.map(r => [
+      r.month,
+      r.fuelCost.toLocaleString(),
+      r.serviceCost.toLocaleString(),
+      r.totalExpense.toLocaleString(),
+      r.allowance.toLocaleString(),
+      `${r.savings >= 0 ? '+' : ''}${r.savings.toLocaleString()}`
+    ]);
+
+    convBody.push([
+      'TOTAL',
+      conveyanceRows.reduce((s, r) => s + r.fuelCost, 0).toLocaleString(),
+      conveyanceRows.reduce((s, r) => s + r.serviceCost, 0).toLocaleString(),
+      yearlyExpense.toLocaleString(),
+      yearlyAllowance.toLocaleString(),
+      `${yearlySavings >= 0 ? '+' : ''}${yearlySavings.toLocaleString()}`
+    ]);
+
+    autoTable(doc, {
+      startY: currentY + 2,
+      head: convHeaders,
+      body: convBody,
+      theme: 'grid',
+      headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5, halign: 'center' },
+      bodyStyles: { fontSize: 7, textColor: [30, 41, 59], cellPadding: 1.8, halign: 'center' },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      columnStyles: {
+        0: { fontStyle: 'bold', halign: 'left' },
+        3: { fontStyle: 'bold' },
+        5: { fontStyle: 'bold' }
+      },
+      margin: { left: margin, right: margin }
+    });
+
+    currentY = doc.lastAutoTable.finalY + 6;
   }
+
+  // ── SECTION 1: FUEL REFILL LOGS TABLE ──
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`Section 1: Detailed Fuel Refill Log Statement (${sortedFuel.length} Records)`, margin, currentY);
+
+  const fuelHeaders = [['Date', 'Quantity', 'Rate', 'Total Cost', 'Odometer', 'Station / Notes', 'Mileage']];
+  const fuelBody = sortedFuel.length === 0
+    ? [['No fuel refill records found for the selected period.', '', '', '', '', '', '']]
+    : sortedFuel.map(f => [
+        f.date || 'N/A',
+        `${f.liters || 0} L`,
+        f.pricePerLiter ? `Tk ${f.pricePerLiter}` : '-',
+        `Tk ${Number(f.totalAmount || (f.liters * f.pricePerLiter) || 0).toLocaleString()}`,
+        f.odometer ? `${f.odometer} km` : '-',
+        (f.stationName || f.notes || '-').slice(0, 30),
+        f.calculatedMileage ? `${f.calculatedMileage} km/L` : (f.fullTank ? 'Full Tank' : '-')
+      ]);
+
+  autoTable(doc, {
+    startY: currentY + 2,
+    head: fuelHeaders,
+    body: fuelBody,
+    theme: 'grid',
+    headStyles: { fillColor: [2, 132, 199], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5 },
+    bodyStyles: { fontSize: 7, textColor: [30, 41, 59], cellPadding: 1.8 },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles: {
+      0: { fontStyle: 'bold' },
+      1: { halign: 'right' },
+      2: { halign: 'right' },
+      3: { fontStyle: 'bold', textColor: [5, 150, 105], halign: 'right' },
+      4: { halign: 'right' },
+      6: { fontStyle: 'bold', textColor: [2, 132, 199], halign: 'right' }
+    },
+    margin: { left: margin, right: margin }
+  });
+
+  currentY = doc.lastAutoTable.finalY + 6;
+
+  // ── SECTION 2: SERVICE & MAINTENANCE TABLE ──
+  // Check if we need to add a page or start table
+  if (currentY > 240) {
+    doc.addPage();
+    currentY = 18;
+  }
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`Section 2: Maintenance & Workshop Records Statement (${sortedService.length} Records)`, margin, currentY);
+
+  const serviceHeaders = [['Date', 'Service Items', 'Garage / Center', 'Odometer', 'Parts (Tk)', 'Labor (Tk)', 'Total (Tk)']];
+  const serviceBody = sortedService.length === 0
+    ? [['No service or maintenance records found for the selected period.', '', '', '', '', '', '']]
+    : sortedService.map(s => [
+        s.date || 'N/A',
+        (s.serviceTypes?.join(', ') || s.notes || 'Routine Servicing').slice(0, 32),
+        (s.garageName || 'Service Center').slice(0, 24),
+        s.odometer ? `${s.odometer} km` : '-',
+        (Number(s.partsCost) || 0).toLocaleString(),
+        (Number(s.serviceCost) || 0).toLocaleString(),
+        `Tk ${((Number(s.partsCost) || 0) + (Number(s.serviceCost) || 0)).toLocaleString()}`
+      ]);
+
+  autoTable(doc, {
+    startY: currentY + 2,
+    head: serviceHeaders,
+    body: serviceBody,
+    theme: 'grid',
+    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5 },
+    bodyStyles: { fontSize: 7, textColor: [30, 41, 59], cellPadding: 1.8 },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles: {
+      0: { fontStyle: 'bold' },
+      4: { halign: 'right' },
+      5: { halign: 'right' },
+      6: { fontStyle: 'bold', textColor: [217, 119, 6], halign: 'right' }
+    },
+    margin: { left: margin, right: margin }
+  });
+
+  // ── FOOTER ON EVERY PAGE ──
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.3);
+    doc.line(margin, 287, pageWidth - margin, 287);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(148, 163, 184);
+    doc.text(
+      'Official Statement generated dynamically by RideLog BD Telemetry Engine. Authenticated with verified user records.',
+      margin,
+      291
+    );
+    doc.text(
+      `Page ${i} of ${totalPages}`,
+      pageWidth - margin,
+      291,
+      { align: 'right' }
+    );
+  }
+
+  // ── DELIVER AS REAL PDF FILE ──
+  const cleanBikeName = (activeBike.name || 'Bike').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const fileName = `RideLog_${cleanBikeName}_Statement_${Date.now().toString().slice(-6)}.pdf`;
+  const base64Data = doc.output('datauristring').split(',')[1];
+
+  return await deliverExportFile(fileName, base64Data, 'application/pdf');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
