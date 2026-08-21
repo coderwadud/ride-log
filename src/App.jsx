@@ -2,13 +2,14 @@ import { trackUserIpAndActivity } from './utils/ipTracker';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import LoginScreen from './components/LoginScreen';
 import { onAuthChange, signOutUser } from './utils/firebase';
-import { loadUserData, saveUserData, resetUserDataInFirestore } from './utils/firestoreDB';
+import { loadUserData, saveUserData, resetUserDataInFirestore, upsertUserIndex } from './utils/firestoreDB';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import FuelLogsTab from './components/FuelLogsTab';
 import ServiceLogsTab from './components/ServiceLogsTab';
 import AnalyticsTab from './components/AnalyticsTab';
 import GpsTrackerTab from './components/GpsTrackerTab';
+import TourTab from './components/TourTab';
 import FuelModal from './components/FuelModal';
 import ServiceModal from './components/ServiceModal';
 import BikeModal from './components/BikeModal';
@@ -28,7 +29,7 @@ import {
 } from './utils/storage';
 import { calculateFuelLogStats, calculateServiceStats, calculateConveyanceStats } from './utils/calculations';
 import { translations } from './utils/translations';
-import { LayoutDashboard, Fuel, Wrench, BarChart3, Navigation } from 'lucide-react';
+import { LayoutDashboard, Fuel, Wrench, BarChart3, Navigation, MapPin } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import {
   updateLastActiveAt,
@@ -290,6 +291,13 @@ export default function App() {
       if (firebaseUser) {
         isLoadedRef.current = false;
         const isNative = Capacitor.isNativePlatform();
+
+        // Update searchable user index for Tour member lookups
+        upsertUserIndex(firebaseUser.uid, {
+          displayName: firebaseUser.displayName || '',
+          email: firebaseUser.email || '',
+          photoURL: firebaseUser.photoURL || ''
+        }).catch(() => {});
 
         try {
           // Fetch user data from Firestore server
@@ -648,6 +656,10 @@ export default function App() {
           <Navigation size={18} />
           <span>{t.gpsTrack || 'GPS ট্র্যাক'}</span>
         </button>
+        <button className={`nav-tab-btn ${!isFeedbackPageOpen && activeTab === 'tour' ? 'active' : ''}`} onClick={() => { setIsFeedbackPageOpen(false); setActiveTab('tour'); }}>
+          <MapPin size={18} />
+          <span>{t.tourTab || 'ট্যুর'}</span>
+        </button>
         <button className={`nav-tab-btn ${!isFeedbackPageOpen && activeTab === 'service' ? 'active' : ''}`} onClick={() => { setIsFeedbackPageOpen(false); setActiveTab('service'); }}>
           <Wrench size={18} />
           <span>{t.serviceLogs}</span>
@@ -702,6 +714,13 @@ export default function App() {
                 theme={theme}
                 user={user}
                 activeBike={activeBike}
+              />
+            )}
+            {activeTab === 'tour' && (
+              <TourTab
+                lang={lang}
+                theme={theme}
+                user={user}
               />
             )}
             {activeTab === 'service' && (

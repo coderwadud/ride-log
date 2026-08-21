@@ -1,8 +1,9 @@
 import { db } from './firebase';
 import {
   doc, getDoc, setDoc, deleteDoc, onSnapshot, collection, query, where,
-  getDocs, writeBatch, deleteField
+  getDocs, writeBatch, deleteField, updateDoc
 } from 'firebase/firestore';
+export { upsertUserIndex } from './tourStorage';
 
 const DEFAULT_BIKE = {
   id: 'bike_1',

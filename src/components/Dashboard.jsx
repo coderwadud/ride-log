@@ -1,5 +1,5 @@
 import React from 'react';
-import { Gauge, Fuel, Wrench, Coins, Droplets, ChevronRight, Briefcase, TrendingUp, TrendingDown } from 'lucide-react';
+import { Gauge, Fuel, Wrench, Coins, Droplets, ChevronRight, Briefcase, TrendingUp, TrendingDown, MapPin } from 'lucide-react';
 import { translations } from '../utils/translations';
 import { formatCurrency, formatNum } from '../utils/calculations';
 
@@ -192,6 +192,83 @@ export default function Dashboard({
           <Wrench size={16} />
           <span>{t.addService}</span>
         </button>
+      </div>
+
+      {/* Group Tour & Ride Planner Banner Card */}
+      <div
+        className="card tour-dashboard-card"
+        onClick={() => onNavigateTab?.('tour')}
+        style={{
+          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.16), rgba(79, 70, 229, 0.28))',
+          border: '1px solid rgba(99, 102, 241, 0.38)',
+          borderRadius: '16px',
+          padding: '14px 16px',
+          marginBottom: '16px',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px',
+          transition: 'all 0.25s ease',
+          boxShadow: '0 4px 20px rgba(99, 102, 241, 0.12)'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+          <div style={{
+            width: 44,
+            height: 44,
+            borderRadius: '12px',
+            background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+            color: '#ffffff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            boxShadow: '0 4px 12px rgba(99, 102, 241, 0.35)'
+          }}>
+            <MapPin size={22} />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <h4 style={{ fontSize: '0.98rem', fontWeight: 700, margin: 0, color: 'var(--text-main)' }}>
+                {lang === 'bn' ? 'গ্রুপ ট্যুর ও রাইড প্ল্যানার' : 'Group Tour & Ride Planner'}
+              </h4>
+              <span style={{
+                fontSize: '0.68rem',
+                fontWeight: 700,
+                padding: '2px 6px',
+                borderRadius: '20px',
+                background: 'rgba(99, 102, 241, 0.25)',
+                color: '#818cf8',
+                border: '1px solid rgba(99, 102, 241, 0.4)'
+              }}>
+                {lang === 'bn' ? 'নতুন ফিচার' : 'NEW'}
+              </span>
+            </div>
+            <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)', margin: '3px 0 0', lineHeight: 1.3 }}>
+              {lang === 'bn'
+                ? 'বন্ধুদের সাথে ট্যুর তৈরি, লাইভ ম্যাপ, খরচ ও চাঁদার হিসাব'
+                : 'Group rides, route planner, live map & expense split'}
+            </p>
+          </div>
+        </div>
+
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          padding: '8px 12px',
+          borderRadius: '10px',
+          background: 'rgba(99, 102, 241, 0.22)',
+          color: '#818cf8',
+          fontSize: '0.78rem',
+          fontWeight: 700,
+          flexShrink: 0,
+          border: '1px solid rgba(99, 102, 241, 0.35)'
+        }}>
+          <span>{lang === 'bn' ? 'ট্যুর দেখুন' : 'Explore'}</span>
+          <ChevronRight size={15} />
+        </div>
       </div>
 
       {/* Primary KPI Stats Grid */}
@@ -387,24 +464,24 @@ export default function Dashboard({
                 onClick={() => onNavigateTab?.('fuel')}
                 style={{
                   flex: 1,
-                  minWidth: '130px',
-                  padding: '9px 12px',
+                  minWidth: '100px',
+                  padding: '9px 10px',
                   borderRadius: '10px',
                   background: 'rgba(16, 185, 129, 0.1)',
                   color: 'var(--accent-fuel)',
                   border: '1px solid rgba(16, 185, 129, 0.25)',
-                  fontSize: '0.8rem',
+                  fontSize: '0.78rem',
                   fontWeight: 700,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '6px',
+                  gap: '4px',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease'
                 }}
               >
                 <Fuel size={14} />
-                <span>{lang === 'bn' ? 'সব ফুয়েল লগ' : 'All Fuel Logs'}</span>
+                <span>{lang === 'bn' ? 'ফুয়েল লগ' : 'Fuel Logs'}</span>
                 <ChevronRight size={14} />
               </button>
 
@@ -414,24 +491,51 @@ export default function Dashboard({
                 onClick={() => onNavigateTab?.('service')}
                 style={{
                   flex: 1,
-                  minWidth: '130px',
-                  padding: '9px 12px',
+                  minWidth: '100px',
+                  padding: '9px 10px',
                   borderRadius: '10px',
                   background: 'rgba(139, 92, 246, 0.1)',
                   color: 'var(--accent-service)',
                   border: '1px solid rgba(139, 92, 246, 0.25)',
-                  fontSize: '0.8rem',
+                  fontSize: '0.78rem',
                   fontWeight: 700,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '6px',
+                  gap: '4px',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease'
                 }}
               >
                 <Wrench size={14} />
-                <span>{lang === 'bn' ? 'সব সার্ভিস লগ' : 'All Service Logs'}</span>
+                <span>{lang === 'bn' ? 'সার্ভিস লগ' : 'Service Logs'}</span>
+                <ChevronRight size={14} />
+              </button>
+
+              <button
+                type="button"
+                className="btn"
+                onClick={() => onNavigateTab?.('tour')}
+                style={{
+                  flex: 1,
+                  minWidth: '100px',
+                  padding: '9px 10px',
+                  borderRadius: '10px',
+                  background: 'rgba(99, 102, 241, 0.12)',
+                  color: '#818cf8',
+                  border: '1px solid rgba(99, 102, 241, 0.28)',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <MapPin size={14} />
+                <span>{lang === 'bn' ? 'গ্রুপ ট্যুর' : 'Group Tours'}</span>
                 <ChevronRight size={14} />
               </button>
             </div>
