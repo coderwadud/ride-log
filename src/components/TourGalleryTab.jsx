@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Camera, Image as ImageIcon, Plus, Trash2, X, Download,
-  Share2, HardDrive, Sparkles, User, Check, AlertCircle, Loader,
-  Film, FileText, ExternalLink, Play, Cloud, CloudCheck, UploadCloud
+  HardDrive, Sparkles, User, Check, AlertCircle, Loader,
+  Film, FileText, ExternalLink, Play, CloudCheck
 } from 'lucide-react';
 import { translations } from '../utils/translations';
 import { listenToTourGallery, addTourPhoto, deleteTourPhoto } from '../utils/tourStorage';
@@ -11,7 +11,6 @@ import {
   getTourDriveFolder,
   uploadMediaToGoogleDrive
 } from '../utils/googleDriveStorage';
-import { uploadDocumentToCloudinary } from '../utils/cloudinary';
 
 export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrganizer }) {
   const t = translations[lang] || translations['bn'];
@@ -91,7 +90,7 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
     e.target.value = '';
   };
 
-  // 1. Upload to Google Drive (Zero Firebase storage)
+  // Strictly Upload to User's Google Drive (RideLog BD/Tours/<Tour Name>)
   const handleSaveToDrive = async () => {
     if (!selectedFile) return;
     setUploading(true);
@@ -100,16 +99,20 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
     setUploadProgress(lang === 'bn' ? 'গুগল ড্রাইভ অথেনটিকেশন যাচাই হচ্ছে...' : 'Authenticating Google Drive...');
 
     try {
+      // 1. Get Drive Token (request if not active)
       const token = await getDriveAccessToken();
       if (!token) throw new Error('Google Drive authentication failed');
       setHasDriveToken(true);
 
-      setUploadProgress(lang === 'bn' ? 'ড্রাইভে ট্যুর ফোল্ডার প্রস্তুত হচ্ছে...' : 'Setting up Tour folder in Drive...');
+      // 2. Get/Create Tour Folder in user's Google Drive
+      setUploadProgress(lang === 'bn' ? 'আপনার ড্রাইভে ট্যুর ফোল্ডার প্রস্তুত হচ্ছে...' : 'Setting up Tour folder in your Google Drive...');
       const folderId = await getTourDriveFolder(token, tour?.title || 'RideLog Tour');
 
+      // 3. Upload File into the Tour Folder on Google Drive
       setUploadProgress(lang === 'bn' ? 'ফাইল আপনার গুগল ড্রাইভে আপলোড হচ্ছে...' : 'Uploading file to your Google Drive...');
       const driveMedia = await uploadMediaToGoogleDrive(token, selectedFile, folderId, caption);
 
+      // 4. Save file metadata (Drive ID & Web View Link) to Tour Gallery in Firestore
       setUploadProgress(lang === 'bn' ? 'ট্যুর মেম্বারদের জন্য তথ্য সংরক্ষণ হচ্ছে...' : 'Saving to Tour Gallery...');
       await addTourPhoto(tourId, {
         ...driveMedia,
@@ -120,6 +123,7 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
         source: 'google_drive'
       });
 
+      // Cleanup
       if (filePreview?.url) URL.revokeObjectURL(filePreview.url);
       setSelectedFile(null);
       setFilePreview(null);
@@ -134,50 +138,6 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
       } else {
         setUploadError(errMsg || 'Upload failed');
       }
-    } finally {
-      setUploading(false);
-      setUploadProgress('');
-    }
-  };
-
-  // 2. Upload to Cloudinary CDN (Zero Firebase storage)
-  const handleCloudinaryUpload = async () => {
-    if (!selectedFile) return;
-    setUploading(true);
-    setUploadError('');
-    setUploadProgress(lang === 'bn' ? 'ক্লাউড সিডিএন-এ ফাইল আপলোড হচ্ছে...' : 'Uploading to Cloud CDN...');
-
-    try {
-      const res = await uploadDocumentToCloudinary(selectedFile);
-      if (!res.success || !res.url) {
-        throw new Error(res.error || 'Cloud upload failed');
-      }
-
-      setUploadProgress(lang === 'bn' ? 'ট্যুর মেম্বারদের জন্য তথ্য সংরক্ষণ হচ্ছে...' : 'Saving to Tour Gallery...');
-      await addTourPhoto(tourId, {
-        photoUrl: res.url,
-        previewUrl: res.url,
-        thumbnailUrl: res.url,
-        downloadUrl: res.url,
-        fileName: selectedFile.name,
-        fileType: filePreview?.type || 'image',
-        mimeType: selectedFile.type || 'image/jpeg',
-        fileSizeBytes: selectedFile.size || res.bytes || 0,
-        caption: caption.trim(),
-        uploadedBy: user?.uid || 'anonymous',
-        uploaderName: user?.displayName || user?.email?.split('@')[0] || 'Rider',
-        uploaderPhoto: user?.photoURL || '',
-        source: 'cloudinary'
-      });
-
-      if (filePreview?.url) URL.revokeObjectURL(filePreview.url);
-      setSelectedFile(null);
-      setFilePreview(null);
-      setCaption('');
-      setShowUploadModal(false);
-    } catch (err) {
-      console.error('Cloud upload error:', err);
-      setUploadError(err.message || 'Upload failed');
     } finally {
       setUploading(false);
       setUploadProgress('');
@@ -219,7 +179,7 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
       <div className="tour-gallery-header">
         <div className="tour-gallery-count">
           <HardDrive size={16} className="text-indigo-400" />
-          <span>{photos.length} {lang === 'bn' ? 'টি ফাইল (ছবি, ভিডিও ও PDF)' : 'Files (Photos, Videos & Docs)'}</span>
+          <span>{photos.length} {lang === 'bn' ? 'টি ফাইল (Google Drive)' : 'Files (Google Drive)'}</span>
         </div>
 
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -252,7 +212,7 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
           <button
             className="tour-btn-primary small"
             onClick={() => fileInputRef.current?.click()}
-            title="Upload File"
+            title="Upload File to Google Drive"
           >
             <Plus size={14} />
             <span>{lang === 'bn' ? 'ফাইল আপলোড' : 'Upload'}</span>
@@ -260,21 +220,21 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
         </div>
       </div>
 
-      {/* Zero Firebase Storage Notice */}
+      {/* Pure Google Drive Notice */}
       <div className="tour-gallery-drive-note">
-        ☁️ {lang === 'bn'
-          ? 'আপনার ছবি, ভিডিও ও PDF ফাইলসমূহ সরাসরি আপনার Google Drive বা ক্লাউড সিডিএন-এ সংরক্ষিত হয় (ফায়ারবেসে কোনো ফাইল রাখা হয় না)।'
-          : 'Media files are stored on Google Drive or Cloud CDN (0 binary files on Firebase).'}
+        📁 {lang === 'bn'
+          ? 'আপনার আপলোড করা ছবি, ভিডিও ও PDF ফাইলসমূহ এক্সক্লুসিভলি আপনার Google Drive-এর "RideLog BD/Tours" ফোল্ডারে জমা হয় এবং ট্যুর মেম্বাররা সরাসরি দেখতে পাবেন।'
+          : 'Media files are exclusively stored in your personal Google Drive under "RideLog BD/Tours" and viewable by tour members.'}
       </div>
 
       {/* Gallery Grid (Images, Videos, PDFs) */}
       {photos.length === 0 ? (
         <div className="tour-empty-state">
           <HardDrive size={40} className="text-gray-400" />
-          <p>{lang === 'bn' ? 'এখনো কোনো ছবি, ভিডিও বা ডকুমেন্ট যোগ করা হয়নি। ট্যুরের সুন্দর মুহূর্তগুলো যোগ করুন!' : 'No media added yet. Upload photos, videos, and PDFs for your tour!'}</p>
+          <p>{lang === 'bn' ? 'এখনো কোনো ছবি, ভিডিও বা ডকুমেন্ট যোগ করা হয়নি। সরাসরি আপনার গুগল ড্রাইভে আপলোড করুন!' : 'No media added yet. Upload photos, videos, and PDFs directly to your Google Drive!'}</p>
           <button className="tour-btn-primary small" onClick={() => fileInputRef.current?.click()}>
             <Plus size={14} />
-            <span>{lang === 'bn' ? 'প্রথম ফাইল আপলোড করুন' : 'Upload First File'}</span>
+            <span>{lang === 'bn' ? 'প্রথম ফাইল আপলোড করুন' : 'Upload to Google Drive'}</span>
           </button>
         </div>
       ) : (
@@ -327,8 +287,8 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
           <div className="tour-create-modal" style={{ maxWidth: '480px' }}>
             <div className="tour-create-header">
               <div className="tour-create-title-row">
-                <Cloud size={16} className="text-indigo-400" />
-                <span>{lang === 'bn' ? 'ফাইল আপলোড করুন' : 'Upload File'}</span>
+                <HardDrive size={16} className="text-indigo-400" />
+                <span>{lang === 'bn' ? 'Google Drive-এ আপলোড করুন' : 'Upload to Google Drive'}</span>
               </div>
               <button className="tour-close-btn" onClick={() => setShowUploadModal(false)}><X size={16} /></button>
             </div>
@@ -375,43 +335,30 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
                     ⚠️ {uploadError}
                   </div>
                   {driveApiNotEnabled && (
-                    <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ marginTop: '8px' }}>
                       <a
                         href="https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=757251174457"
                         target="_blank"
                         rel="noreferrer"
                         className="tour-btn-primary small"
-                        style={{ background: '#4f46e5', textAlign: 'center', textDecoration: 'none', justifyContent: 'center' }}
+                        style={{ background: '#4f46e5', textAlign: 'center', textDecoration: 'none', justifyContent: 'center', display: 'flex', width: '100%' }}
                       >
                         <ExternalLink size={13} />
-                        <span>Google Console-এ Drive API চালু করুন</span>
+                        <span>Google Console-এ Drive API চালু করুন (Enable Drive API)</span>
                       </a>
-                      <button
-                        className="tour-btn-ghost small"
-                        onClick={handleCloudinaryUpload}
-                        disabled={uploading}
-                        style={{ color: '#10b981', borderColor: 'rgba(16,185,129,0.4)', justifyContent: 'center' }}
-                      >
-                        <UploadCloud size={13} />
-                        <span>⚡ ক্লাউড সিডিএন-এ আপলোড করুন (Cloud CDN Upload)</span>
-                      </button>
                     </div>
                   )}
                 </div>
               )}
             </div>
 
-            <div className="tour-create-footer" style={{ gap: '8px', flexWrap: 'wrap' }}>
+            <div className="tour-create-footer">
               <button className="tour-btn-ghost" onClick={() => setShowUploadModal(false)} disabled={uploading}>
                 {lang === 'bn' ? 'বাতিল' : 'Cancel'}
               </button>
-              <button className="tour-btn-ghost" onClick={handleCloudinaryUpload} disabled={uploading} title="Cloud Upload" style={{ color: '#10b981', borderColor: 'rgba(16,185,129,0.3)' }}>
-                <UploadCloud size={14} />
-                <span>{lang === 'bn' ? 'ক্লাউড সিডিএন আপলোড' : 'Cloud CDN'}</span>
-              </button>
               <button className="tour-btn-primary" onClick={handleSaveToDrive} disabled={uploading}>
                 <HardDrive size={14} />
-                <span>{uploading ? (lang === 'bn' ? 'আপলোড হচ্ছে...' : 'Uploading...') : (lang === 'bn' ? 'Google Drive-এ আপলোড' : 'Google Drive')}</span>
+                <span>{uploading ? (lang === 'bn' ? 'আপলোড হচ্ছে...' : 'Uploading...') : (lang === 'bn' ? 'Google Drive-এ আপলোড করুন' : 'Upload to Google Drive')}</span>
               </button>
             </div>
           </div>
@@ -429,46 +376,29 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
             {/* Media Content Display */}
             {selectedItem.fileType === 'video' || selectedItem.mimeType?.startsWith('video/') ? (
               <div style={{ width: '100%', maxWidth: '85vw', maxHeight: '70vh', display: 'flex', justifyContent: 'center' }}>
-                {selectedItem.driveFileId ? (
-                  <iframe
-                    src={`https://drive.google.com/file/d/${selectedItem.driveFileId}/preview`}
-                    style={{ width: '100%', minHeight: '360px', border: 'none', borderRadius: '12px' }}
-                    allow="autoplay"
-                    title="Tour Video"
-                  />
-                ) : (
-                  <video src={selectedItem.photoUrl || selectedItem.previewUrl} controls style={{ width: '100%', maxHeight: '65vh', borderRadius: '12px' }} />
-                )}
+                <iframe
+                  src={`https://drive.google.com/file/d/${selectedItem.driveFileId}/preview`}
+                  style={{ width: '100%', minHeight: '360px', border: 'none', borderRadius: '12px' }}
+                  allow="autoplay"
+                  title="Tour Video"
+                />
               </div>
             ) : selectedItem.fileType === 'pdf' || selectedItem.mimeType === 'application/pdf' ? (
               <div style={{ width: '100%', maxWidth: '85vw', minHeight: '360px', background: 'var(--bg-card)', borderRadius: '14px', padding: '24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
                 <FileText size={56} className="text-red-400" />
                 <h3 style={{ margin: 0, color: 'var(--text-main)' }}>{selectedItem.fileName || 'PDF Document'}</h3>
-                <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-dim)' }}>Uploaded by {selectedItem.uploaderName}</p>
+                <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-dim)' }}>Uploaded to Google Drive by {selectedItem.uploaderName}</p>
                 <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                  {selectedItem.driveFileId ? (
-                    <a
-                      href={selectedItem.webViewLink || `https://drive.google.com/file/d/${selectedItem.driveFileId}/view`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="tour-btn-primary small"
-                      style={{ gap: '6px' }}
-                    >
-                      <ExternalLink size={14} />
-                      <span>{lang === 'bn' ? 'Google Drive-এ PDF দেখুন' : 'Open in Google Drive'}</span>
-                    </a>
-                  ) : (
-                    <a
-                      href={selectedItem.photoUrl || selectedItem.downloadUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="tour-btn-primary small"
-                      style={{ gap: '6px' }}
-                    >
-                      <Download size={14} />
-                      <span>{lang === 'bn' ? 'PDF ডাউনলোড / ওপেন' : 'Open PDF'}</span>
-                    </a>
-                  )}
+                  <a
+                    href={selectedItem.webViewLink || `https://drive.google.com/file/d/${selectedItem.driveFileId}/view`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="tour-btn-primary small"
+                    style={{ gap: '6px' }}
+                  >
+                    <ExternalLink size={14} />
+                    <span>{lang === 'bn' ? 'Google Drive-এ PDF দেখুন' : 'Open in Google Drive'}</span>
+                  </a>
                 </div>
               </div>
             ) : (
@@ -483,7 +413,7 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
             <div className="tour-lightbox-info">
               <div className="tour-lightbox-meta">
                 <strong>{selectedItem.caption || selectedItem.fileName || 'Tour Memory'}</strong>
-                <span>Uploaded by {selectedItem.uploaderName} • {new Date(selectedItem.createdAt).toLocaleDateString()} {selectedItem.fileSizeBytes > 0 ? `(${formatFileSize(selectedItem.fileSizeBytes)})` : ''}</span>
+                <span>Uploaded to Google Drive by {selectedItem.uploaderName} • {new Date(selectedItem.createdAt).toLocaleDateString()} {selectedItem.fileSizeBytes > 0 ? `(${formatFileSize(selectedItem.fileSizeBytes)})` : ''}</span>
               </div>
 
               <div className="tour-lightbox-actions">
@@ -501,9 +431,9 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
                   </a>
                 )}
 
-                {(selectedItem.downloadUrl || selectedItem.photoUrl) && (
+                {selectedItem.downloadUrl && (
                   <a
-                    href={selectedItem.downloadUrl || selectedItem.photoUrl}
+                    href={selectedItem.downloadUrl}
                     download={selectedItem.fileName || 'tour_file'}
                     target="_blank"
                     rel="noreferrer"
