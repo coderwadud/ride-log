@@ -1932,6 +1932,17 @@ h5 {
 }
 .tour-sos-header-btn:hover { background: #ef4444; color: #fff; }
 
+.tour-invitation-accept-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin: 10px 14px; padding: 12px 14px;
+  background: rgba(245, 158, 11, 0.1); border: 1.5px solid rgba(245, 158, 11, 0.35);
+  border-radius: 14px;
+}
+.tour-invitation-text { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.tour-invitation-text strong { display: block; font-size: 13px; color: #f59e0b; }
+.tour-invitation-text p { margin: 2px 0 0; font-size: 11px; color: var(--text-muted); }
+.tour-invitation-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
 /* ── Standalone Estimator Modal ── */
 .tour-estimator-modal {
   background: var(--bg-card); border: 1px solid var(--border-color);

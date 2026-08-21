@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft, Users, Map, Receipt, PiggyBank, Scale, FileText,
   Play, CheckCircle, Trash2, MoreVertical, Plus, Clock, Image as ImageIcon,
-  TrendingUp, ShieldAlert, Download
+  TrendingUp, ShieldAlert, Download, Mail, Check, X
 } from 'lucide-react';
 import { translations } from '../utils/translations';
-import { listenToTour, updateTour, cancelTour, deleteTour } from '../utils/tourStorage';
+import {
+  listenToTour, updateTour, cancelTour, deleteTour,
+  listenToTourMembers, respondToTourInvitation
+} from '../utils/tourStorage';
 import { getTourStatus } from '../utils/tourCalculations';
 import TourMembersTab from './TourMembersTab';
 import TourMapTab from './TourMapTab';
@@ -32,6 +35,7 @@ const SUB_TABS = [
 export default function TourDetailPage({ tourId, lang = 'bn', theme, user, onBack, onOpenCreate }) {
   const t = translations[lang] || translations['bn'];
   const [tour, setTour] = useState(null);
+  const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeSubTab, setActiveSubTab] = useState('members');
   const [showMenu, setShowMenu] = useState(false);
@@ -40,15 +44,17 @@ export default function TourDetailPage({ tourId, lang = 'bn', theme, user, onBac
 
   useEffect(() => {
     if (!tourId) return;
-    const unsub = listenToTour(tourId, (data) => {
+    const unsub1 = listenToTour(tourId, (data) => {
       setTour(data);
       setLoading(false);
     });
-    return unsub;
+    const unsub2 = listenToTourMembers(tourId, setMembers);
+    return () => { unsub1(); unsub2(); };
   }, [tourId]);
 
   const isOrganizer = tour?.createdBy === user?.uid;
   const status = tour ? getTourStatus(tour.status) : null;
+  const myMember = members.find(m => m.uid === user?.uid);
 
   const handleStatusChange = async (newStatus) => {
     setShowMenu(false);
@@ -61,6 +67,18 @@ export default function TourDetailPage({ tourId, lang = 'bn', theme, user, onBac
     // Optimistic local update for instant UI response
     setTour(prev => prev ? { ...prev, status: newStatus } : prev);
     await updateTour(tourId, { status: newStatus });
+  };
+
+  const handleAcceptInvite = async () => {
+    if (!user?.uid) return;
+    await respondToTourInvitation(tourId, user.uid, true);
+  };
+
+  const handleDeclineInvite = async () => {
+    if (!user?.uid) return;
+    if (!window.confirm(lang === 'bn' ? 'আমন্ত্রণটি প্রত্যাখ্যান করবেন?' : 'Decline this tour invitation?')) return;
+    await respondToTourInvitation(tourId, user.uid, false);
+    onBack();
   };
 
   const formatDate = (iso) => {
@@ -188,6 +206,29 @@ export default function TourDetailPage({ tourId, lang = 'bn', theme, user, onBac
           </div>
         </div>
       </div>
+
+      {/* Pending Invitation Alert Banner */}
+      {myMember?.status === 'invited' && (
+        <div className="tour-invitation-accept-banner">
+          <div className="tour-invitation-text">
+            <Mail size={16} className="text-amber-400" />
+            <div>
+              <strong>{lang === 'bn' ? 'ট্যুর আমন্ত্রণ!' : 'Tour Invitation!'}</strong>
+              <p>{tour.organizerName || 'অর্গানাইজার'} {lang === 'bn' ? 'আপনাকে এই ট্যুরে যোগ দিতে আমন্ত্রণ জানিয়েছেন।' : 'invited you to join this tour.'}</p>
+            </div>
+          </div>
+          <div className="tour-invitation-actions">
+            <button className="tour-btn-primary small" onClick={handleAcceptInvite} style={{ background: '#10b981', gap: '4px' }}>
+              <Check size={13} />
+              <span>{t.acceptInvite || 'গ্রহণ করুন'}</span>
+            </button>
+            <button className="tour-btn-ghost small" onClick={handleDeclineInvite} style={{ color: '#ef4444', gap: '4px' }}>
+              <X size={13} />
+              <span>{t.rejectInvite || 'বাতিল'}</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Route summary strip */}
       {tour.destinations?.length > 0 && (
