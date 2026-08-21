@@ -104,9 +104,9 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
       if (!token) throw new Error('Google Drive authentication failed');
       setHasDriveToken(true);
 
-      // 2. Get/Create Tour Folder in user's Google Drive
+      // 2. Get/Create Tour Folder in user's Google Drive: ridelogbd-app-image -> <Tour Title> (<Date>)
       setUploadProgress(lang === 'bn' ? 'আপনার ড্রাইভে ট্যুর ফোল্ডার প্রস্তুত হচ্ছে...' : 'Setting up Tour folder in your Google Drive...');
-      const folderId = await getTourDriveFolder(token, tour?.title || 'RideLog Tour');
+      const folderId = await getTourDriveFolder(token, tour?.title || 'RideLog Tour', tour?.startDate || tour?.createdAt);
 
       // 3. Upload File into the Tour Folder on Google Drive
       setUploadProgress(lang === 'bn' ? 'ফাইল আপনার গুগল ড্রাইভে আপলোড হচ্ছে...' : 'Uploading file to your Google Drive...');

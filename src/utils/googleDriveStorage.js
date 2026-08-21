@@ -81,13 +81,29 @@ async function findOrCreateFolder(accessToken, folderName, parentId = null) {
 }
 
 /**
- * Get or create the hierarchical folder: RideLog BD -> Tours -> <Tour Title>
+ * Get or create the hierarchical folder: ridelogbd-app-image -> <Tour Title> (<Date>)
  */
-export async function getTourDriveFolder(accessToken, tourTitle = 'Tour') {
-  const rootFolderId = await findOrCreateFolder(accessToken, 'RideLog BD');
-  const toursFolderId = await findOrCreateFolder(accessToken, 'Tours', rootFolderId);
+export async function getTourDriveFolder(accessToken, tourTitle = 'Tour', tourDate = '') {
+  // 1. Root Folder: ridelogbd-app-image
+  const rootFolderId = await findOrCreateFolder(accessToken, 'ridelogbd-app-image');
+
+  // 2. Format subfolder name with Tour Title and Date
   const safeTitle = tourTitle.replace(/[/\\?%*:|"<>]/g, '-').trim() || 'Tour';
-  const tourFolderId = await findOrCreateFolder(accessToken, safeTitle, toursFolderId);
+  let dateFormatted = '';
+  if (tourDate) {
+    try {
+      const d = new Date(tourDate);
+      if (!isNaN(d.getTime())) {
+        dateFormatted = d.toISOString().split('T')[0];
+      }
+    } catch {
+      dateFormatted = '';
+    }
+  }
+  const folderName = dateFormatted ? `${safeTitle} (${dateFormatted})` : safeTitle;
+
+  // 3. Subfolder inside ridelogbd-app-image
+  const tourFolderId = await findOrCreateFolder(accessToken, folderName, rootFolderId);
   return tourFolderId;
 }
 
