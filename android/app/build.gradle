@@ -41,8 +41,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_21
-        targetCompatibility JavaVersion.VERSION_21
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 }
 
@@ -62,6 +62,9 @@ dependencies {
     // Firebase Analytics Native SDK — tracks App version, Device model, DAU/MAU in Firebase dashboard
     implementation platform('com.google.firebase:firebase-bom:33.15.0')
     implementation 'com.google.firebase:firebase-analytics'
+
+    // Google Play Services Location for Background FusedLocationProviderClient
+    implementation 'com.google.android.gms:play-services-location:21.3.0'
 
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"

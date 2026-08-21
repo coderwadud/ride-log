@@ -8,10 +8,11 @@ import {
   Trash2, Calendar, Compass, History, Layers, Check,
   Map, Globe, Bike, Mountain, Moon, Activity, Film,
   Gauge, Clock, Flag, MapPin, Zap, X, Sparkles, CheckCircle2, Save,
-  Fuel, Wrench, ExternalLink
+  Fuel, Wrench, ExternalLink, ShieldCheck, Cpu
 } from 'lucide-react';
 import { saveTrip, getTripsLast3Days, deleteTrip, calculateDistanceKm } from '../utils/tripStorage';
 import { filterGpsJitter, snapToRoadsOSRM, calculateBearing, smoothPathMovingAverage, fetchNearbyPumpsAndGarages } from '../utils/geoUtils';
+import { startBackgroundGps, stopBackgroundGps, getNativeRecordedPoints, requestBatteryOptimizationExemption } from '../utils/backgroundGps';
 
 // 5 100% Free Map Modes / Layers with Lucide SVG Icons
 const MAP_LAYERS = {
@@ -672,12 +673,45 @@ export default function GpsTrackerTab({
   // Listen to App background/foreground transitions and Screen Wake/Visibility changes to auto-resync
   useEffect(() => {
     let sub = null;
+
+    const syncNativeRecordedPoints = async () => {
+      try {
+        const nativePts = await getNativeRecordedPoints();
+        if (nativePts && nativePts.length > 0) {
+          setRecordedPoints((prev) => {
+            if (nativePts.length >= prev.length) {
+              if (mapInstanceRef.current && nativePts.length > 1) {
+                const latLngs = nativePts.map((p) => [p.lat, p.lng]);
+                if (!livePolylineRef.current) {
+                  livePolylineRef.current = L.polyline(latLngs, {
+                    color: '#0284c7',
+                    weight: 6,
+                    opacity: 0.9,
+                    smoothFactor: 2.0,
+                    lineCap: 'round',
+                    lineJoin: 'round'
+                  }).addTo(mapInstanceRef.current);
+                } else {
+                  livePolylineRef.current.setLatLngs(latLngs);
+                }
+              }
+              return nativePts;
+            }
+            return prev;
+          });
+        }
+      } catch (e) {
+        console.debug('Background points sync notice:', e);
+      }
+    };
+
     if (Capacitor.isNativePlatform()) {
       sub = App.addListener('appStateChange', (state) => {
         if (state.isActive) {
           if (isRecording && !isPaused && startTimeEpochRef.current) {
             const diffSec = Math.floor((Date.now() - startTimeEpochRef.current) / 1000);
             setElapsedSeconds(Math.max(0, diffSec));
+            syncNativeRecordedPoints();
           }
           // Immediate GPS fix on resume
           Geolocation.getCurrentPosition({ enableHighAccuracy: true })
@@ -700,24 +734,13 @@ export default function GpsTrackerTab({
           if (startTimeEpochRef.current) {
             const diffSec = Math.floor((Date.now() - startTimeEpochRef.current) / 1000);
             setElapsedSeconds(Math.max(0, diffSec));
+            syncNativeRecordedPoints();
           }
           if ('wakeLock' in navigator && !wakeLockRef.current) {
             navigator.wakeLock.request('screen').then((lock) => {
               wakeLockRef.current = lock;
             }).catch(() => {});
           }
-        }
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              const { latitude, longitude, accuracy, heading } = pos.coords;
-              setCurrentPosition([latitude, longitude]);
-              setGpsAccuracy(Math.round(accuracy || 0));
-              if (heading && !isNaN(heading)) currentHeadingRef.current = heading;
-            },
-            () => {},
-            { enableHighAccuracy: true, timeout: 4000 }
-          );
         }
       }
     };
@@ -730,119 +753,107 @@ export default function GpsTrackerTab({
     };
   }, [isRecording, isPaused]);
 
-  // ── LIVE TRACKING GPS WATCHER ──
+  // ── LIVE TRACKING GPS PROCESSOR ──
+  const handleLocationUpdate = (ptData) => {
+    if (!ptData || typeof ptData.lat !== 'number' || typeof ptData.lng !== 'number') return;
+    const { lat, lng, speed, accuracy, altitude, bearing, timestamp, distanceKm: nativeDist } = ptData;
+    const newCoord = [lat, lng];
+    const speedKmH = speed || 0;
+
+    setCurrentPosition(newCoord);
+    setCurrentSpeed(speedKmH);
+    setGpsAccuracy(Math.round(accuracy || 0));
+    setMaxSpeed((prev) => Math.max(prev, speedKmH));
+
+    if (bearing && !isNaN(bearing)) {
+      currentHeadingRef.current = bearing;
+    }
+
+    const pointObj = {
+      lat,
+      lng,
+      speed: speedKmH,
+      accuracy: Math.round(accuracy || 0),
+      altitude: altitude || 0,
+      bearing: bearing || 0,
+      timestamp: timestamp || Date.now()
+    };
+
+    setRecordedPoints((prev) => {
+      // 🛡️ JITTER & STATIONARY FILTER
+      const filterRes = filterGpsJitter(prev, pointObj);
+      let updated = prev;
+
+      if (filterRes.accept) {
+        let newDist = tripDistanceKm;
+        if (nativeDist && nativeDist > 0) {
+          newDist = nativeDist;
+          setTripDistanceKm(newDist);
+        } else if (prev.length > 0) {
+          const last = prev[prev.length - 1];
+          const distInc = calculateDistanceKm(last.lat, last.lng, lat, lng);
+          if (distInc > 0.003) {
+            newDist = +(tripDistanceKm + distInc).toFixed(2);
+            setTripDistanceKm(newDist);
+          }
+          if (!bearing) {
+            const calcBear = calculateBearing(last.lat, last.lng, lat, lng);
+            if (calcBear) currentHeadingRef.current = calcBear;
+          }
+        }
+        updated = [...prev, pointObj];
+
+        // 💾 CONTINUOUSLY PERSIST TO STORAGE ON VALID MOVEMENT
+        try {
+          localStorage.setItem('ridelog_active_session_persistent_v1', JSON.stringify({
+            isRecording: true,
+            isPaused: false,
+            startTimeEpoch: startTimeEpochRef.current || Date.now(),
+            tripStartTime: tripStartTime || new Date().toISOString(),
+            tripDistanceKm: newDist,
+            maxSpeed: Math.max(maxSpeed, speedKmH),
+            recordedPoints: updated
+          }));
+        } catch (e) {}
+      }
+
+      // Update Map Marker & Polyline
+      if (mapInstanceRef.current) {
+        const map = mapInstanceRef.current;
+        if (!liveMarkerRef.current) {
+          liveMarkerRef.current = L.marker(newCoord, { icon: createBikeUserIcon(currentHeadingRef.current) }).addTo(map);
+        } else {
+          liveMarkerRef.current.setLatLng(newCoord);
+          liveMarkerRef.current.setIcon(createBikeUserIcon(currentHeadingRef.current));
+        }
+
+        if (filterRes.accept && updated.length > 1) {
+          const latLngs = updated.map((p) => [p.lat, p.lng]);
+          if (!livePolylineRef.current) {
+            livePolylineRef.current = L.polyline(latLngs, {
+              color: '#0284c7',
+              weight: 6,
+              opacity: 0.9,
+              smoothFactor: 2.0,
+              lineCap: 'round',
+              lineJoin: 'round'
+            }).addTo(map);
+          } else {
+            livePolylineRef.current.setLatLngs(latLngs);
+          }
+        }
+
+        map.panTo(newCoord, { animate: true, duration: 0.5 });
+      }
+
+      return updated;
+    });
+  };
+
   // Dedicated GPS Watcher Re-Attacher for Auto-Recovery
   const startGpsWatcherOnly = async () => {
     try {
-      const handleLocationUpdate = (latitude, longitude, speed, accuracy, altitude, heading) => {
-        const newCoord = [latitude, longitude];
-        const speedKmH = speed ? Math.max(0, Math.round(speed * 3.6)) : 0;
-
-        setCurrentPosition(newCoord);
-        setCurrentSpeed(speedKmH);
-        setGpsAccuracy(Math.round(accuracy || 0));
-        setMaxSpeed((prev) => Math.max(prev, speedKmH));
-
-        if (heading && !isNaN(heading)) {
-          currentHeadingRef.current = heading;
-        }
-
-        const pointObj = {
-          lat: latitude,
-          lng: longitude,
-          speed: speedKmH,
-          accuracy: Math.round(accuracy || 0),
-          altitude: altitude || 0,
-          timestamp: Date.now()
-        };
-
-        setRecordedPoints((prev) => {
-          // 🛡️ JITTER & STATIONARY FILTER
-          const filterRes = filterGpsJitter(prev, pointObj);
-          let updated = prev;
-
-          if (filterRes.accept) {
-            let newDist = tripDistanceKm;
-            if (prev.length > 0) {
-              const last = prev[prev.length - 1];
-              const distInc = calculateDistanceKm(last.lat, last.lng, latitude, longitude);
-              if (distInc > 0.003) {
-                newDist = +(tripDistanceKm + distInc).toFixed(2);
-                setTripDistanceKm(newDist);
-              }
-              if (!heading) {
-                const bearing = calculateBearing(last.lat, last.lng, latitude, longitude);
-                if (bearing) currentHeadingRef.current = bearing;
-              }
-            }
-            updated = [...prev, pointObj];
-
-            // 💾 CONTINUOUSLY PERSIST TO STORAGE ON VALID MOVEMENT
-            try {
-              localStorage.setItem('ridelog_active_session_persistent_v1', JSON.stringify({
-                isRecording: true,
-                isPaused: false,
-                startTimeEpoch: startTimeEpochRef.current || Date.now(),
-                tripStartTime: tripStartTime || new Date().toISOString(),
-                tripDistanceKm: newDist,
-                maxSpeed: Math.max(maxSpeed, speedKmH),
-                recordedPoints: updated
-              }));
-            } catch (e) {}
-          }
-
-          // Update Map Marker & Polyline
-          if (mapInstanceRef.current) {
-            const map = mapInstanceRef.current;
-            if (!liveMarkerRef.current) {
-              liveMarkerRef.current = L.marker(newCoord, { icon: createBikeUserIcon(currentHeadingRef.current) }).addTo(map);
-            } else {
-              liveMarkerRef.current.setLatLng(newCoord);
-              liveMarkerRef.current.setIcon(createBikeUserIcon(currentHeadingRef.current));
-            }
-
-            if (filterRes.accept && updated.length > 1) {
-              const latLngs = updated.map((p) => [p.lat, p.lng]);
-              if (!livePolylineRef.current) {
-                livePolylineRef.current = L.polyline(latLngs, {
-                  color: '#0284c7',
-                  weight: 6,
-                  opacity: 0.9,
-                  smoothFactor: 2.0,
-                  lineCap: 'round',
-                  lineJoin: 'round'
-                }).addTo(map);
-              } else {
-                livePolylineRef.current.setLatLngs(latLngs);
-              }
-            }
-
-            map.panTo(newCoord, { animate: true, duration: 0.5 });
-          }
-
-          return updated;
-        });
-      };
-
-      if (Capacitor.isNativePlatform()) {
-        watchIdRef.current = await Geolocation.watchPosition(
-          { enableHighAccuracy: true, timeout: 4000, maximumAge: 0 },
-          (position, err) => {
-            if (err || !position) return;
-            const { latitude, longitude, speed, accuracy, altitude } = position.coords;
-            handleLocationUpdate(latitude, longitude, speed, accuracy, altitude);
-          }
-        );
-      } else if (navigator.geolocation) {
-        watchIdRef.current = navigator.geolocation.watchPosition(
-          (position) => {
-            const { latitude, longitude, speed, accuracy, altitude } = position.coords;
-            handleLocationUpdate(latitude, longitude, speed, accuracy, altitude);
-          },
-          (err) => console.warn('Web geolocation watch warning:', err),
-          { enableHighAccuracy: true, timeout: 4000, maximumAge: 0 }
-        );
-      }
+      await startBackgroundGps(handleLocationUpdate);
     } catch (e) {
       console.warn('Watcher attach error:', e);
     }
@@ -856,6 +867,8 @@ export default function GpsTrackerTab({
           alert(isBn ? '⚠️ GPS লোকেশন পারমিশন দিন।' : '⚠️ Please allow GPS location permission.');
           return;
         }
+        // Request battery saver exemption on Android so tracking is never killed
+        requestBatteryOptimizationExemption().catch(() => {});
       }
 
       setIsRecording(true);
@@ -876,6 +889,7 @@ export default function GpsTrackerTab({
           speed: 0,
           accuracy: gpsAccuracy || 10,
           altitude: 0,
+          bearing: currentHeadingRef.current || 0,
           timestamp: Date.now()
         });
       }
@@ -899,100 +913,10 @@ export default function GpsTrackerTab({
         liveStartMarkerRef.current = L.marker(currentPosition, { icon: createStartPinIcon() }).addTo(map);
       }
 
-      const handleLocationUpdate = (latitude, longitude, speed, accuracy, altitude, heading) => {
-        const newCoord = [latitude, longitude];
-        const speedKmH = speed ? Math.max(0, Math.round(speed * 3.6)) : 0;
-
-        setCurrentPosition(newCoord);
-        setCurrentSpeed(speedKmH);
-        setGpsAccuracy(Math.round(accuracy || 0));
-        setMaxSpeed((prev) => Math.max(prev, speedKmH));
-
-        if (heading && !isNaN(heading)) {
-          currentHeadingRef.current = heading;
-        }
-
-        const pointObj = {
-          lat: latitude,
-          lng: longitude,
-          speed: speedKmH,
-          accuracy: Math.round(accuracy || 0),
-          altitude: altitude || 0,
-          timestamp: Date.now()
-        };
-
-        setRecordedPoints((prev) => {
-          // 🛡️ JITTER & STATIONARY FILTER
-          const filterRes = filterGpsJitter(prev, pointObj);
-          let updated = prev;
-
-          if (filterRes.accept) {
-            if (prev.length > 0) {
-              const last = prev[prev.length - 1];
-              const distInc = calculateDistanceKm(last.lat, last.lng, latitude, longitude);
-              if (distInc > 0.003) {
-                setTripDistanceKm((curr) => +(curr + distInc).toFixed(2));
-              }
-              if (!heading) {
-                const bearing = calculateBearing(last.lat, last.lng, latitude, longitude);
-                if (bearing) currentHeadingRef.current = bearing;
-              }
-            }
-            updated = [...prev, pointObj];
-          }
-
-          // Update Map Marker & Polyline
-          if (mapInstanceRef.current) {
-            const map = mapInstanceRef.current;
-
-            if (!liveMarkerRef.current) {
-              liveMarkerRef.current = L.marker(newCoord, { icon: createBikeUserIcon(currentHeadingRef.current) }).addTo(map);
-            } else {
-              liveMarkerRef.current.setLatLng(newCoord);
-              liveMarkerRef.current.setIcon(createBikeUserIcon(currentHeadingRef.current));
-            }
-
-            if (filterRes.accept && updated.length > 1) {
-              const latLngs = updated.map((p) => [p.lat, p.lng]);
-              if (!livePolylineRef.current) {
-                livePolylineRef.current = L.polyline(latLngs, {
-                  color: '#0284c7',
-                  weight: 6,
-                  opacity: 0.9,
-                  smoothFactor: 2.0,
-                  lineCap: 'round',
-                  lineJoin: 'round'
-                }).addTo(map);
-              } else {
-                livePolylineRef.current.setLatLngs(latLngs);
-              }
-            }
-
-            map.panTo(newCoord, { animate: true, duration: 0.5 });
-          }
-
-          return updated;
-        });
-      };
-
-      if (Capacitor.isNativePlatform()) {
-        watchIdRef.current = await Geolocation.watchPosition(
-          { enableHighAccuracy: true, timeout: 4000, maximumAge: 0 },
-          (position, err) => {
-            if (err || !position?.coords) return;
-            const { latitude, longitude, speed, accuracy, altitude, heading } = position.coords;
-            handleLocationUpdate(latitude, longitude, speed, accuracy, altitude, heading);
-          }
-        );
-      } else if (navigator.geolocation) {
-        watchIdRef.current = navigator.geolocation.watchPosition(
-          (position) => {
-            const { latitude, longitude, speed, accuracy, altitude, heading } = position.coords;
-            handleLocationUpdate(latitude, longitude, speed, accuracy, altitude, heading);
-          },
-          (err) => console.warn('Web geolocation watch warning:', err),
-          { enableHighAccuracy: true, timeout: 4000, maximumAge: 0 }
-        );
+      // Start Native Android Foreground Service & Background Location Collector
+      const res = await startBackgroundGps(handleLocationUpdate);
+      if (!res?.success) {
+        console.warn('GPS start warning:', res?.error);
       }
     } catch (e) {
       console.error('Failed to start live ride:', e);
@@ -1009,16 +933,8 @@ export default function GpsTrackerTab({
   };
 
   const finishLiveRecording = async () => {
-    if (watchIdRef.current !== null) {
-      if (Capacitor.isNativePlatform()) {
-        try {
-          await Geolocation.clearWatch({ id: watchIdRef.current });
-        } catch (e) {}
-      } else if (navigator.geolocation) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-      }
-      watchIdRef.current = null;
-    }
+    // Stop Native Foreground Service and fetch full recorded points buffer
+    const { points: nativePoints, summary } = await stopBackgroundGps();
 
     setIsRecording(false);
     setIsPaused(false);
@@ -1032,8 +948,21 @@ export default function GpsTrackerTab({
       localStorage.removeItem('ridelog_active_session_persistent_v1');
     } catch (e) {}
 
+    // Use native recorded points if available (ensures 0% loss during screen OFF)
+    let rawPoints = recordedPoints;
+    if (nativePoints && nativePoints.length > 0) {
+      rawPoints = nativePoints.map((p) => ({
+        lat: p.lat,
+        lng: p.lng,
+        speed: p.speed || 0,
+        accuracy: p.accuracy || 10,
+        altitude: p.altitude || 0,
+        bearing: p.bearing || 0,
+        timestamp: p.timestamp || Date.now()
+      }));
+    }
+
     // Ensure road snapping / smoothing on final route points before saving
-    let rawPoints = [...recordedPoints];
     let finalPoints = rawPoints;
 
     if (rawPoints.length >= 2) {
@@ -1044,8 +973,8 @@ export default function GpsTrackerTab({
       }
     } else if (rawPoints.length === 0 && currentPosition) {
       finalPoints = [
-        { lat: currentPosition[0], lng: currentPosition[1], speed: 0, accuracy: 10, altitude: 0, timestamp: Date.now() - 5000 },
-        { lat: currentPosition[0] + 0.0001, lng: currentPosition[1] + 0.0001, speed: 0, accuracy: 10, altitude: 0, timestamp: Date.now() }
+        { lat: currentPosition[0], lng: currentPosition[1], speed: 0, accuracy: 10, altitude: 0, bearing: 0, timestamp: Date.now() - 5000 },
+        { lat: currentPosition[0] + 0.0001, lng: currentPosition[1] + 0.0001, speed: 0, accuracy: 10, altitude: 0, bearing: 0, timestamp: Date.now() }
       ];
     } else if (rawPoints.length === 1) {
       finalPoints.push({
@@ -1054,6 +983,7 @@ export default function GpsTrackerTab({
         speed: 0,
         accuracy: 10,
         altitude: 0,
+        bearing: 0,
         timestamp: Date.now()
       });
     }
@@ -1089,6 +1019,8 @@ export default function GpsTrackerTab({
       maxSpeedKmH: maxSpeed,
       avgSpeedKmH: isNaN(avgSpeed) ? 0 : avgSpeed,
       points: finalPoints,
+      rawPoints,
+      summary: summary || null,
       defaultTitle
     });
     setCustomTripTitle(defaultTitle);
@@ -1112,7 +1044,9 @@ export default function GpsTrackerTab({
         distanceKm: pendingTripData.distanceKm,
         maxSpeedKmH: pendingTripData.maxSpeedKmH,
         avgSpeedKmH: pendingTripData.avgSpeedKmH,
-        points: pendingTripData.points
+        points: pendingTripData.points,
+        rawPoints: pendingTripData.rawPoints || pendingTripData.points,
+        summary: pendingTripData.summary || null
       };
 
       await saveTrip(newTrip);
@@ -1534,27 +1468,55 @@ export default function GpsTrackerTab({
           </div>
         )}
 
-        {/* GPS Accuracy Indicator */}
-        {gpsAccuracy !== null && mode === 'live' && (
+        {/* GPS Accuracy & Background Status HUD */}
+        {mode === 'live' && (
           <div style={{
             position: 'absolute',
             top: '12px',
             left: '12px',
             zIndex: 1000,
-            background: 'rgba(15, 23, 42, 0.85)',
-            padding: '4px 10px',
-            borderRadius: '20px',
-            fontSize: '0.74rem',
-            fontWeight: 700,
-            color: gpsAccuracy < 15 ? '#10b981' : '#f59e0b',
-            border: '1px solid var(--border-color)',
-            backdropFilter: 'blur(8px)',
             display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
+            flexDirection: 'column',
+            gap: '5px'
           }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: gpsAccuracy < 15 ? '#10b981' : '#f59e0b' }} />
-            <span>GPS ±{gpsAccuracy}m</span>
+            {gpsAccuracy !== null && (
+              <div style={{
+                background: 'rgba(15, 23, 42, 0.88)',
+                padding: '4px 10px',
+                borderRadius: '20px',
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                color: gpsAccuracy < 15 ? '#10b981' : '#f59e0b',
+                border: '1px solid var(--border-color)',
+                backdropFilter: 'blur(8px)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+              }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: gpsAccuracy < 15 ? '#10b981' : '#f59e0b' }} />
+                <span>GPS ±{gpsAccuracy}m</span>
+              </div>
+            )}
+
+            {isRecording && (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(6, 95, 70, 0.4))',
+                padding: '3px 9px',
+                borderRadius: '16px',
+                fontSize: '0.68rem',
+                fontWeight: 800,
+                color: '#34d399',
+                border: '1px solid rgba(52, 211, 153, 0.4)',
+                backdropFilter: 'blur(8px)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}>
+                <ShieldCheck size={12} color="#34d399" />
+                <span>{isBn ? 'Screen-Off সুরক্ষিত' : 'Screen-Off Protected'} • {recordedPoints.length} pts</span>
+              </div>
+            )}
           </div>
         )}
 
