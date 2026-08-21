@@ -1,10 +1,54 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Camera, Image as ImageIcon, Plus, Trash2, X, Download,
-  Share2, HardDrive, Sparkles, User, Check
+  Share2, HardDrive, Sparkles, User, Check, AlertCircle, Loader
 } from 'lucide-react';
 import { translations } from '../utils/translations';
 import { listenToTourGallery, addTourPhoto, deleteTourPhoto } from '../utils/tourStorage';
+
+function compressGalleryImage(file, maxWidth = 1280, maxHeight = 1280, quality = 0.75) {
+  return new Promise((resolve) => {
+    if (!file || !file.type.startsWith('image/')) {
+      resolve('');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth || height > maxHeight) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        let dataUrl = canvas.toDataURL('image/jpeg', quality);
+        // If still above 700KB base64, compress to 0.55
+        if (dataUrl.length > 800000) {
+          dataUrl = canvas.toDataURL('image/jpeg', 0.55);
+        }
+        resolve(dataUrl);
+      };
+      img.onerror = () => resolve(e.target.result);
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve('');
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrganizer }) {
   const t = translations[lang] || translations['bn'];
@@ -14,9 +58,11 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
   const [photos, setPhotos] = useState([]);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [processingImage, setProcessingImage] = useState(false);
   const [caption, setCaption] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [previewDataUrl, setPreviewDataUrl] = useState('');
+  const [uploadError, setUploadError] = useState('');
 
   useEffect(() => {
     if (!tourId) return;
@@ -24,21 +70,30 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
     return unsub;
   }, [tourId]);
 
-  const handleFileSelect = (e) => {
+  const handleFileSelect = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setPreviewDataUrl(event.target.result);
-      setShowUploadModal(true);
-    };
-    reader.readAsDataURL(file);
+    setProcessingImage(true);
+    setUploadError('');
+    try {
+      const compressed = await compressGalleryImage(file);
+      if (compressed) {
+        setPreviewDataUrl(compressed);
+        setShowUploadModal(true);
+      }
+    } catch (err) {
+      console.error('Image compression error:', err);
+    } finally {
+      setProcessingImage(false);
+      e.target.value = '';
+    }
   };
 
   const handleSavePhoto = async () => {
     if (!previewDataUrl) return;
     setUploading(true);
+    setUploadError('');
     try {
       await addTourPhoto(tourId, {
         photoUrl: previewDataUrl,
@@ -53,6 +108,7 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
       setShowUploadModal(false);
     } catch (err) {
       console.error('Error saving photo:', err);
+      setUploadError(lang === 'bn' ? 'ছবি সেভ করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।' : 'Failed to save photo. Please try again.');
     } finally {
       setUploading(false);
     }
@@ -102,6 +158,7 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
             className="tour-add-btn"
             onClick={() => cameraInputRef.current?.click()}
             title="Take Photo"
+            disabled={processingImage}
           >
             <Camera size={14} />
             <span>{t.takePhoto || 'ক্যামেরা'}</span>
@@ -111,12 +168,21 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
             className="tour-add-btn"
             onClick={() => fileInputRef.current?.click()}
             title="Upload Photo"
+            disabled={processingImage}
           >
             <Plus size={14} />
             <span>{t.uploadPhoto || 'আপলোড'}</span>
           </button>
         </div>
       </div>
+
+      {/* Processing Loader Indicator */}
+      {processingImage && (
+        <div className="tour-alert-success" style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', textAlign: 'center', padding: '8px' }}>
+          <Loader size={14} className="spin" style={{ display: 'inline', marginRight: '6px' }} />
+          <span>{lang === 'bn' ? 'ছবি প্রস্তুত হচ্ছে...' : 'Processing image...'}</span>
+        </div>
+      )}
 
       {/* Photos Grid */}
       {photos.length === 0 ? (
@@ -136,7 +202,7 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
               className="tour-photo-card"
               onClick={() => setSelectedPhoto(photo)}
             >
-              <img src={photo.photoUrl} alt={photo.caption || 'Tour Memory'} className="tour-photo-thumb" />
+              <img src={photo.photoUrl} alt={photo.caption || 'Tour Memory'} className="tour-photo-thumb" loading="lazy" />
               <div className="tour-photo-overlay">
                 <div className="tour-photo-caption">{photo.caption || '📸'}</div>
                 <div className="tour-photo-uploader">
@@ -162,7 +228,7 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
 
             <div className="tour-create-body">
               <div className="tour-photo-preview-wrap">
-                <img src={previewDataUrl} alt="Preview" className="tour-preview-img" />
+                <img src={previewDataUrl} alt="Preview" className="tour-preview-img" style={{ maxHeight: '240px', width: '100%', objectFit: 'contain', borderRadius: '10px' }} />
               </div>
 
               <div className="form-group" style={{ marginTop: '12px' }}>
@@ -175,6 +241,12 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
                   placeholder={lang === 'bn' ? 'যেমন: সাজেক ভ্যালির সূর্যাস্ত' : 'e.g. Sunset at Sajek Valley'}
                 />
               </div>
+
+              {uploadError && (
+                <div style={{ color: '#ef4444', fontSize: '11px', marginTop: '6px' }}>
+                  ⚠️ {uploadError}
+                </div>
+              )}
             </div>
 
             <div className="tour-create-footer">
