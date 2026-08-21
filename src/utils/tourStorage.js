@@ -449,6 +449,7 @@ export function listenToExpenses(tourId, callback) {
     callback([]);
   });
 }
+export const listenToTourExpenses = listenToExpenses;
 
 // ─── FUND CONTRIBUTIONS ────────────────────────────────────────────────────────
 
@@ -586,3 +587,177 @@ export function listenToSettlements(tourId, callback) {
     callback([]);
   });
 }
+
+// ─── ITINERARY & STOPS ────────────────────────────────────────────────────────
+
+export async function addTourStop(tourId, stopData) {
+  if (!tourId || !stopData.name) return null;
+  const id = generateId('stop');
+  const docData = {
+    id,
+    name: stopData.name.trim(),
+    purpose: stopData.purpose || '',
+    location: stopData.location || '',
+    arrivalTime: stopData.arrivalTime || '',
+    departureTime: stopData.departureTime || '',
+    durationMins: Number(stopData.durationMins) || 15,
+    notes: stopData.notes || '',
+    order: Number(stopData.order) || 0,
+    status: 'upcoming', // upcoming | arrived | departed
+    createdAt: new Date().toISOString()
+  };
+  await setDoc(doc(db, 'tours', tourId, 'stops', id), docData);
+  return id;
+}
+
+export async function updateTourStop(tourId, stopId, updates) {
+  if (!tourId || !stopId) return;
+  try {
+    await updateDoc(doc(db, 'tours', tourId, 'stops', stopId), {
+      ...updates,
+      updatedAt: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('updateTourStop error:', err);
+  }
+}
+
+export async function deleteTourStop(tourId, stopId) {
+  if (!tourId || !stopId) return;
+  try {
+    await deleteDoc(doc(db, 'tours', tourId, 'stops', stopId));
+  } catch (err) {
+    console.error('deleteTourStop error:', err);
+  }
+}
+
+export function listenToTourStops(tourId, callback) {
+  if (!tourId) { callback([]); return () => {}; }
+  const ref = collection(db, 'tours', tourId, 'stops');
+  return onSnapshot(ref, snap => {
+    const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    list.sort((a, b) => (a.order || 0) - (b.order || 0) || new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+    callback(list);
+  }, err => {
+    console.debug('listenToTourStops error:', err.message);
+    callback([]);
+  });
+}
+
+// ─── TOUR GALLERY ─────────────────────────────────────────────────────────────
+
+export async function addTourPhoto(tourId, photoData) {
+  if (!tourId || !photoData.photoUrl) return null;
+  const id = generateId('photo');
+  const docData = {
+    id,
+    photoUrl: photoData.photoUrl,
+    caption: photoData.caption || '',
+    uploadedBy: photoData.uploadedBy || '',
+    uploaderName: photoData.uploaderName || 'Member',
+    uploaderPhoto: photoData.uploaderPhoto || '',
+    source: photoData.source || 'upload', // upload | camera | drive
+    driveFileId: photoData.driveFileId || '',
+    createdAt: new Date().toISOString()
+  };
+  await setDoc(doc(db, 'tours', tourId, 'gallery', id), docData);
+  return id;
+}
+
+export async function deleteTourPhoto(tourId, photoId) {
+  if (!tourId || !photoId) return;
+  try {
+    await deleteDoc(doc(db, 'tours', tourId, 'gallery', photoId));
+  } catch (err) {
+    console.error('deleteTourPhoto error:', err);
+  }
+}
+
+export function listenToTourGallery(tourId, callback) {
+  if (!tourId) { callback([]); return () => {}; }
+  const ref = collection(db, 'tours', tourId, 'gallery');
+  return onSnapshot(ref, snap => {
+    const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    callback(list);
+  }, err => {
+    console.debug('listenToTourGallery error:', err.message);
+    callback([]);
+  });
+}
+
+// ─── TOUR SAFETY & SOS ALERTS ─────────────────────────────────────────────────
+
+export async function broadcastSosAlert(tourId, alertData) {
+  if (!tourId) return null;
+  const id = generateId('sos');
+  const docData = {
+    id,
+    senderUid: alertData.senderUid || '',
+    senderName: alertData.senderName || 'Rider',
+    lat: alertData.lat || null,
+    lng: alertData.lng || null,
+    battery: alertData.battery || null,
+    status: 'active', // active | resolved | safe_checkin
+    type: alertData.type || 'sos', // sos | safe_checkin
+    message: alertData.message || '🚨 Emergency SOS alert! Rider needs assistance.',
+    createdAt: new Date().toISOString()
+  };
+  await setDoc(doc(db, 'tours', tourId, 'sos_alerts', id), docData);
+  return id;
+}
+
+export async function resolveSosAlert(tourId, alertId) {
+  if (!tourId || !alertId) return;
+  try {
+    await updateDoc(doc(db, 'tours', tourId, 'sos_alerts', alertId), {
+      status: 'resolved',
+      resolvedAt: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('resolveSosAlert error:', err);
+  }
+}
+
+export function listenToTourSosAlerts(tourId, callback) {
+  if (!tourId) { callback([]); return () => {}; }
+  const ref = collection(db, 'tours', tourId, 'sos_alerts');
+  return onSnapshot(ref, snap => {
+    const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    callback(list);
+  }, err => {
+    console.debug('listenToTourSosAlerts error:', err.message);
+    callback([]);
+  });
+}
+
+// ─── TOUR INVITATIONS & RESPONSE ──────────────────────────────────────────────
+
+export async function respondToTourInvitation(tourId, uid, accept = true) {
+  if (!tourId || !uid) return;
+  try {
+    const memberRef = doc(db, 'tours', tourId, 'members', uid);
+    if (accept) {
+      await updateDoc(memberRef, {
+        status: 'accepted',
+        joinedAt: new Date().toISOString()
+      });
+      // Ensure uid is in tour memberIds
+      await updateDoc(doc(db, 'tours', tourId), {
+        memberIds: arrayUnion(uid)
+      });
+    } else {
+      await updateDoc(memberRef, {
+        status: 'declined',
+        declinedAt: new Date().toISOString()
+      });
+      await updateDoc(doc(db, 'tours', tourId), {
+        memberIds: arrayRemove(uid)
+      });
+    }
+  } catch (err) {
+    console.error('respondToTourInvitation error:', err);
+  }
+}
+

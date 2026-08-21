@@ -1,20 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Users, Map, Receipt, PiggyBank, Scale, FileText, Play, CheckCircle, Trash2, MoreVertical, Plus } from 'lucide-react';
+import {
+  ArrowLeft, Users, Map, Receipt, PiggyBank, Scale, FileText,
+  Play, CheckCircle, Trash2, MoreVertical, Plus, Clock, Image as ImageIcon,
+  TrendingUp, ShieldAlert, Download
+} from 'lucide-react';
 import { translations } from '../utils/translations';
 import { listenToTour, updateTour, cancelTour, deleteTour } from '../utils/tourStorage';
 import { getTourStatus } from '../utils/tourCalculations';
 import TourMembersTab from './TourMembersTab';
 import TourMapTab from './TourMapTab';
+import TourItineraryTab from './TourItineraryTab';
 import TourExpensesTab from './TourExpensesTab';
 import TourFundTab from './TourFundTab';
 import TourSettlementTab from './TourSettlementTab';
+import TourGalleryTab from './TourGalleryTab';
+import TourAnalyticsTab from './TourAnalyticsTab';
+import TourSafetyModal from './TourSafetyModal';
+import TourReportModal from './TourReportModal';
 
 const SUB_TABS = [
-  { id: 'members', icon: Users, labelBn: 'সদস্য', labelEn: 'Members' },
-  { id: 'map',     icon: Map,   labelBn: 'ম্যাপ',  labelEn: 'Map' },
-  { id: 'expenses',icon: Receipt, labelBn: 'খরচ',  labelEn: 'Expenses' },
-  { id: 'fund',    icon: PiggyBank, labelBn: 'ফান্ড', labelEn: 'Fund' },
-  { id: 'settlement', icon: Scale, labelBn: 'হিসাব', labelEn: 'Settle' }
+  { id: 'members',   icon: Users,      labelBn: 'সদস্য',     labelEn: 'Members' },
+  { id: 'map',       icon: Map,        labelBn: 'ম্যাপ',      labelEn: 'Map' },
+  { id: 'itinerary', icon: Clock,      labelBn: 'ভ্রমণসূচি',  labelEn: 'Itinerary' },
+  { id: 'expenses',  icon: Receipt,    labelBn: 'খরচ',      labelEn: 'Expenses' },
+  { id: 'fund',      icon: PiggyBank,  labelBn: 'ফান্ড',     labelEn: 'Fund' },
+  { id: 'settlement',icon: Scale,      labelBn: 'হিসাব',     labelEn: 'Settle' },
+  { id: 'gallery',   icon: ImageIcon,  labelBn: 'গ্যালারি',   labelEn: 'Gallery' },
+  { id: 'analytics', icon: TrendingUp, labelBn: 'পরিসংখ্যান', labelEn: 'Analytics' }
 ];
 
 export default function TourDetailPage({ tourId, lang = 'bn', theme, user, onBack, onOpenCreate }) {
@@ -23,6 +35,8 @@ export default function TourDetailPage({ tourId, lang = 'bn', theme, user, onBac
   const [loading, setLoading] = useState(true);
   const [activeSubTab, setActiveSubTab] = useState('members');
   const [showMenu, setShowMenu] = useState(false);
+  const [showSafetyModal, setShowSafetyModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   useEffect(() => {
     if (!tourId) return;
@@ -94,7 +108,18 @@ export default function TourDetailPage({ tourId, lang = 'bn', theme, user, onBac
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {/* Emergency SOS Button */}
+          <button
+            className="tour-sos-header-btn"
+            onClick={() => setShowSafetyModal(true)}
+            title="Safety & Emergency SOS"
+          >
+            <ShieldAlert size={14} />
+            <span>SOS</span>
+          </button>
+
+          {/* Quick Start / End Actions for Organizer */}
           {isOrganizer && tour.status === 'planned' && (
             <button
               className="tour-btn-primary small"
@@ -125,35 +150,42 @@ export default function TourDetailPage({ tourId, lang = 'bn', theme, user, onBac
             </button>
           )}
 
-          {isOrganizer && (
-            <div className="tour-menu-wrap">
-              <button className="tour-menu-btn" onClick={() => setShowMenu(s => !s)}>
-                <MoreVertical size={20} />
-              </button>
-              {showMenu && (
-                <>
-                  <div className="tour-menu-overlay" onClick={() => setShowMenu(false)} />
-                  <div className="tour-dropdown-menu">
-                    {tour.status === 'planned' && (
-                      <button onClick={() => handleStatusChange('active')}><Play size={14} /> {t.startTour}</button>
-                    )}
-                    {tour.status === 'active' && (
-                      <button onClick={() => handleStatusChange('completed')}><CheckCircle size={14} /> {t.endTour}</button>
-                    )}
-                    {(tour.status === 'planned' || tour.status === 'active') && (
-                      <button onClick={() => handleStatusChange('cancelled')}><CheckCircle size={14} /> {t.cancelTour}</button>
-                    )}
-                    {tour.status === 'cancelled' && (
-                      <button onClick={() => handleStatusChange('planned')}><Play size={14} /> {lang === 'bn' ? 'পুনরায় শুরু' : 'Reactivate'}</button>
-                    )}
+          {/* 3-Dot Overflow Menu */}
+          <div className="tour-menu-wrap">
+            <button className="tour-menu-btn" onClick={() => setShowMenu(s => !s)}>
+              <MoreVertical size={20} />
+            </button>
+            {showMenu && (
+              <>
+                <div className="tour-menu-overlay" onClick={() => setShowMenu(false)} />
+                <div className="tour-dropdown-menu">
+                  <button onClick={() => { setShowMenu(false); setShowReportModal(true); }}>
+                    <Download size={14} /> {lang === 'bn' ? 'রিপোর্ট ডাউনলোড (PDF/Excel)' : 'Download Report'}
+                  </button>
+                  <button onClick={() => { setShowMenu(false); setShowSafetyModal(true); }}>
+                    <ShieldAlert size={14} /> {lang === 'bn' ? 'সেফটি ও জরুরি হেল্প' : 'Safety & Helplines'}
+                  </button>
+                  {isOrganizer && tour.status === 'planned' && (
+                    <button onClick={() => handleStatusChange('active')}><Play size={14} /> {t.startTour}</button>
+                  )}
+                  {isOrganizer && tour.status === 'active' && (
+                    <button onClick={() => handleStatusChange('completed')}><CheckCircle size={14} /> {t.endTour}</button>
+                  )}
+                  {isOrganizer && (tour.status === 'planned' || tour.status === 'active') && (
+                    <button onClick={() => handleStatusChange('cancelled')}><CheckCircle size={14} /> {t.cancelTour}</button>
+                  )}
+                  {isOrganizer && tour.status === 'cancelled' && (
+                    <button onClick={() => handleStatusChange('planned')}><Play size={14} /> {lang === 'bn' ? 'পুনরায় শুরু' : 'Reactivate'}</button>
+                  )}
+                  {isOrganizer && (
                     <button className="danger" onClick={() => handleStatusChange('deleted')}>
                       <Trash2 size={14} /> {t.deleteTour}
                     </button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -180,7 +212,7 @@ export default function TourDetailPage({ tourId, lang = 'bn', theme, user, onBac
             className={`tour-subtab-btn ${activeSubTab === id ? 'active' : ''}`}
             onClick={() => setActiveSubTab(id)}
           >
-            <Icon size={15} />
+            <Icon size={14} />
             <span>{lang === 'bn' ? labelBn : labelEn}</span>
           </button>
         ))}
@@ -194,6 +226,9 @@ export default function TourDetailPage({ tourId, lang = 'bn', theme, user, onBac
         {activeSubTab === 'map' && (
           <TourMapTab tourId={tourId} tour={tour} lang={lang} user={user} />
         )}
+        {activeSubTab === 'itinerary' && (
+          <TourItineraryTab tourId={tourId} tour={tour} lang={lang} user={user} isOrganizer={isOrganizer} />
+        )}
         {activeSubTab === 'expenses' && (
           <TourExpensesTab tourId={tourId} tour={tour} lang={lang} user={user} />
         )}
@@ -203,7 +238,34 @@ export default function TourDetailPage({ tourId, lang = 'bn', theme, user, onBac
         {activeSubTab === 'settlement' && (
           <TourSettlementTab tourId={tourId} tour={tour} lang={lang} user={user} />
         )}
+        {activeSubTab === 'gallery' && (
+          <TourGalleryTab tourId={tourId} tour={tour} lang={lang} user={user} isOrganizer={isOrganizer} />
+        )}
+        {activeSubTab === 'analytics' && (
+          <TourAnalyticsTab tourId={tourId} tour={tour} lang={lang} user={user} />
+        )}
       </div>
+
+      {/* Safety & SOS Modal */}
+      {showSafetyModal && (
+        <TourSafetyModal
+          tourId={tourId}
+          tour={tour}
+          lang={lang}
+          user={user}
+          onClose={() => setShowSafetyModal(false)}
+        />
+      )}
+
+      {/* Report Modal */}
+      {showReportModal && (
+        <TourReportModal
+          tourId={tourId}
+          tour={tour}
+          lang={lang}
+          onClose={() => setShowReportModal(false)}
+        />
+      )}
     </div>
   );
 }

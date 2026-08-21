@@ -1,17 +1,23 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { MapPin, Plus, Users, Calendar, ChevronRight, Route, AlertCircle } from 'lucide-react';
+import {
+  MapPin, Plus, Users, Calendar, ChevronRight, Route,
+  Calculator, Mail, Check, X, Sparkles, Filter
+} from 'lucide-react';
 import { translations } from '../utils/translations';
-import { listenToMyTours } from '../utils/tourStorage';
+import { listenToMyTours, respondToTourInvitation } from '../utils/tourStorage';
 import { getTourStatus } from '../utils/tourCalculations';
 import TourCreateModal from './TourCreateModal';
 import TourDetailPage from './TourDetailPage';
+import TourCostEstimatorModal from './TourCostEstimatorModal';
 
 export default function TourTab({ lang = 'bn', theme, user }) {
   const t = translations[lang] || translations['bn'];
   const [tours, setTours] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [showEstimator, setShowEstimator] = useState(false);
   const [activeTourId, setActiveTourId] = useState(null);
+  const [filterTab, setFilterTab] = useState('all'); // all | created | joined | invited
 
   useEffect(() => {
     if (!user?.uid) { setLoading(false); return; }
@@ -25,8 +31,19 @@ export default function TourTab({ lang = 'bn', theme, user }) {
 
   const handleTourCreated = useCallback((tourId) => {
     setShowCreate(false);
+    setShowEstimator(false);
     setActiveTourId(tourId);
   }, []);
+
+  const handleAcceptInvite = async (e, tourId) => {
+    e.stopPropagation();
+    await respondToTourInvitation(tourId, user.uid, true);
+  };
+
+  const handleRejectInvite = async (e, tourId) => {
+    e.stopPropagation();
+    await respondToTourInvitation(tourId, user.uid, false);
+  };
 
   if (activeTourId) {
     return (
@@ -52,9 +69,20 @@ export default function TourTab({ lang = 'bn', theme, user }) {
     );
   }
 
-  const activeTours = tours.filter(t => t.status === 'active');
-  const plannedTours = tours.filter(t => t.status === 'planned');
-  const pastTours = tours.filter(t => t.status === 'completed' || t.status === 'cancelled');
+  // Segment tours
+  const createdTours = tours.filter(t => t.createdBy === user?.uid);
+  const joinedTours = tours.filter(t => t.createdBy !== user?.uid && t.memberIds?.includes(user?.uid));
+
+  // Filter based on tab
+  const displayTours = filterTab === 'created'
+    ? createdTours
+    : filterTab === 'joined'
+    ? joinedTours
+    : tours;
+
+  const activeTours = displayTours.filter(t => t.status === 'active');
+  const plannedTours = displayTours.filter(t => t.status === 'planned');
+  const pastTours = displayTours.filter(t => t.status === 'completed' || t.status === 'cancelled');
 
   return (
     <div className="tour-tab">
@@ -64,9 +92,43 @@ export default function TourTab({ lang = 'bn', theme, user }) {
           <Route size={22} className="tour-tab-icon" />
           <span>{t.myTours}</span>
         </div>
-        <button className="tour-create-btn" onClick={() => setShowCreate(true)}>
-          <Plus size={18} />
-          {t.newTour}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            className="tour-estimator-header-btn"
+            onClick={() => setShowEstimator(true)}
+            title={t.costEstimatorTitle || 'ট্যুর খরচ ক্যালকুলেটর'}
+          >
+            <Calculator size={15} />
+            <span>{lang === 'bn' ? 'খরচ ক্যালকুলেটর' : 'Estimator'}</span>
+          </button>
+
+          <button className="tour-create-btn" onClick={() => setShowCreate(true)}>
+            <Plus size={16} />
+            <span>{t.newTour}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Filter Tabs Bar */}
+      <div className="tour-filter-bar">
+        <button
+          className={`tour-filter-tab ${filterTab === 'all' ? 'active' : ''}`}
+          onClick={() => setFilterTab('all')}
+        >
+          {t.filterAll || 'সব ট্যুর'} ({tours.length})
+        </button>
+        <button
+          className={`tour-filter-tab ${filterTab === 'created' ? 'active' : ''}`}
+          onClick={() => setFilterTab('created')}
+        >
+          {t.filterCreated || 'আমার তৈরি'} ({createdTours.length})
+        </button>
+        <button
+          className={`tour-filter-tab ${filterTab === 'joined' ? 'active' : ''}`}
+          onClick={() => setFilterTab('joined')}
+        >
+          {t.filterJoined || 'যুক্ত হওয়া'} ({joinedTours.length})
         </button>
       </div>
 
@@ -75,17 +137,23 @@ export default function TourTab({ lang = 'bn', theme, user }) {
         <div className="tour-loading">
           <div className="tour-loading-spinner" />
         </div>
-      ) : tours.length === 0 ? (
+      ) : displayTours.length === 0 ? (
         <div className="tour-empty">
           <div className="tour-empty-icon">
-            <MapPin size={48} />
+            <MapPin size={44} />
           </div>
           <h3>{t.noTours}</h3>
           <p>{t.noToursDesc}</p>
-          <button className="tour-empty-btn" onClick={() => setShowCreate(true)}>
-            <Plus size={18} />
-            {t.createTour}
-          </button>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            <button className="tour-empty-btn" onClick={() => setShowCreate(true)}>
+              <Plus size={16} />
+              <span>{t.createTour}</span>
+            </button>
+            <button className="tour-btn-ghost" onClick={() => setShowEstimator(true)}>
+              <Calculator size={16} />
+              <span>{t.costEstimatorTitle || 'খরচ ক্যালকুলেটর'}</span>
+            </button>
+          </div>
         </div>
       ) : (
         <div className="tour-list">
@@ -101,6 +169,7 @@ export default function TourTab({ lang = 'bn', theme, user }) {
         </div>
       )}
 
+      {/* Create Tour Wizard Modal */}
       {showCreate && (
         <TourCreateModal
           lang={lang}
@@ -108,6 +177,18 @@ export default function TourTab({ lang = 'bn', theme, user }) {
           user={user}
           onClose={() => setShowCreate(false)}
           onCreated={handleTourCreated}
+        />
+      )}
+
+      {/* Standalone Cost Estimator Modal */}
+      {showEstimator && (
+        <TourCostEstimatorModal
+          lang={lang}
+          onClose={() => setShowEstimator(false)}
+          onConvertToTour={(estimateData) => {
+            setShowEstimator(false);
+            setShowCreate(true);
+          }}
         />
       )}
     </div>

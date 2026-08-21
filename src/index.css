@@ -1909,4 +1909,231 @@ h5 {
 .tour-report-btn.pdf:hover { background: rgba(239,68,68,0.08); box-shadow: 0 4px 15px rgba(239,68,68,0.15); }
 .tour-report-btn.excel { color: #10b981; border-color: rgba(16,185,129,0.2); }
 .tour-report-btn.excel:hover { background: rgba(16,185,129,0.08); box-shadow: 0 4px 15px rgba(16,185,129,0.15); }
-.tour-report-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.tour-report-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+/* ── Tour Filters & Header Actions ── */
+.tour-filter-bar { display: flex; gap: 6px; padding: 0 16px 12px; overflow-x: auto; }
+.tour-filter-tab {
+  padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  background: var(--bg-input); border: 1px solid var(--border-color);
+  color: var(--text-dim); cursor: pointer; white-space: nowrap; transition: all 0.2s;
+}
+.tour-filter-tab.active { background: #6366f1; color: #fff; border-color: #6366f1; }
+.tour-estimator-header-btn {
+  display: flex; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 8px;
+  background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.3);
+  color: #818cf8; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.2s;
+}
+.tour-estimator-header-btn:hover { background: rgba(99,102,241,0.2); color: #fff; }
+.tour-sos-header-btn {
+  display: flex; align-items: center; gap: 3px; padding: 5px 8px; border-radius: 8px;
+  background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.4);
+  color: #ef4444; font-size: 11px; font-weight: 800; cursor: pointer; transition: all 0.2s;
+}
+.tour-sos-header-btn:hover { background: #ef4444; color: #fff; }
+
+/* ── Standalone Estimator Modal ── */
+.tour-estimator-modal {
+  background: var(--bg-card); border: 1px solid var(--border-color);
+  border-radius: 20px; display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+}
+.tour-estimator-notice {
+  font-size: 11px; color: #818cf8; background: rgba(99,102,241,0.08);
+  padding: 8px 16px; border-bottom: 1px solid var(--border-color);
+}
+.tour-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tour-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.tour-estimator-summary { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+.tour-estimator-summary-header { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-main); }
+.tour-estimator-kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.tour-estimator-kpi-box {
+  background: var(--bg-input); border: 1px solid var(--border-color);
+  border-radius: 10px; padding: 8px 4px; text-align: center;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.tour-estimator-kpi-box .label { font-size: 10px; color: var(--text-dim); }
+.tour-estimator-kpi-box .val { font-size: 13px; font-weight: 700; color: #10b981; }
+.tour-estimator-footer {
+  display: flex; align-items: center; padding: 12px 16px; border-top: 1px solid var(--border-color);
+  gap: 8px; background: var(--bg-card);
+}
+
+/* ── Itinerary Tab ── */
+.tour-itinerary-tab { display: flex; flex-direction: column; }
+.tour-itinerary-timeline { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; }
+.tour-stop-card {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--bg-card); border: 1px solid var(--border-color);
+  border-radius: 14px; padding: 12px; transition: all 0.2s;
+}
+.tour-stop-card.arrived { border-color: #10b981; background: rgba(16,185,129,0.05); }
+.tour-stop-card.departed { opacity: 0.7; }
+.tour-stop-left { display: flex; flex-direction: column; align-items: center; gap: 4px; flex-shrink: 0; }
+.tour-stop-num { font-size: 10px; font-weight: 700; color: var(--text-dim); }
+.tour-stop-icon { width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+.tour-stop-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.tour-stop-title-row { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-main); }
+.tour-stop-purpose-badge { font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 6px; }
+.tour-stop-meta-row { font-size: 11px; color: var(--text-dim); display: flex; gap: 6px; }
+.tour-stop-notes { font-size: 11px; color: var(--text-muted); margin: 2px 0 0; }
+.tour-stop-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+.tour-stop-status-btn {
+  font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 6px; border: none; cursor: pointer;
+}
+.tour-stop-status-btn.upcoming { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.tour-stop-status-btn.arrived { background: rgba(16,185,129,0.15); color: #10b981; }
+.tour-stop-status-btn.departed { background: var(--bg-input); color: var(--text-dim); }
+
+/* ── Tour Gallery Tab ── */
+.tour-gallery-tab { display: flex; flex-direction: column; padding: 14px 16px; gap: 12px; }
+.tour-gallery-header { display: flex; align-items: center; justify-content: space-between; }
+.tour-gallery-count { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--text-main); }
+.tour-gallery-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px;
+}
+.tour-photo-card {
+  position: relative; aspect-ratio: 1; border-radius: 12px; overflow: hidden;
+  border: 1px solid var(--border-color); cursor: pointer; background: var(--bg-input);
+}
+.tour-photo-thumb { width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s; }
+.tour-photo-card:hover .tour-photo-thumb { transform: scale(1.05); }
+.tour-photo-overlay {
+  position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 60%);
+  display: flex; flex-direction: column; justify-content: flex-end; padding: 6px;
+  color: #fff; font-size: 10px; opacity: 0.9;
+}
+.tour-photo-caption { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tour-photo-uploader { font-size: 8px; color: rgba(255,255,255,0.7); }
+.tour-lightbox-modal {
+  position: relative; max-width: 90vw; max-height: 90vh;
+  display: flex; flex-direction: column; align-items: center;
+}
+.tour-lightbox-close {
+  position: absolute; top: -36px; right: 0; background: none; border: none;
+  color: #fff; cursor: pointer;
+}
+.tour-lightbox-img {
+  max-width: 85vw; max-height: 70vh; border-radius: 12px; object-fit: contain;
+}
+.tour-lightbox-info {
+  margin-top: 10px; width: 100%; display: flex; align-items: center;
+  justify-content: space-between; color: #fff; background: rgba(0,0,0,0.6);
+  padding: 10px 14px; border-radius: 10px;
+}
+.tour-lightbox-meta { display: flex; flex-direction: column; gap: 2px; }
+.tour-lightbox-meta span { font-size: 11px; color: rgba(255,255,255,0.6); }
+.tour-lightbox-actions { display: flex; gap: 8px; }
+
+/* ── Tour Safety & SOS Modal ── */
+.tour-safety-modal {
+  background: var(--bg-card); border: 1px solid var(--border-color);
+  border-radius: 20px; display: flex; flex-direction: column; overflow: hidden;
+}
+.tour-sos-banner { display: flex; gap: 8px; margin-bottom: 12px; }
+.tour-sos-big-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 14px; border-radius: 14px; background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #fff; font-size: 13px; font-weight: 800; border: none; cursor: pointer;
+  box-shadow: 0 4px 15px rgba(239,68,68,0.4); transition: transform 0.2s;
+}
+.tour-sos-big-btn:hover { transform: scale(1.02); }
+.tour-safe-checkin-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 14px; border-radius: 14px; background: rgba(16,185,129,0.15);
+  border: 1.5px solid rgba(16,185,129,0.4); color: #10b981; font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: all 0.2s;
+}
+.tour-active-alerts-section {
+  display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px;
+  background: rgba(239,68,68,0.06); padding: 12px; border-radius: 12px;
+  border: 1px solid rgba(239,68,68,0.2);
+}
+.tour-alert-card {
+  background: var(--bg-card); border-radius: 10px; padding: 10px;
+  border: 1px solid rgba(239,68,68,0.3); display: flex; flex-direction: column; gap: 4px;
+}
+.tour-alert-card-header { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-main); }
+.tour-alert-msg { font-size: 11px; color: #ef4444; margin: 0; font-weight: 600; }
+.tour-alert-actions { display: flex; gap: 6px; margin-top: 6px; }
+.tour-nearby-services-section { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.tour-nearby-buttons-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.tour-nearby-btn {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px;
+  background: var(--bg-input); border: 1px solid var(--border-color);
+  color: var(--text-main); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+}
+.tour-nearby-btn:hover { background: rgba(99,102,241,0.1); border-color: #6366f1; }
+.tour-nearby-btn .arrow { margin-left: auto; color: var(--text-dim); }
+.tour-helplines-section { display: flex; flex-direction: column; gap: 8px; }
+.tour-helplines-list { display: flex; flex-direction: column; gap: 6px; }
+.tour-helpline-row {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px;
+  background: var(--bg-input); border: 1px solid var(--border-color); text-decoration: none;
+  color: var(--text-main); transition: all 0.2s;
+}
+.tour-helpline-row:hover { background: rgba(16,185,129,0.1); border-color: #10b981; }
+.tour-helpline-icon {
+  width: 32px; height: 32px; border-radius: 8px; background: rgba(99,102,241,0.15);
+  color: #6366f1; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.tour-helpline-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.tour-helpline-info strong { font-size: 12px; }
+.tour-helpline-num { font-size: 11px; color: #10b981; font-weight: 700; }
+.tour-call-badge {
+  display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 6px;
+  background: #10b981; color: #fff; font-size: 10px; font-weight: 700;
+}
+
+/* ── Tour Analytics Tab ── */
+.tour-analytics-tab { display: flex; flex-direction: column; padding: 14px 16px; gap: 16px; }
+.tour-analytics-kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.tour-analytics-card {
+  display: flex; align-items: center; gap: 10px; background: var(--bg-card);
+  border: 1px solid var(--border-color); border-radius: 14px; padding: 12px;
+}
+.tour-analytics-icon {
+  width: 38px; height: 38px; border-radius: 10px; display: flex;
+  align-items: center; justify-content: center; flex-shrink: 0;
+}
+.tour-analytics-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.tour-analytics-info .label { font-size: 10px; color: var(--text-dim); }
+.tour-analytics-info .val { font-size: 15px; font-weight: 800; color: var(--text-main); }
+.tour-analytics-info .sub { font-size: 10px; color: var(--text-muted); }
+.tour-analytics-section { display: flex; flex-direction: column; gap: 10px; }
+.tour-analytics-section-title {
+  display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--text-main);
+}
+.tour-bike-stats-list { display: flex; flex-direction: column; gap: 8px; }
+.tour-bike-stat-row {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bg-card); border: 1px solid var(--border-color);
+  border-radius: 12px; padding: 10px 12px; gap: 8px;
+}
+.tour-bike-stat-left { display: flex; align-items: center; gap: 8px; }
+.tour-bike-icon-circle {
+  width: 32px; height: 32px; border-radius: 50%; background: rgba(99,102,241,0.15);
+  color: #6366f1; display: flex; align-items: center; justify-content: center;
+}
+.tour-bike-stat-left strong { display: block; font-size: 12px; color: var(--text-main); }
+.tour-bike-stat-left .rider-name { font-size: 10px; color: var(--text-dim); }
+.tour-bike-stat-right { display: flex; gap: 8px; }
+.stat-pill { display: flex; flex-direction: column; align-items: flex-end; font-size: 11px; color: var(--text-muted); }
+.stat-pill .lbl { font-size: 9px; color: var(--text-dim); }
+.stat-pill.highlight strong { color: #10b981; }
+
+.tour-leaderboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.tour-leaderboard-card {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  background: var(--bg-card); border: 1.5px solid var(--border-color);
+  border-radius: 14px; padding: 12px 8px; gap: 6px;
+}
+.tour-leaderboard-card.gold { border-color: rgba(245,158,11,0.4); background: rgba(245,158,11,0.05); }
+.tour-leaderboard-card.silver { border-color: rgba(148,163,184,0.4); background: rgba(148,163,184,0.05); }
+.tour-leaderboard-card.bronze { border-color: rgba(217,119,6,0.4); background: rgba(217,119,6,0.05); }
+.trophy-badge { font-size: 24px; }
+.leaderboard-info { display: flex; flex-direction: column; gap: 2px; }
+.badge-title { font-size: 10px; color: var(--text-dim); }
+.rider-winner { font-size: 12px; font-weight: 700; color: var(--text-main); }
+.leaderboard-info .score { font-size: 10px; color: #10b981; font-weight: 600; }
+
