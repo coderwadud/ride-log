@@ -349,17 +349,19 @@ export default function TourCostEstimatorModal({ lang = 'bn', onClose, onConvert
 
         {/* Footer Actions */}
         <div className="tour-estimator-footer">
-          <button className="tour-btn-ghost" onClick={downloadEstimatePdf} title="PDF Download">
-            <Download size={14} />
-            <span>PDF রিপোর্ট</span>
-          </button>
-          <button className="tour-btn-ghost" onClick={downloadEstimateExcel} title="Excel CSV Download">
-            <FileText size={14} />
-            <span>Excel ফাইল</span>
-          </button>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button className="tour-btn-export pdf" onClick={downloadEstimatePdf} title="Download PDF Estimate">
+              <Download size={14} />
+              <span>PDF রিপোর্ট</span>
+            </button>
+            <button className="tour-btn-export excel" onClick={downloadEstimateExcel} title="Download Excel CSV">
+              <FileText size={14} />
+              <span>Excel ফাইল</span>
+            </button>
+          </div>
           {onConvertToTour && (
             <button className="tour-btn-primary" onClick={handleConvertToTour} style={{ marginLeft: 'auto' }}>
-              <span>{t.convertIntoTour || 'ট্যুর তৈরি করুন'}</span>
+              <span>{t.convertIntoTour || 'ট্যুরে রূপান্তর'}</span>
               <ArrowRight size={14} />
             </button>
           )}
