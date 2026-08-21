@@ -181,6 +181,8 @@ export async function uploadMediaToGoogleDrive(accessToken, file, folderId, capt
 
   return {
     driveFileId: fileId,
+    folderId,
+    folderViewLink: `https://drive.google.com/drive/folders/${folderId}`,
     fileName: file.name,
     fileType,
     mimeType: file.type || 'image/jpeg',
@@ -191,4 +193,11 @@ export async function uploadMediaToGoogleDrive(accessToken, file, folderId, capt
     previewUrl: `https://drive.google.com/thumbnail?id=${fileId}&sz=w1200`,
     directStreamUrl: `https://drive.google.com/uc?id=${fileId}`
   };
+}
+
+/**
+ * Get the Root Drive folder ID for 'ridelogbd-app-image'
+ */
+export async function getRootDriveFolder(accessToken) {
+  return await findOrCreateFolder(accessToken, 'ridelogbd-app-image');
 }

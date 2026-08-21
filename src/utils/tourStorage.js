@@ -666,6 +666,8 @@ export async function addTourPhoto(tourId, photoData) {
     uploaderPhoto: photoData.uploaderPhoto || '',
     source: photoData.source || 'upload', // google_drive | upload | camera
     driveFileId: photoData.driveFileId || '',
+    folderId: photoData.folderId || '',
+    folderViewLink: photoData.folderViewLink || '',
     createdAt: new Date().toISOString()
   };
   await setDoc(doc(db, 'tours', tourId, 'gallery', id), docData);

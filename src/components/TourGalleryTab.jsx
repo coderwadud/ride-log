@@ -194,9 +194,22 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
               <span>{driveConnecting ? 'কানেক্ট হচ্ছে...' : (t.connectDrive || 'Google Drive কানেক্ট')}</span>
             </button>
           ) : (
-            <div className="tour-drive-connected-badge">
-              <CloudCheck size={14} />
-              <span>Google Drive Connected</span>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <div className="tour-drive-connected-badge">
+                <CloudCheck size={14} />
+                <span>Google Drive Connected</span>
+              </div>
+              <a
+                href="https://drive.google.com/drive/u/0/my-drive"
+                target="_blank"
+                rel="noreferrer"
+                className="tour-btn-ghost small"
+                style={{ color: '#818cf8', borderColor: 'rgba(99,102,241,0.4)', textDecoration: 'none', gap: '4px' }}
+                title="Open Google Drive"
+              >
+                <ExternalLink size={13} />
+                <span>{lang === 'bn' ? 'ড্রাইভ ফোল্ডার' : 'Open Drive'}</span>
+              </a>
             </div>
           )}
 
@@ -223,8 +236,8 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
       {/* Pure Google Drive Notice */}
       <div className="tour-gallery-drive-note">
         📁 {lang === 'bn'
-          ? 'আপনার আপলোড করা ছবি, ভিডিও ও PDF ফাইলসমূহ এক্সক্লুসিভলি আপনার Google Drive-এর "RideLog BD/Tours" ফোল্ডারে জমা হয় এবং ট্যুর মেম্বাররা সরাসরি দেখতে পাবেন।'
-          : 'Media files are exclusively stored in your personal Google Drive under "RideLog BD/Tours" and viewable by tour members.'}
+          ? 'আপনার আপলোড করা ছবি, ভিডিও ও PDF ফাইলসমূহ এক্সক্লুসিভলি আপনার Google Drive-এর "ridelogbd-app-image" ফোল্ডারে জমা হয়।'
+          : 'Media files are exclusively stored in your Google Drive under "ridelogbd-app-image".'}
       </div>
 
       {/* Gallery Grid (Images, Videos, PDFs) */}
