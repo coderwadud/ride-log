@@ -647,16 +647,24 @@ export function listenToTourStops(tourId, callback) {
 // ─── TOUR GALLERY ─────────────────────────────────────────────────────────────
 
 export async function addTourPhoto(tourId, photoData) {
-  if (!tourId || !photoData.photoUrl) return null;
+  if (!tourId || (!photoData.photoUrl && !photoData.driveFileId)) return null;
   const id = generateId('photo');
   const docData = {
     id,
-    photoUrl: photoData.photoUrl,
+    photoUrl: photoData.photoUrl || photoData.thumbnailUrl || '',
+    previewUrl: photoData.previewUrl || photoData.photoUrl || '',
+    thumbnailUrl: photoData.thumbnailUrl || photoData.photoUrl || '',
+    webViewLink: photoData.webViewLink || '',
+    downloadUrl: photoData.webContentLink || photoData.downloadUrl || '',
+    fileName: photoData.fileName || '',
+    fileType: photoData.fileType || 'image', // image | video | pdf | other
+    mimeType: photoData.mimeType || 'image/jpeg',
+    fileSizeBytes: Number(photoData.fileSizeBytes) || 0,
     caption: photoData.caption || '',
     uploadedBy: photoData.uploadedBy || '',
     uploaderName: photoData.uploaderName || 'Member',
     uploaderPhoto: photoData.uploaderPhoto || '',
-    source: photoData.source || 'upload', // upload | camera | drive
+    source: photoData.source || 'upload', // google_drive | upload | camera
     driveFileId: photoData.driveFileId || '',
     createdAt: new Date().toISOString()
   };

@@ -2072,25 +2072,60 @@ h5 {
 .tour-stop-status-btn.departed { background: var(--bg-input); color: var(--text-dim); }
 
 /* ── Tour Gallery Tab ── */
+/* ── Tour Gallery Tab (Google Drive Powered) ── */
 .tour-gallery-tab { display: flex; flex-direction: column; padding: 14px 16px; gap: 12px; }
-.tour-gallery-header { display: flex; align-items: center; justify-content: space-between; }
+.tour-gallery-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 .tour-gallery-count { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--text-main); }
+.tour-drive-connected-badge {
+  display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700;
+  color: #10b981; background: rgba(16,185,129,0.12); padding: 4px 10px;
+  border-radius: 20px; border: 1px solid rgba(16,185,129,0.3);
+}
+.tour-gallery-drive-note {
+  font-size: 11px; color: #818cf8; background: rgba(99,102,241,0.08);
+  border: 1px dashed rgba(99,102,241,0.3); padding: 8px 12px; border-radius: 10px;
+  line-height: 1.4;
+}
 .tour-gallery-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px;
 }
 .tour-photo-card {
   position: relative; aspect-ratio: 1; border-radius: 12px; overflow: hidden;
   border: 1px solid var(--border-color); cursor: pointer; background: var(--bg-input);
 }
+.tour-photo-card.video { border-color: rgba(99,102,241,0.4); }
+.tour-photo-card.pdf { border-color: rgba(239,68,68,0.4); }
 .tour-photo-thumb { width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s; }
 .tour-photo-card:hover .tour-photo-thumb { transform: scale(1.05); }
-.tour-photo-overlay {
-  position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 60%);
-  display: flex; flex-direction: column; justify-content: flex-end; padding: 6px;
-  color: #fff; font-size: 10px; opacity: 0.9;
+
+.tour-video-thumb-wrap {
+  width: 100%; height: 100%; background: linear-gradient(135deg, #1e1b4b, #0f172a);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  position: relative;
 }
-.tour-photo-caption { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tour-photo-uploader { font-size: 8px; color: rgba(255,255,255,0.7); }
+.tour-video-play-icon {
+  width: 38px; height: 38px; border-radius: 50%; background: rgba(99,102,241,0.8);
+  display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+}
+.tour-video-tag {
+  position: absolute; top: 6px; right: 6px; font-size: 8px; font-weight: 800;
+  background: #ef4444; color: #fff; padding: 2px 5px; border-radius: 4px;
+}
+
+.tour-pdf-thumb-wrap {
+  width: 100%; height: 100%; background: linear-gradient(135deg, #2d1515, #0f172a);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 10px; text-align: center; gap: 4px;
+}
+.tour-pdf-name { font-size: 10px; font-weight: 700; color: #f87171; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 90%; }
+
+.tour-photo-overlay {
+  position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 60%);
+  display: flex; flex-direction: column; justify-content: flex-end; padding: 6px;
+  color: #fff; font-size: 10px; opacity: 0.95;
+}
+.tour-photo-caption { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
+.tour-photo-uploader { font-size: 9px; color: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: space-between; }
 .tour-lightbox-modal {
   position: relative; max-width: 90vw; max-height: 90vh;
   display: flex; flex-direction: column; align-items: center;
@@ -2105,7 +2140,7 @@ h5 {
 .tour-lightbox-info {
   margin-top: 10px; width: 100%; display: flex; align-items: center;
   justify-content: space-between; color: #fff; background: rgba(0,0,0,0.6);
-  padding: 10px 14px; border-radius: 10px;
+  padding: 10px 14px; border-radius: 10px; flex-wrap: wrap; gap: 8px;
 }
 .tour-lightbox-meta { display: flex; flex-direction: column; gap: 2px; }
 .tour-lightbox-meta span { font-size: 11px; color: rgba(255,255,255,0.6); }
