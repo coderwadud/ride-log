@@ -11,58 +11,7 @@ import {
   getTourDriveFolder,
   uploadMediaToGoogleDrive
 } from '../utils/googleDriveStorage';
-
-function compressGalleryImage(file, maxWidth = 1280, maxHeight = 1280, quality = 0.75) {
-  return new Promise((resolve) => {
-    if (!file || !file.type.startsWith('image/')) {
-      resolve('');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        let width = img.width;
-        let height = img.height;
-
-        if (width > maxWidth || height > maxHeight) {
-          if (width > height) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
-          } else {
-            width = Math.round((width * maxHeight) / height);
-            height = maxHeight;
-          }
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-
-        let dataUrl = canvas.toDataURL('image/jpeg', quality);
-        if (dataUrl.length > 800000) {
-          dataUrl = canvas.toDataURL('image/jpeg', 0.55);
-        }
-        resolve(dataUrl);
-      };
-      img.onerror = () => resolve(e.target.result);
-      img.src = e.target.result;
-    };
-    reader.onerror = () => resolve('');
-    reader.readAsDataURL(file);
-  });
-}
-
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
+import { uploadDocumentToCloudinary } from '../utils/cloudinary';
 
 export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrganizer }) {
   const t = translations[lang] || translations['bn'];
@@ -142,7 +91,7 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
     e.target.value = '';
   };
 
-  // Execute Upload: Upload to User's Google Drive -> Save Metadata to Firestore
+  // 1. Upload to Google Drive (Zero Firebase storage)
   const handleSaveToDrive = async () => {
     if (!selectedFile) return;
     setUploading(true);
@@ -151,20 +100,16 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
     setUploadProgress(lang === 'bn' ? 'গুগল ড্রাইভ অথেনটিকেশন যাচাই হচ্ছে...' : 'Authenticating Google Drive...');
 
     try {
-      // 1. Get Drive Token (request if not active)
       const token = await getDriveAccessToken();
       if (!token) throw new Error('Google Drive authentication failed');
       setHasDriveToken(true);
 
-      // 2. Get/Create Tour Folder in user's Google Drive
       setUploadProgress(lang === 'bn' ? 'ড্রাইভে ট্যুর ফোল্ডার প্রস্তুত হচ্ছে...' : 'Setting up Tour folder in Drive...');
       const folderId = await getTourDriveFolder(token, tour?.title || 'RideLog Tour');
 
-      // 3. Upload File into the Tour Folder
       setUploadProgress(lang === 'bn' ? 'ফাইল আপনার গুগল ড্রাইভে আপলোড হচ্ছে...' : 'Uploading file to your Google Drive...');
       const driveMedia = await uploadMediaToGoogleDrive(token, selectedFile, folderId, caption);
 
-      // 4. Save file metadata to Tour Gallery in Firestore
       setUploadProgress(lang === 'bn' ? 'ট্যুর মেম্বারদের জন্য তথ্য সংরক্ষণ হচ্ছে...' : 'Saving to Tour Gallery...');
       await addTourPhoto(tourId, {
         ...driveMedia,
@@ -175,7 +120,6 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
         source: 'google_drive'
       });
 
-      // Cleanup
       if (filePreview?.url) URL.revokeObjectURL(filePreview.url);
       setSelectedFile(null);
       setFilePreview(null);
@@ -196,32 +140,34 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
     }
   };
 
-  // Direct Fallback Upload (When Google Drive API is not yet activated on Google Console)
-  const handleDirectFallbackUpload = async () => {
+  // 2. Upload to Cloudinary CDN (Zero Firebase storage)
+  const handleCloudinaryUpload = async () => {
     if (!selectedFile) return;
     setUploading(true);
-    setUploadProgress(lang === 'bn' ? 'ফাইল অপ্টিমাইজ ও আপলোড হচ্ছে...' : 'Optimizing and uploading file...');
+    setUploadError('');
+    setUploadProgress(lang === 'bn' ? 'ক্লাউড সিডিএন-এ ফাইল আপলোড হচ্ছে...' : 'Uploading to Cloud CDN...');
+
     try {
-      let dataUrl = '';
-      if (selectedFile.type.startsWith('image/')) {
-        dataUrl = await compressGalleryImage(selectedFile);
-      } else {
-        dataUrl = await fileToBase64(selectedFile);
+      const res = await uploadDocumentToCloudinary(selectedFile);
+      if (!res.success || !res.url) {
+        throw new Error(res.error || 'Cloud upload failed');
       }
 
+      setUploadProgress(lang === 'bn' ? 'ট্যুর মেম্বারদের জন্য তথ্য সংরক্ষণ হচ্ছে...' : 'Saving to Tour Gallery...');
       await addTourPhoto(tourId, {
-        photoUrl: dataUrl,
-        previewUrl: dataUrl,
-        thumbnailUrl: dataUrl,
+        photoUrl: res.url,
+        previewUrl: res.url,
+        thumbnailUrl: res.url,
+        downloadUrl: res.url,
         fileName: selectedFile.name,
         fileType: filePreview?.type || 'image',
-        mimeType: selectedFile.type,
-        fileSizeBytes: selectedFile.size,
+        mimeType: selectedFile.type || 'image/jpeg',
+        fileSizeBytes: selectedFile.size || res.bytes || 0,
         caption: caption.trim(),
         uploadedBy: user?.uid || 'anonymous',
         uploaderName: user?.displayName || user?.email?.split('@')[0] || 'Rider',
         uploaderPhoto: user?.photoURL || '',
-        source: 'upload'
+        source: 'cloudinary'
       });
 
       if (filePreview?.url) URL.revokeObjectURL(filePreview.url);
@@ -230,8 +176,8 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
       setCaption('');
       setShowUploadModal(false);
     } catch (err) {
-      console.error('Direct upload error:', err);
-      setUploadError(err.message || 'Direct upload failed');
+      console.error('Cloud upload error:', err);
+      setUploadError(err.message || 'Upload failed');
     } finally {
       setUploading(false);
       setUploadProgress('');
@@ -314,11 +260,11 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
         </div>
       </div>
 
-      {/* Google Drive Privacy Note Banner */}
+      {/* Zero Firebase Storage Notice */}
       <div className="tour-gallery-drive-note">
-        🔒 {lang === 'bn'
-          ? 'ছবি, ভিডিও ও PDF আপলোড করলে ট্যুরের সকল সদস্য দেখতে, প্লে করতে ও ডাউনলোড করতে পারবেন।'
-          : 'Uploaded photos, videos, and PDFs can be viewed, played, and downloaded by all tour members.'}
+        ☁️ {lang === 'bn'
+          ? 'আপনার ছবি, ভিডিও ও PDF ফাইলসমূহ সরাসরি আপনার Google Drive বা ক্লাউড সিডিএন-এ সংরক্ষিত হয় (ফায়ারবেসে কোনো ফাইল রাখা হয় না)।'
+          : 'Media files are stored on Google Drive or Cloud CDN (0 binary files on Firebase).'}
       </div>
 
       {/* Gallery Grid (Images, Videos, PDFs) */}
@@ -381,7 +327,7 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
           <div className="tour-create-modal" style={{ maxWidth: '480px' }}>
             <div className="tour-create-header">
               <div className="tour-create-title-row">
-                <HardDrive size={16} className="text-indigo-400" />
+                <Cloud size={16} className="text-indigo-400" />
                 <span>{lang === 'bn' ? 'ফাইল আপলোড করুন' : 'Upload File'}</span>
               </div>
               <button className="tour-close-btn" onClick={() => setShowUploadModal(false)}><X size={16} /></button>
@@ -442,12 +388,12 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
                       </a>
                       <button
                         className="tour-btn-ghost small"
-                        onClick={handleDirectFallbackUpload}
+                        onClick={handleCloudinaryUpload}
                         disabled={uploading}
                         style={{ color: '#10b981', borderColor: 'rgba(16,185,129,0.4)', justifyContent: 'center' }}
                       >
                         <UploadCloud size={13} />
-                        <span>⚡ সরাসরি অ্যাপে আপলোড করুন (Direct Upload)</span>
+                        <span>⚡ ক্লাউড সিডিএন-এ আপলোড করুন (Cloud CDN Upload)</span>
                       </button>
                     </div>
                   )}
@@ -459,13 +405,13 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
               <button className="tour-btn-ghost" onClick={() => setShowUploadModal(false)} disabled={uploading}>
                 {lang === 'bn' ? 'বাতিল' : 'Cancel'}
               </button>
-              <button className="tour-btn-ghost" onClick={handleDirectFallbackUpload} disabled={uploading} title="Direct Cloud Upload" style={{ color: '#10b981' }}>
+              <button className="tour-btn-ghost" onClick={handleCloudinaryUpload} disabled={uploading} title="Cloud Upload" style={{ color: '#10b981', borderColor: 'rgba(16,185,129,0.3)' }}>
                 <UploadCloud size={14} />
-                <span>{lang === 'bn' ? 'সরাসরি আপলোড' : 'Direct Upload'}</span>
+                <span>{lang === 'bn' ? 'ক্লাউড সিডিএন আপলোড' : 'Cloud CDN'}</span>
               </button>
               <button className="tour-btn-primary" onClick={handleSaveToDrive} disabled={uploading}>
                 <HardDrive size={14} />
-                <span>{uploading ? (lang === 'bn' ? 'আপলোড হচ্ছে...' : 'Uploading...') : (lang === 'bn' ? 'Google Drive-এ আপলোড' : 'Upload to Drive')}</span>
+                <span>{uploading ? (lang === 'bn' ? 'আপলোড হচ্ছে...' : 'Uploading...') : (lang === 'bn' ? 'Google Drive-এ আপলোড' : 'Google Drive')}</span>
               </button>
             </div>
           </div>
