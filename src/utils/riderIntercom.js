@@ -198,6 +198,7 @@ export class RiderIntercomEngine {
       echoCancellation: true,
       autoGainControl: true,
       pttMode: false,
+      lang: options.lang || 'bn',
       ...options
     };
 
@@ -228,9 +229,14 @@ export class RiderIntercomEngine {
    */
   async setupLocalAudio() {
     if (this.localStream) return this.localStream;
+    const isBn = this.options.lang === 'bn';
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      throw new Error('আপনার ডিভাইসের ব্রাউজার ভয়েস কলিং সাপোর্ট করছে না বা সাইটটি HTTPS-এ নেই।');
+      throw new Error(
+        isBn
+          ? 'আপনার ডিভাইসের ব্রাউজার ভয়েস কলিং সাপোর্ট করছে না বা সাইটটি HTTPS-এ নেই।'
+          : 'Voice intercom is not supported on this browser or connection is not secure (HTTPS).'
+      );
     }
 
     try {
@@ -252,11 +258,23 @@ export class RiderIntercomEngine {
       } catch (fallbackErr) {
         console.error('Microphone access denied or failed:', fallbackErr);
         if (fallbackErr.name === 'NotAllowedError' || fallbackErr.name === 'PermissionDeniedError') {
-          throw new Error('মাইক্রোফোন পারমিশন বন্ধ আছে। অনুগ্রহ করে ব্রাউজার বা ফোনের সাইট সেটিংসে গিয়ে Microphone Allow (অনুমতি দিন) করুন।');
+          throw new Error(
+            isBn
+              ? 'মাইক্রোফোন পারমিশন বন্ধ আছে। অনুগ্রহ করে ব্রাউজার বা ফোনের সাইট সেটিংসে গিয়ে Microphone Allow (অনুমতি দিন) করুন।'
+              : 'Microphone permission is blocked. Please allow microphone access in your browser or device settings.'
+          );
         } else if (fallbackErr.name === 'NotFoundError' || fallbackErr.name === 'DevicesNotFoundError') {
-          throw new Error('কোনো মাইক্রোফোন খুঁজে পাওয়া যায়নি।');
+          throw new Error(
+            isBn
+              ? 'কোনো মাইক্রোফোন খুঁজে পাওয়া যায়নি। অনুগ্রহ করে হেডফোন বা মাইক্রোফোন যুক্ত করুন।'
+              : 'No microphone found. Please connect a headset or microphone to your device.'
+          );
         } else {
-          throw new Error(`মাইক্রোফোন চালু করা যায়নি (${fallbackErr.message || fallbackErr.name})`);
+          throw new Error(
+            isBn
+              ? `মাইক্রোফোন চালু করা যায়নি (${fallbackErr.message || fallbackErr.name})`
+              : `Could not access microphone (${fallbackErr.message || fallbackErr.name})`
+          );
         }
       }
     }

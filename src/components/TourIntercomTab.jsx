@@ -78,6 +78,7 @@ export default function TourIntercomTab({
         engine = new RiderIntercomEngine(tourId, user, {
           pttMode: false,
           noiseSuppression: noiseFilter,
+          lang: lang,
           onStateChange: (state) => {
             setIntercomState(state);
           },
