@@ -59,7 +59,6 @@ export default function TourIntercomTab({
   const [noiseFilter] = useState(true);
   const [isWifiScanning, setIsWifiScanning] = useState(false);
   const [wifiDirectState, setWifiDirectState] = useState({ isScanning: false, discoveredPeers: [], localIp: null });
-  const [showQrModal, setShowQrModal] = useState(false);
 
   const pttButtonRef = useRef(null);
 
@@ -497,7 +496,7 @@ export default function TourIntercomTab({
         </div>
       )}
 
-      {/* Wi-Fi Direct (Wi-Fi to Wi-Fi P2P) Auto-Connect Radar Box */}
+      {/* Wi-Fi Direct (Wi-Fi to Wi-Fi P2P) 100% Auto-Connect Radar Box */}
       <div className={`tour-wifi-direct-card ${isWifiScanning ? 'scanning' : ''}`}>
         <div className="wifi-direct-top">
           <div className="wifi-direct-icon-wrap">
@@ -506,12 +505,12 @@ export default function TourIntercomTab({
           </div>
           <div className="wifi-direct-info">
             <span className="wifi-direct-title">
-              {lang === 'bn' ? '⚡ Wi-Fi Direct অটো কানেক্ট (পাসওয়ার্ড ছাড়া)' : '⚡ Wi-Fi Direct Auto Connect (No Password)'}
+              {lang === 'bn' ? '⚡ Wi-Fi Direct অটো কানেক্ট (পাসওয়ার্ড ও স্ক্যান ছাড়া)' : '⚡ Wi-Fi Direct Auto Connect (No Password, No Scanning)'}
             </span>
             <span className="wifi-direct-subtitle">
               {isWifiScanning
-                ? (lang === 'bn' ? 'কাছাকাছি রাইডারদের স্ক্যান করা হচ্ছে... (Wi-Fi চালু রাখুন)' : 'Scanning nearby rider devices on Wi-Fi...')
-                : (lang === 'bn' ? 'ইন্টারনেট বা হটস্পট ছাড়াও Wi-Fi চালু থাকলে অটো পেয়ারিং হবে' : 'Auto-pair phone-to-phone on local Wi-Fi without passwords')}
+                ? (lang === 'bn' ? 'কাছাকাছি রাইডারদের সাথে স্বয়ংক্রিয়ভাবে কানেক্ট হচ্ছে...' : 'Auto-connecting to nearby riders on Wi-Fi...')
+                : (lang === 'bn' ? 'শুধু Wi-Fi অন রাখলেই ফোনগুলো স্বয়ংক্রিয়ভাবে একে অপরের সাথে যুক্ত হবে' : 'Just keep Wi-Fi on; phones auto-pair directly')}
             </span>
           </div>
         </div>
@@ -524,23 +523,14 @@ export default function TourIntercomTab({
             {isWifiScanning ? (
               <>
                 <Loader size={14} className="spin text-amber-400" />
-                <span>{lang === 'bn' ? 'স্ক্যানিং চলছে...' : 'Scanning Wi-Fi...'}</span>
+                <span>{lang === 'bn' ? 'অটো-কানেকশন সক্রিয়...' : 'Auto-Connection Active...'}</span>
               </>
             ) : (
               <>
                 <Zap size={14} />
-                <span>{lang === 'bn' ? 'Wi-Fi Direct স্ক্যান শুরু করুন' : 'Start Wi-Fi Direct'}</span>
+                <span>{lang === 'bn' ? 'Wi-Fi Direct অটো কানেক্ট চালু করুন' : 'Enable Wi-Fi Direct Auto-Connect'}</span>
               </>
             )}
-          </button>
-
-          <button
-            className="wifi-direct-qr-btn"
-            onClick={() => setShowQrModal(true)}
-            title="1-Tap QR Code"
-          >
-            <QrCode size={14} />
-            <span>{lang === 'bn' ? '১-ট্যাপ QR' : '1-Tap QR'}</span>
           </button>
         </div>
 
@@ -550,44 +540,6 @@ export default function TourIntercomTab({
           </div>
         )}
       </div>
-
-      {/* 1-Tap QR Instant Connection Modal */}
-      {showQrModal && (
-        <div className="tour-modal-backdrop" onClick={() => setShowQrModal(false)}>
-          <div className="tour-qr-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="tour-qr-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <QrCode size={20} className="text-emerald-400" />
-                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800 }}>
-                  {lang === 'bn' ? '১-ক্লিকে অটো কানেক্ট QR' : '1-Tap Auto Connect QR'}
-                </h3>
-              </div>
-              <button className="tour-qr-close-btn" onClick={() => setShowQrModal(false)}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="tour-qr-body">
-              <div className="tour-qr-frame">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent('WIFI:T:nopass;S:RideLog_Tour_Mesh;P:;;')}`}
-                  alt="Wi-Fi Direct QR Code"
-                  className="tour-qr-image"
-                />
-              </div>
-
-              <div className="tour-qr-instructions">
-                <Smartphone size={16} className="text-indigo-400" />
-                <p>
-                  {lang === 'bn'
-                    ? 'পাশের রাইডারকে তার ফোনের ক্যামেরা বা কিউআর স্ক্যানার দিয়ে এটি স্ক্যান করতে বলুন। কোনো পাসওয়ার্ড টাইপ না করেই ১ ক্লিকে অটো কানেক্ট হবে।'
-                    : 'Ask nearby riders to scan this QR with their camera. They will connect instantly with zero password typing.'}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Offline Rider Mesh & Hotspot Bridge Guide Box */}
       <div className="tour-intercom-mesh-guide">
