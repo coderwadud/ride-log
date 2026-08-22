@@ -1471,18 +1471,194 @@ h5 {
 }
 .tour-calc-route-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
-.tour-routes-list { display: flex; flex-direction: column; gap: 8px; }
-.tour-route-card {
-  display: flex; align-items: center; gap: 10px;
-  width: 100%; padding: 12px 14px; border-radius: 12px;
-  background: var(--bg-input); border: 2px solid var(--border-color);
-  cursor: pointer; transition: all 0.2s; text-align: left;
+.tour-create-map-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
 }
-.tour-route-card.selected { border-color: #6366f1; background: rgba(99,102,241,0.1); }
-.tour-route-badge { font-size: 11px; font-weight: 700; color: var(--text-dim); min-width: 70px; }
-.tour-route-stats { display: flex; gap: 14px; flex: 1; }
-.tour-route-stats span { font-size: 13px; color: var(--text-main); }
-.tour-route-selected-mark { color: #6366f1; margin-left: auto; }
+.tour-create-map-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.tour-create-map-container {
+  height: 230px;
+  width: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1.5px solid var(--border-color);
+  position: relative;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+  background: #0f172a;
+}
+.tour-create-map-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 500;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  padding: 4px 10px;
+  border-radius: 14px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #818cf8;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+}
+
+/* Smart Recommendation Banner */
+.tour-recommendation-card {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.14), rgba(16, 185, 129, 0.1));
+  border: 1.5px solid rgba(99, 102, 241, 0.4);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.1);
+}
+.tour-recommendation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.tour-recommendation-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #818cf8;
+}
+.tour-recommendation-pill {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #10b981;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.tour-recommendation-text {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin: 0;
+}
+.tour-recommendation-text strong {
+  color: var(--text-main);
+}
+
+/* Enhanced Route Cards in Modal */
+.tour-routes-list { display: flex; flex-direction: column; gap: 8px; }
+.tour-route-item-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--bg-input);
+  border: 2px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+.tour-route-item-btn:hover {
+  border-color: rgba(99, 102, 241, 0.45);
+  transform: translateY(-1px);
+}
+.tour-route-item-btn.selected {
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.12);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.2);
+}
+.tour-route-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.tour-route-item-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.tour-route-badges-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.tour-badge-fastest {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 8px;
+  background: rgba(16, 185, 129, 0.18);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.tour-badge-shortest {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 8px;
+  background: rgba(56, 189, 248, 0.18);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.tour-badge-best {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.tour-route-item-stats {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+.tour-route-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.tour-route-stat-item strong {
+  color: var(--text-main);
+  font-weight: 700;
+}
+.tour-route-stat-item.fuel strong {
+  color: #f59e0b;
+}
 
 .tour-cost-params { display: flex; flex-direction: column; gap: 12px; }
 .tour-cost-breakdown { display: flex; flex-direction: column; gap: 8px; background: var(--bg-input); border-radius: 12px; padding: 14px; }

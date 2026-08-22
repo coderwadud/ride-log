@@ -1,0 +1,71 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ── 1. USERS & SUBCOLLECTIONS ─────────────────────────────────────────────
+    // (bikes, fuel_logs, service_logs, trips, documents_meta)
+    match /users/{userId} {
+      // User can read and write their own doc; authenticated users/admin can read for admin & collaboration
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isOwner(userId));
+
+      match /{allSubcollections=**} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+
+    // ── 2. USER INDEX (For Tour Member Search & Invite) ──────────────────────
+    match /user_index/{userId} {
+      // Any logged in rider can search user_index to invite by email or phone
+      allow read: if isAuthenticated();
+      // Riders can only update their own index profile
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ── 3. TOURS & TOUR SUBCOLLECTIONS ─────────────────────────────────────────
+    // Subcollections: members, expenses, fund_contributions, live_locations, stops, gallery, sos_alerts, settlements
+    match /tours/{tourId} {
+      // Any authenticated user can create, view, or manage tours
+      allow read, write: if isAuthenticated();
+
+      match /{allSubcollections=**} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+
+    // ── 4. SUPPORT FEEDBACK & TICKETS ─────────────────────────────────────────
+    match /feedbacks/{feedbackId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /supportTickets/{ticketId} {
+      allow read, write: if isAuthenticated();
+    }
+    match /tickets/{ticketId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ── 5. APP CONFIG (Version Control, Campaigns, Features) ──────────────────
+    match /app_config/{document} {
+      // Public read so the app can check for updates and notices before or after login
+      allow read: if true;
+      // Admin / authenticated user write
+      allow write: if isAuthenticated();
+    }
+
+    // ── 6. DIRECTORY (Petrol Pumps, Garages) ──────────────────────────────────
+    match /directory/{document} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+  }
+}

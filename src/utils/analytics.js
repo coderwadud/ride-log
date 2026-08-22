@@ -4,25 +4,11 @@
  * - Updates `lastActiveAt` in Firestore for inactive user detection
  */
 
-import { initializeApp, getApps } from 'firebase/app';
 import { getAnalytics, logEvent, isSupported } from 'firebase/analytics';
-import { getFirestore, doc, updateDoc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { getCurrentAppVersion, BASE_APP_VERSION } from './appVersion';
 import { Capacitor } from '@capacitor/core';
-
-const firebaseConfig = {
-  apiKey: "AIzaSyBmFLLRdpGmwW0fNaOw76AnzUOfItkMJkA",
-  authDomain: "ride-log-8511a.firebaseapp.com",
-  projectId: "ride-log-8511a",
-  storageBucket: "ride-log-8511a.firebasestorage.app",
-  messagingSenderId: "757251174457",
-  appId: "1:757251174457:web:08b7aead9de1f2cbe2dde8",
-  measurementId: "G-3VYKY7458H"
-};
-
-// Reuse existing Firebase app instance
-const app = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
-const db = getFirestore(app);
+import { app, db } from './firebase';
 
 // Analytics instance (lazy — only works in web/browser, not native Android)
 let analyticsInstance = null;

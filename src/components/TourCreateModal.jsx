@@ -1,5 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, MapPin, Plus, Trash2, ChevronRight, ChevronLeft, Loader, Check, Route, AlertCircle } from 'lucide-react';
+import { 
+  X, MapPin, Plus, Trash2, ChevronRight, ChevronLeft, Loader, 
+  Check, Route, AlertCircle, Sparkles, Zap, Compass, Clock, Fuel,
+  CheckCircle2, Info, Navigation
+} from 'lucide-react';
 import { translations } from '../utils/translations';
 import { createTour } from '../utils/tourStorage';
 import { calculateCostEstimate } from '../utils/tourCalculations';
@@ -29,6 +33,11 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
   const [routes, setRoutes] = useState([]);
   const [routesLoading, setRoutesLoading] = useState(false);
   const [selectedRouteIdx, setSelectedRouteIdx] = useState(0);
+
+  // Leaflet map refs
+  const mapContainerRef = useRef(null);
+  const leafletMapRef = useRef(null);
+  const routeLayersRef = useRef([]);
 
   // Step 3 state
   const [costParams, setCostParams] = useState({
@@ -60,6 +69,18 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
     }
   }, [startDate, endDate]);
 
+  // ── Format Duration Helper ────────────────────────────────────────────────
+  const formatDuration = useCallback((hours) => {
+    if (!hours) return '--';
+    const totalMinutes = Math.round(hours * 60);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    if (lang === 'bn') {
+      return `${h > 0 ? `${h} ঘণ্টা ` : ''}${m} মিনিট`;
+    }
+    return `${h > 0 ? `${h}h ` : ''}${m}m`;
+  }, [lang]);
+
   // ── Destination search ────────────────────────────────────────────────────
   const searchPlace = useCallback((query, destId) => {
     if (!query || query.length < 3) { setSearchResults(r => ({ ...r, [destId]: [] })); return; }
@@ -90,30 +111,63 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
   const addDestination = () => setDestinations(d => [...d, EMPTY_DEST()]);
   const removeDest = (id) => setDestinations(d => d.filter(dest => dest.id !== id));
 
-  // ── Route calculation ─────────────────────────────────────────────────────
+  // ── Route calculation with Steps & Geometry ──────────────────────────────
   const calculateRoutes = useCallback(async () => {
     const validDests = destinations.filter(d => d.lat && d.lng);
-    if (validDests.length < 2) { setError(lang === 'bn' ? 'কমপক্ষে ২টি গন্তব্য নির্বাচন করুন।' : 'Select at least 2 destinations.'); return; }
+    if (validDests.length < 2) { 
+      setError(lang === 'bn' ? 'কমপক্ষে ২টি গন্তব্য নির্বাচন করুন।' : 'Select at least 2 destinations.'); 
+      return; 
+    }
     setError('');
     setRoutesLoading(true);
     setRoutes([]);
     try {
       const coords = validDests.map(d => `${d.lng},${d.lat}`).join(';');
-      const url = `${OSRM_BASE}/${coords}?overview=full&geometries=geojson&alternatives=3`;
+      const url = `${OSRM_BASE}/${coords}?overview=full&geometries=geojson&alternatives=3&steps=true`;
       const res = await fetch(url);
       const data = await res.json();
       if (data.code === 'Ok' && data.routes?.length) {
-        const routeList = data.routes.map((r, i) => ({
-          index: i,
-          distanceKm: (r.distance / 1000),
-          durationHours: (r.duration / 3600),
-          geometry: r.geometry
+        const kmPerLiter = Number(costParams.kmPerLiter) || 40;
+        const fuelPrice = Number(costParams.fuelPricePerLiter) || 135;
+
+        const routeList = data.routes.map((r, i) => {
+          const distKm = Math.round((r.distance / 1000) * 10) / 10;
+          const durationHours = r.duration / 3600;
+          const fuelLiters = Math.round((distKm / kmPerLiter) * 10) / 10;
+          const fuelCost = Math.round(fuelLiters * fuelPrice);
+          const roadName = r.legs?.[0]?.summary || `Route ${i + 1}`;
+
+          return {
+            index: i,
+            distanceKm: distKm,
+            durationHours: durationHours,
+            fuelLiters: fuelLiters,
+            fuelCost: fuelCost,
+            summary: roadName,
+            geometry: r.geometry
+          };
+        });
+
+        // Find fastest and shortest routes for smart recommendation
+        let fastestIdx = 0;
+        let shortestIdx = 0;
+        routeList.forEach((r, idx) => {
+          if (r.durationHours < routeList[fastestIdx].durationHours) fastestIdx = idx;
+          if (r.distanceKm < routeList[shortestIdx].distanceKm) shortestIdx = idx;
+        });
+
+        const analyzed = routeList.map((r, idx) => ({
+          ...r,
+          isFastest: idx === fastestIdx,
+          isShortest: idx === shortestIdx,
+          isBestRecommended: idx === fastestIdx // Fastest route via highway is best for tours
         }));
-        setRoutes(routeList);
-        setSelectedRouteIdx(0);
+
+        setRoutes(analyzed);
+        setSelectedRouteIdx(fastestIdx);
 
         // Pre-fill toll with standard formula if not manually specified
-        const distKm = routeList[0]?.distanceKm || 0;
+        const distKm = analyzed[0]?.distanceKm || 0;
         setCostParams(p => ({
           ...p,
           tollCostManual: p.tollCostManual !== '' ? p.tollCostManual : Math.round(distKm * 0.5)
@@ -121,9 +175,149 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
       } else {
         setError(t.noRoutesFound);
       }
-    } catch { setError(t.noRoutesFound); }
-    finally { setRoutesLoading(false); }
-  }, [destinations, lang, t]);
+    } catch { 
+      setError(t.noRoutesFound); 
+    } finally { 
+      setRoutesLoading(false); 
+    }
+  }, [destinations, lang, t, costParams.kmPerLiter, costParams.fuelPricePerLiter]);
+
+  // ── Leaflet Map Setup & Invalidation in Step 2 ────────────────────────────
+  useEffect(() => {
+    if (step !== 2) return;
+    if (!mapContainerRef.current) return;
+
+    let isMounted = true;
+    if (!leafletMapRef.current) {
+      import('leaflet').then(L => {
+        if (!isMounted || !mapContainerRef.current) return;
+        if (leafletMapRef.current) return;
+
+        const map = L.map(mapContainerRef.current, {
+          center: [23.685, 90.356],
+          zoom: 7,
+          zoomControl: true
+        });
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap',
+          maxZoom: 19
+        }).addTo(map);
+
+        leafletMapRef.current = map;
+        setTimeout(() => {
+          if (map) map.invalidateSize();
+        }, 250);
+      }).catch(err => {
+        console.error('Leaflet load error:', err);
+      });
+    } else {
+      setTimeout(() => {
+        if (leafletMapRef.current) leafletMapRef.current.invalidateSize();
+      }, 200);
+    }
+  }, [step]);
+
+  // ── Draw Waypoint Markers & Routes on Leaflet Map ─────────────────────────
+  useEffect(() => {
+    if (step !== 2 || !leafletMapRef.current) return;
+
+    import('leaflet').then(L => {
+      const map = leafletMapRef.current;
+      if (!map) return;
+
+      // Clear existing layers
+      routeLayersRef.current.forEach(layer => layer.remove());
+      routeLayersRef.current = [];
+
+      const validDests = destinations.filter(d => d.lat && d.lng);
+
+      // 1. Draw Waypoint Markers
+      validDests.forEach((dest, i) => {
+        const isStart = i === 0;
+        const isEnd = i === validDests.length - 1;
+        const markerColor = isStart ? '#10b981' : isEnd ? '#ef4444' : '#38bdf8';
+        const markerEmoji = isStart ? '🚩' : isEnd ? '🏁' : `${i + 1}`;
+
+        const icon = L.divIcon({
+          className: '',
+          html: `
+            <div class="tour-waypoint-pin" style="border-color: ${markerColor}">
+              <div class="tour-waypoint-badge" style="background: ${markerColor}">${markerEmoji}</div>
+              <span class="tour-waypoint-name">${dest.name || `Point ${i + 1}`}</span>
+            </div>
+          `,
+          iconSize: [120, 36],
+          iconAnchor: [60, 36]
+        });
+
+        const m = L.marker([dest.lat, dest.lng], { icon })
+          .addTo(map)
+          .bindPopup(`<strong>${isStart ? (lang === 'bn' ? 'শুরুর স্থান' : 'Start') : isEnd ? (lang === 'bn' ? 'গন্তব্য' : 'Destination') : `${lang === 'bn' ? 'স্টপ' : 'Stop'} ${i}`}</strong><br>${dest.name}`);
+
+        routeLayersRef.current.push(m);
+      });
+
+      // 2. Draw Alternative Routes in Dashed Gray Lines
+      routes.forEach((r, idx) => {
+        if (!r.geometry || idx === selectedRouteIdx) return;
+        try {
+          const altLayer = L.geoJSON(r.geometry, {
+            style: {
+              color: '#94a3b8',
+              weight: 4,
+              opacity: 0.55,
+              dashArray: '6 6'
+            }
+          }).addTo(map);
+
+          altLayer.on('click', () => setSelectedRouteIdx(idx));
+          routeLayersRef.current.push(altLayer);
+        } catch (e) {}
+      });
+
+      // 3. Draw Active Selected Route with Glowing Vibrant Line
+      const activeRoute = routes[selectedRouteIdx];
+      if (activeRoute?.geometry) {
+        try {
+          const glowLayer = L.geoJSON(activeRoute.geometry, {
+            style: {
+              color: '#38bdf8',
+              weight: 8,
+              opacity: 0.35
+            }
+          }).addTo(map);
+          routeLayersRef.current.push(glowLayer);
+
+          const mainLayer = L.geoJSON(activeRoute.geometry, {
+            style: {
+              color: '#6366f1',
+              weight: 5,
+              opacity: 0.95
+            }
+          }).addTo(map);
+          routeLayersRef.current.push(mainLayer);
+
+          map.fitBounds(mainLayer.getBounds(), { padding: [30, 30], maxZoom: 15 });
+        } catch (e) {}
+      } else if (validDests.length > 0) {
+        const group = L.featureGroup(routeLayersRef.current);
+        if (group.getLayers().length > 0) {
+          map.fitBounds(group.getBounds(), { padding: [30, 30], maxZoom: 14 });
+        }
+      }
+    });
+  }, [step, routes, selectedRouteIdx, destinations, lang]);
+
+  // Clean up Leaflet on unmount
+  useEffect(() => {
+    return () => {
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove();
+        leafletMapRef.current = null;
+      }
+    };
+  }, []);
 
   // ── Cost estimation ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -194,6 +388,10 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
     }
   };
 
+  const activeRoute = routes[selectedRouteIdx] || routes[0];
+  const fastestRoute = routes.find(r => r.isFastest);
+  const shortestRoute = routes.find(r => r.isShortest);
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -259,7 +457,7 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
             </div>
           )}
 
-          {/* ── Step 2: Route & Destinations ── */}
+          {/* ── Step 2: Route, Interactive Map & Recommendation ── */}
           {step === 2 && (
             <div className="tour-step-content">
               <div className="form-group">
@@ -275,7 +473,7 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
                           className="tour-input"
                           value={dest.name}
                           onChange={e => { updateDest(dest.id, 'name', e.target.value); searchPlace(e.target.value, dest.id); }}
-                          placeholder={t.destinationPlaceholder}
+                          placeholder={idx === 0 ? (lang === 'bn' ? 'শুরুর স্থান (যেমন: ঢাকা)' : 'Starting location (e.g. Dhaka)') : idx === destinations.length - 1 ? (lang === 'bn' ? 'চূড়ান্ত গন্তব্য (যেমন: কক্সবাজার)' : 'Final destination (e.g. Cox\'s Bazar)') : t.destinationPlaceholder}
                         />
                         {dest.lat && <span className="tour-dest-confirmed"><Check size={12} /> {dest.lat.toFixed(3)}, {dest.lng.toFixed(3)}</span>}
                         {searchLoading[dest.id] && <Loader size={12} className="spin" />}
@@ -301,6 +499,7 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
                 </button>
               </div>
 
+              {/* Calculate Routes Button */}
               <button
                 className="tour-calc-route-btn"
                 onClick={calculateRoutes}
@@ -309,22 +508,136 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
                 {routesLoading ? <><Loader size={15} className="spin" /> {t.loadingRoutes}</> : <><Route size={15} /> {t.compareRoutes}</>}
               </button>
 
+              {/* 🗺️ Interactive Route Map Preview */}
+              <div className="tour-create-map-section">
+                <div className="tour-create-map-header">
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <Compass size={14} className="text-indigo-400" />
+                    {t.liveRouteMap || (lang === 'bn' ? 'ম্যাপে রুটের লাইভ প্রিভিউ' : 'Live Route Map Preview')}
+                  </span>
+                  {routes.length > 1 && (
+                    <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+                      {t.clickMapOrCard || (lang === 'bn' ? 'ম্যাপের লাইনে ক্লিক করে রুট পরিবর্তন করুন' : 'Click route line to select')}
+                    </span>
+                  )}
+                </div>
+
+                <div className="tour-create-map-container">
+                  <div ref={mapContainerRef} style={{ height: '100%', width: '100%' }} />
+
+                  <div className="tour-create-map-badge">
+                    <Navigation size={11} />
+                    <span>{routes.length > 0 ? `${routes.length} ${lang === 'bn' ? 'টি রুট' : 'routes'}` : (lang === 'bn' ? 'রুট ম্যাপ' : 'Route Map')}</span>
+                  </div>
+
+                  {routesLoading && (
+                    <div className="tour-map-route-loading">
+                      <Loader size={15} className="spin" />
+                      <span>{lang === 'bn' ? 'ম্যাপে রুট ড্র করা হচ্ছে...' : 'Drawing routes on map...'}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 💡 Smart Route Recommendation Box */}
+              {routes.length > 0 && activeRoute && (
+                <div className="tour-recommendation-card">
+                  <div className="tour-recommendation-header">
+                    <div className="tour-recommendation-title">
+                      <Sparkles size={14} className="text-indigo-400" />
+                      <span>{t.routeInsights || (lang === 'bn' ? 'রুট অ্যানালাইসিস ও সেরা পরামর্শ' : 'Route Insights & Recommendation')}</span>
+                    </div>
+                    {activeRoute.isBestRecommended && (
+                      <span className="tour-recommendation-pill">
+                        <CheckCircle2 size={11} /> {t.bestRouteRecommended || (lang === 'bn' ? 'সেরা পছন্দ' : 'Recommended')}
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="tour-recommendation-text">
+                    {lang === 'bn' ? (
+                      activeRoute.isBestRecommended && activeRoute.isShortest ? (
+                        <>💡 <strong>রুট {activeRoute.index + 1}</strong> সবচেয়ে সেরা বিকল্প — এটি সবচেয়ে দ্রুততম ({formatDuration(activeRoute.durationHours)}) এবং দূরত্বও সবচেয়ে কম ({activeRoute.distanceKm} কিমি)।</>
+                      ) : activeRoute.isBestRecommended ? (
+                        <>💡 <strong>রুট {activeRoute.index + 1}</strong> সবচেয়ে সেরা পছন্দ — হাইওয়ে প্রশস্ত থাকায় {shortestRoute ? `${Math.round((shortestRoute.durationHours - activeRoute.durationHours) * 60)} মিনিট সময় বাঁচবে` : 'দ্রুত পৌঁছানো যাবে'} এবং বাইক রাইড আরামদায়ক হবে।</>
+                      ) : activeRoute.isShortest ? (
+                        <>💡 <strong>রুট {activeRoute.index + 1}</strong> শর্টকাট — দূরত্ব {fastestRoute ? `${(fastestRoute.distanceKm - activeRoute.distanceKm).toFixed(1)} কিমি কম` : 'কম'}, তবে লোকাল সড়কের কারণে সময় কিছুটা বেশি লাগতে পারে।</>
+                      ) : (
+                        <>💡 <strong>বিকল্প রুট {activeRoute.index + 1}</strong> — দূরত্ব {activeRoute.distanceKm} কিমি ও আনুমানিক সময় {formatDuration(activeRoute.durationHours)}।</>
+                      )
+                    ) : (
+                      activeRoute.isBestRecommended && activeRoute.isShortest ? (
+                        <>💡 <strong>Route {activeRoute.index + 1}</strong> is the best choice — it is both the fastest ({formatDuration(activeRoute.durationHours)}) and shortest ({activeRoute.distanceKm} km).</>
+                      ) : activeRoute.isBestRecommended ? (
+                        <>💡 <strong>Route {activeRoute.index + 1}</strong> is recommended — saves {shortestRoute ? `${Math.round((shortestRoute.durationHours - activeRoute.durationHours) * 60)} mins` : 'time'} with smoother highway conditions.</>
+                      ) : activeRoute.isShortest ? (
+                        <>💡 <strong>Route {activeRoute.index + 1}</strong> is a shortcut — {fastestRoute ? `${(fastestRoute.distanceKm - activeRoute.distanceKm).toFixed(1)} km shorter` : 'shorter distance'}, but may take slightly longer.</>
+                      ) : (
+                        <>💡 <strong>Route {activeRoute.index + 1}</strong> — Distance: {activeRoute.distanceKm} km, Duration: {formatDuration(activeRoute.durationHours)}.</>
+                      )
+                    )}
+                  </p>
+                </div>
+              )}
+
+              {/* 🛣️ Route Selection Cards */}
               {routes.length > 0 && (
                 <div className="tour-routes-list">
-                  {routes.map((route, idx) => (
-                    <button
-                      key={idx}
-                      className={`tour-route-card ${selectedRouteIdx === idx ? 'selected' : ''}`}
-                      onClick={() => setSelectedRouteIdx(idx)}
-                    >
-                      <div className="tour-route-badge">{t.routeAlt} {idx + 1}</div>
-                      <div className="tour-route-stats">
-                        <span>📍 {route.distanceKm.toFixed(1)} km</span>
-                        <span>⏱️ {Math.round(route.durationHours * 60)} min</span>
-                      </div>
-                      {selectedRouteIdx === idx && <div className="tour-route-selected-mark"><Check size={14} /></div>}
-                    </button>
-                  ))}
+                  {routes.map((route, idx) => {
+                    const isSelected = selectedRouteIdx === idx;
+                    return (
+                      <button
+                        key={idx}
+                        className={`tour-route-item-btn ${isSelected ? 'selected' : ''}`}
+                        onClick={() => setSelectedRouteIdx(idx)}
+                      >
+                        <div className="tour-route-item-top">
+                          <div className="tour-route-item-label">
+                            <span>{t.routeAlt} {idx + 1}</span>
+                            {route.summary && <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: 'normal' }}>({route.summary})</span>}
+                          </div>
+
+                          <div className="tour-route-badges-wrap">
+                            {route.isBestRecommended && (
+                              <span className="tour-badge-best">
+                                <Sparkles size={10} /> {lang === 'bn' ? 'সেরা পছন্দ' : 'Best'}
+                              </span>
+                            )}
+                            {route.isFastest && !route.isBestRecommended && (
+                              <span className="tour-badge-fastest">
+                                <Zap size={10} /> {t.fastest || 'Fastest'}
+                              </span>
+                            )}
+                            {route.isShortest && (
+                              <span className="tour-badge-shortest">
+                                📏 {t.shortest || 'Shortest'}
+                              </span>
+                            )}
+                            {isSelected && (
+                              <div style={{ color: '#6366f1', display: 'flex', alignItems: 'center' }}>
+                                <Check size={16} />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="tour-route-item-stats">
+                          <div className="tour-route-stat-item">
+                            <span>📍</span>
+                            <strong>{route.distanceKm} km</strong>
+                          </div>
+                          <div className="tour-route-stat-item">
+                            <Clock size={12} />
+                            <strong>{formatDuration(route.durationHours)}</strong>
+                          </div>
+                          <div className="tour-route-stat-item fuel">
+                            <Fuel size={12} />
+                            <strong>৳{route.fuelCost} ({route.fuelLiters}L)</strong>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
