@@ -8,6 +8,7 @@ import {
   listenToTourMembers, listenToLiveLocations,
   updateLiveLocation, clearLiveLocation, updateMemberField
 } from '../utils/tourStorage';
+import { createOfflineCachedTileLayer } from '../utils/offlineMapTiles';
 
 const OSRM_BASE = 'https://router.project-osrm.org/route/v1/driving';
 
@@ -30,7 +31,7 @@ export default function TourMapTab({ tourId, tour, lang = 'bn', user }) {
   const [routesLoading, setRoutesLoading] = useState(false);
   const [routeError, setRouteError] = useState('');
 
-  // ── 1. Init Leaflet map ───────────────────────────────────────────────────
+  // ── 1. Init Leaflet map with Offline Cached Tiles ─────────────────────────
   useEffect(() => {
     if (!mapRef.current || leafletMapRef.current) return;
     let isMounted = true;
@@ -44,10 +45,16 @@ export default function TourMapTab({ tourId, tour, lang = 'bn', user }) {
         zoomControl: true
       });
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap',
-        maxZoom: 19
-      }).addTo(map);
+      const tileLayer = createOfflineCachedTileLayer(
+        L,
+        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        {
+          attribution: '© OpenStreetMap',
+          maxZoom: 19,
+          layerKey: 'osm_tour_map'
+        }
+      );
+      if (tileLayer) tileLayer.addTo(map);
 
       leafletMapRef.current = map;
       setMapReady(true);
@@ -107,19 +114,21 @@ export default function TourMapTab({ tourId, tour, lang = 'bn', user }) {
         setRouteError(t.noRoutesFound || 'No routes found');
       }
     } catch (err) {
-      console.error('Route fetch error:', err);
-      // Fallback: If tour has saved routeGeometry, use that
-      if (tour?.routeGeometry) {
-        setRoutes([{
-          index: 0,
-          distanceKm: tour.estimatedDistanceKm || 0,
-          durationHours: tour.estimatedDurationHours || 0,
-          fuelLiters: Math.round(((tour.estimatedDistanceKm || 0) / 40) * 10) / 10,
-          fuelCost: Math.round(((tour.estimatedDistanceKm || 0) / 40) * 135),
-          geometry: tour.routeGeometry,
-          summary: 'Saved Route'
-        }]);
-      }
+      console.debug('Route fetch offline fallback:', err);
+      // Fallback: If tour has saved routeGeometry, use that, or fallback to destination waypoints
+      const geometry = tour?.routeGeometry || {
+        type: 'LineString',
+        coordinates: validDests.map(d => [d.lng, d.lat])
+      };
+      setRoutes([{
+        index: 0,
+        distanceKm: tour?.estimatedDistanceKm || 0,
+        durationHours: tour?.estimatedDurationHours || 0,
+        fuelLiters: Math.round(((tour?.estimatedDistanceKm || 0) / 40) * 10) / 10,
+        fuelCost: Math.round(((tour?.estimatedDistanceKm || 0) / 40) * 135),
+        geometry: geometry,
+        summary: lang === 'bn' ? 'সংরক্ষিত / অফলাইন রুট' : 'Saved / Offline Route'
+      }]);
     } finally {
       setRoutesLoading(false);
     }

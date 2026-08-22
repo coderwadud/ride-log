@@ -13,6 +13,7 @@ import {
 import { saveTrip, getTripsLast3Days, deleteTrip, calculateDistanceKm } from '../utils/tripStorage';
 import { filterGpsJitter, snapToRoadsOSRM, calculateBearing, smoothPathMovingAverage, fetchNearbyPumpsAndGarages } from '../utils/geoUtils';
 import { startBackgroundGps, stopBackgroundGps, getNativeRecordedPoints, requestBatteryOptimizationExemption } from '../utils/backgroundGps';
+import { createOfflineCachedTileLayer } from '../utils/offlineMapTiles';
 
 // 5 100% Free Map Modes / Layers with Lucide SVG Icons
 const MAP_LAYERS = {
@@ -484,12 +485,13 @@ export default function GpsTrackerTab({
       minZoom: 4
     }).setView([defaultLat, defaultLng], 16);
 
-    // Initial Base Tile Layer from saved preference
+    // Initial Base Tile Layer from saved preference with Offline IndexedDB caching
     const initialConfig = MAP_LAYERS[selectedLayerKey] || MAP_LAYERS.street;
-    const initialLayer = L.tileLayer(initialConfig.url, {
+    const initialLayer = createOfflineCachedTileLayer(L, initialConfig.url, {
       maxZoom: 22,
       maxNativeZoom: initialConfig.maxNativeZoom || 19,
-      subdomains: initialConfig.subdomains || 'abc'
+      subdomains: initialConfig.subdomains || 'abc',
+      layerKey: initialConfig.id
     }).addTo(map);
 
     currentTileLayerRef.current = initialLayer;
@@ -617,10 +619,11 @@ export default function GpsTrackerTab({
       } catch (e) {}
     }
 
-    const newLayer = L.tileLayer(layerConfig.url, {
+    const newLayer = createOfflineCachedTileLayer(L, layerConfig.url, {
       maxZoom: 22,
       maxNativeZoom: layerConfig.maxNativeZoom || 19,
-      subdomains: layerConfig.subdomains || 'abc'
+      subdomains: layerConfig.subdomains || 'abc',
+      layerKey: layerConfig.id
     }).addTo(map);
 
     if (newLayer.bringToBack) {

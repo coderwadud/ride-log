@@ -18,6 +18,23 @@ import {
   orderBy, limit
 } from 'firebase/firestore';
 
+// ─── LOCAL SNAPSHOT CACHE HELPERS (OFFLINE-FIRST) ─────────────────────────────
+
+function getLocalCache(key, fallback = null) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function setLocalCache(key, data) {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch {}
+}
+
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
 function generateId(prefix = 'id') {
@@ -94,7 +111,7 @@ export async function lookupUserByPhone(phone) {
 
 /**
  * Create a new tour. The creator is automatically added as 'organizer' member.
- * Returns the new tourId.
+ * Returns the new tourId. Works 100% offline.
  */
 export async function createTour(uid, userData, tourData) {
   if (!uid) throw new Error('uid required');
@@ -125,10 +142,13 @@ export async function createTour(uid, userData, tourData) {
     updatedAt: now
   };
 
-  await setDoc(doc(db, 'tours', tourId), tourDoc);
+  // 1. Save synchronously to local snapshot cache (Instant offline availability!)
+  setLocalCache(`rl_tour_${tourId}`, tourDoc);
+  const myToursCache = getLocalCache(`rl_my_tours_${uid}`, []);
+  const updatedMyTours = [tourDoc, ...myToursCache.filter(t => t.id !== tourId)];
+  setLocalCache(`rl_my_tours_${uid}`, updatedMyTours);
 
-  // Add organizer as member sub-document
-  await setDoc(doc(db, 'tours', tourId, 'members', uid), {
+  const organizerMember = {
     uid,
     name: userData.displayName || userData.name || 'Organizer',
     email: (userData.email || '').toLowerCase(),
@@ -139,7 +159,16 @@ export async function createTour(uid, userData, tourData) {
     shareLocation: false,
     joinedAt: now,
     invitedAt: now
-  });
+  };
+  setLocalCache(`rl_tour_members_${tourId}`, [organizerMember]);
+
+  // 2. Persist to Firestore (Cached locally in IndexedDB by SDK and queued for sync if offline)
+  try {
+    await setDoc(doc(db, 'tours', tourId), tourDoc);
+    await setDoc(doc(db, 'tours', tourId, 'members', uid), organizerMember);
+  } catch (err) {
+    console.debug('Firestore write queued in offline cache:', err.message);
+  }
 
   return tourId;
 }
@@ -149,11 +178,24 @@ export async function createTour(uid, userData, tourData) {
  */
 export async function updateTour(tourId, updates) {
   if (!tourId) return;
+  const now = new Date().toISOString();
+  
+  // Update local cache
+  const cached = getLocalCache(`rl_tour_${tourId}`);
+  if (cached) {
+    const updated = { ...cached, ...updates, updatedAt: now };
+    setLocalCache(`rl_tour_${tourId}`, updated);
+    if (cached.createdBy) {
+      const myTours = getLocalCache(`rl_my_tours_${cached.createdBy}`, []);
+      setLocalCache(`rl_my_tours_${cached.createdBy}`, myTours.map(t => t.id === tourId ? updated : t));
+    }
+  }
+
   try {
     const ref = doc(db, 'tours', tourId);
-    await updateDoc(ref, { ...updates, updatedAt: new Date().toISOString() });
+    await updateDoc(ref, { ...updates, updatedAt: now });
   } catch (err) {
-    console.error('updateTour error:', err);
+    console.debug('updateTour queued in offline cache:', err.message);
   }
 }
 
@@ -165,10 +207,19 @@ export async function cancelTour(tourId) {
 }
 
 /**
- * Hard-delete a tour document (organizer only — does not delete subcollections).
+ * Hard-delete a tour document.
  */
 export async function deleteTour(tourId) {
   if (!tourId) return;
+  
+  // Clean local cache
+  const cached = getLocalCache(`rl_tour_${tourId}`);
+  if (cached?.createdBy) {
+    const myTours = getLocalCache(`rl_my_tours_${cached.createdBy}`, []);
+    setLocalCache(`rl_my_tours_${cached.createdBy}`, myTours.filter(t => t.id !== tourId));
+  }
+  localStorage.removeItem(`rl_tour_${tourId}`);
+
   try {
     await deleteDoc(doc(db, 'tours', tourId));
   } catch (err) {
@@ -177,25 +228,30 @@ export async function deleteTour(tourId) {
 }
 
 /**
- * Get a single tour document (one-time fetch).
+ * Get a single tour document (one-time fetch with local cache fallback).
  */
 export async function getTour(tourId) {
   if (!tourId) return null;
+  const cached = getLocalCache(`rl_tour_${tourId}`);
   try {
     const snap = await getDoc(doc(db, 'tours', tourId));
-    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+    if (snap.exists()) {
+      const data = { id: snap.id, ...snap.data() };
+      setLocalCache(`rl_tour_${tourId}`, data);
+      return data;
+    }
+    return cached;
   } catch (err) {
-    console.debug('getTour error:', err.message);
-    return null;
+    return cached;
   }
 }
 
 /**
  * Get all tours where the current user is a member.
- * Returns array sorted by startDate desc.
  */
 export async function getMyTours(uid) {
   if (!uid || uid === 'guest') return [];
+  const cached = getLocalCache(`rl_my_tours_${uid}`, []);
   try {
     const q = query(
       collection(db, 'tours'),
@@ -203,54 +259,64 @@ export async function getMyTours(uid) {
       orderBy('startDate', 'desc')
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (list.length > 0) setLocalCache(`rl_my_tours_${uid}`, list);
+    return list.length > 0 ? list : cached;
   } catch (err) {
-    console.debug('getMyTours error:', err.message);
-    // Fallback without orderBy if index not ready
-    try {
-      const q2 = query(collection(db, 'tours'), where('memberIds', 'array-contains', uid));
-      const snap2 = await getDocs(q2);
-      const list = snap2.docs.map(d => ({ id: d.id, ...d.data() }));
-      list.sort((a, b) => new Date(b.startDate || 0) - new Date(a.startDate || 0));
-      return list;
-    } catch (e2) {
-      return [];
-    }
+    return cached;
   }
 }
 
 /**
  * Real-time listener for a single tour document.
+ * Emits cached tour immediately for 0ms offline display!
  */
 export function listenToTour(tourId, callback) {
   if (!tourId) return () => {};
+  
+  // 1. Instant local cache emission
+  const cached = getLocalCache(`rl_tour_${tourId}`);
+  if (cached) callback(cached);
+
   const ref = doc(db, 'tours', tourId);
   return onSnapshot(ref, snap => {
-    if (snap.exists()) callback({ id: snap.id, ...snap.data() });
-    else callback(null);
+    if (snap.exists()) {
+      const data = { id: snap.id, ...snap.data() };
+      setLocalCache(`rl_tour_${tourId}`, data);
+      callback(data);
+    } else if (!cached) {
+      callback(null);
+    }
   }, err => {
-    console.debug('listenToTour error:', err.message);
-    callback(null);
+    console.debug('listenToTour offline fallback:', err.message);
+    if (cached) callback(cached);
   });
 }
 
 /**
  * Real-time listener for user's tour list.
+ * Emits cached tours immediately for 0ms offline display!
  */
 export function listenToMyTours(uid, callback) {
   if (!uid || uid === 'guest') { callback([]); return () => {}; }
+
+  // 1. Instant local cache emission
+  const cached = getLocalCache(`rl_my_tours_${uid}`, []);
+  if (cached.length > 0) callback(cached);
+
   try {
     const q = query(collection(db, 'tours'), where('memberIds', 'array-contains', uid));
     return onSnapshot(q, snap => {
       const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       list.sort((a, b) => new Date(b.startDate || 0) - new Date(a.startDate || 0));
+      setLocalCache(`rl_my_tours_${uid}`, list);
       callback(list);
     }, err => {
-      console.debug('listenToMyTours error:', err.message);
-      callback([]);
+      console.debug('listenToMyTours offline fallback:', err.message);
+      if (cached.length > 0) callback(cached);
     });
   } catch (err) {
-    callback([]);
+    if (cached.length > 0) callback(cached);
     return () => {};
   }
 }
@@ -362,16 +428,22 @@ export async function updateMemberField(tourId, memberUid, updates) {
 
 /**
  * Real-time listener for all members of a tour.
+ * Emits cached members immediately for 0ms offline display!
  */
 export function listenToTourMembers(tourId, callback) {
   if (!tourId) { callback([]); return () => {}; }
+
+  const cached = getLocalCache(`rl_tour_members_${tourId}`, []);
+  if (cached.length > 0) callback(cached);
+
   const ref = collection(db, 'tours', tourId, 'members');
   return onSnapshot(ref, snap => {
     const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    callback(list);
+    if (list.length > 0) setLocalCache(`rl_tour_members_${tourId}`, list);
+    callback(list.length > 0 ? list : cached);
   }, err => {
-    console.debug('listenToTourMembers error:', err.message);
-    callback([]);
+    console.debug('listenToTourMembers offline fallback:', err.message);
+    if (cached.length > 0) callback(cached);
   });
 }
 
@@ -398,13 +470,18 @@ export async function addExpense(tourId, expenseData) {
     createdAt: now,
     createdByUid: expenseData.createdByUid || ''
   };
+
+  // Synchronously update local cache
+  const cached = getLocalCache(`rl_tour_expenses_${tourId}`, []);
+  const updated = [expense, ...cached.filter(e => e.id !== expenseId)];
+  setLocalCache(`rl_tour_expenses_${tourId}`, updated);
+
   try {
     await setDoc(doc(db, 'tours', tourId, 'expenses', expenseId), expense);
-    return expense;
   } catch (err) {
-    console.error('addExpense error:', err);
-    return null;
+    console.debug('addExpense queued in offline cache:', err.message);
   }
+  return expense;
 }
 
 /**
@@ -412,13 +489,17 @@ export async function addExpense(tourId, expenseData) {
  */
 export async function updateExpense(tourId, expenseId, updates) {
   if (!tourId || !expenseId) return;
+  const cached = getLocalCache(`rl_tour_expenses_${tourId}`, []);
+  const updated = cached.map(e => e.id === expenseId ? { ...e, ...updates } : e);
+  setLocalCache(`rl_tour_expenses_${tourId}`, updated);
+
   try {
     await updateDoc(doc(db, 'tours', tourId, 'expenses', expenseId), {
       ...updates,
       updatedAt: new Date().toISOString()
     });
   } catch (err) {
-    console.error('updateExpense error:', err);
+    console.debug('updateExpense queued in offline cache:', err.message);
   }
 }
 
@@ -427,26 +508,35 @@ export async function updateExpense(tourId, expenseId, updates) {
  */
 export async function deleteExpense(tourId, expenseId) {
   if (!tourId || !expenseId) return;
+  const cached = getLocalCache(`rl_tour_expenses_${tourId}`, []);
+  setLocalCache(`rl_tour_expenses_${tourId}`, cached.filter(e => e.id !== expenseId));
+
   try {
     await deleteDoc(doc(db, 'tours', tourId, 'expenses', expenseId));
   } catch (err) {
-    console.error('deleteExpense error:', err);
+    console.debug('deleteExpense queued in offline cache:', err.message);
   }
 }
 
 /**
  * Real-time listener for all tour expenses.
+ * Emits cached expenses immediately for 0ms offline display!
  */
 export function listenToExpenses(tourId, callback) {
   if (!tourId) { callback([]); return () => {}; }
+  
+  const cached = getLocalCache(`rl_tour_expenses_${tourId}`, []);
+  if (cached.length > 0) callback(cached);
+
   const ref = collection(db, 'tours', tourId, 'expenses');
   return onSnapshot(ref, snap => {
     const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     list.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    setLocalCache(`rl_tour_expenses_${tourId}`, list);
     callback(list);
   }, err => {
-    console.debug('listenToExpenses error:', err.message);
-    callback([]);
+    console.debug('listenToExpenses offline fallback:', err.message);
+    if (cached.length > 0) callback(cached);
   });
 }
 export const listenToTourExpenses = listenToExpenses;
@@ -455,7 +545,6 @@ export const listenToTourExpenses = listenToExpenses;
 
 /**
  * Record a fund contribution.
- * contribData: { amount, contributedBy: { uid?, guestId?, name }, date, notes }
  */
 export async function addFundContribution(tourId, contribData) {
   if (!tourId || !contribData) return null;
@@ -469,13 +558,17 @@ export async function addFundContribution(tourId, contribData) {
     notes: contribData.notes || '',
     createdAt: now
   };
+
+  const cached = getLocalCache(`rl_tour_fund_${tourId}`, []);
+  const updated = [contrib, ...cached.filter(c => c.id !== contribId)];
+  setLocalCache(`rl_tour_fund_${tourId}`, updated);
+
   try {
     await setDoc(doc(db, 'tours', tourId, 'fund_contributions', contribId), contrib);
-    return contrib;
   } catch (err) {
-    console.error('addFundContribution error:', err);
-    return null;
+    console.debug('addFundContribution queued in offline cache:', err.message);
   }
+  return contrib;
 }
 
 /**
@@ -483,10 +576,13 @@ export async function addFundContribution(tourId, contribData) {
  */
 export async function deleteFundContribution(tourId, contribId) {
   if (!tourId || !contribId) return;
+  const cached = getLocalCache(`rl_tour_fund_${tourId}`, []);
+  setLocalCache(`rl_tour_fund_${tourId}`, cached.filter(c => c.id !== contribId));
+
   try {
     await deleteDoc(doc(db, 'tours', tourId, 'fund_contributions', contribId));
   } catch (err) {
-    console.error('deleteFundContribution error:', err);
+    console.debug('deleteFundContribution queued in offline cache:', err.message);
   }
 }
 
@@ -495,14 +591,19 @@ export async function deleteFundContribution(tourId, contribId) {
  */
 export function listenToFundContributions(tourId, callback) {
   if (!tourId) { callback([]); return () => {}; }
+
+  const cached = getLocalCache(`rl_tour_fund_${tourId}`, []);
+  if (cached.length > 0) callback(cached);
+
   const ref = collection(db, 'tours', tourId, 'fund_contributions');
   return onSnapshot(ref, snap => {
     const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     list.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    setLocalCache(`rl_tour_fund_${tourId}`, list);
     callback(list);
   }, err => {
-    console.debug('listenToFundContributions error:', err.message);
-    callback([]);
+    console.debug('listenToFundContributions offline fallback:', err.message);
+    if (cached.length > 0) callback(cached);
   });
 }
 
@@ -606,41 +707,63 @@ export async function addTourStop(tourId, stopData) {
     status: 'upcoming', // upcoming | arrived | departed
     createdAt: new Date().toISOString()
   };
-  await setDoc(doc(db, 'tours', tourId, 'stops', id), docData);
+
+  const cached = getLocalCache(`rl_tour_stops_${tourId}`, []);
+  const updated = [...cached, docData];
+  updated.sort((a, b) => (a.order || 0) - (b.order || 0) || new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+  setLocalCache(`rl_tour_stops_${tourId}`, updated);
+
+  try {
+    await setDoc(doc(db, 'tours', tourId, 'stops', id), docData);
+  } catch (err) {
+    console.debug('addTourStop queued in offline cache:', err.message);
+  }
   return id;
 }
 
 export async function updateTourStop(tourId, stopId, updates) {
   if (!tourId || !stopId) return;
+  const cached = getLocalCache(`rl_tour_stops_${tourId}`, []);
+  const updated = cached.map(s => s.id === stopId ? { ...s, ...updates } : s);
+  setLocalCache(`rl_tour_stops_${tourId}`, updated);
+
   try {
     await updateDoc(doc(db, 'tours', tourId, 'stops', stopId), {
       ...updates,
       updatedAt: new Date().toISOString()
     });
   } catch (err) {
-    console.error('updateTourStop error:', err);
+    console.debug('updateTourStop queued in offline cache:', err.message);
   }
 }
 
 export async function deleteTourStop(tourId, stopId) {
   if (!tourId || !stopId) return;
+  const cached = getLocalCache(`rl_tour_stops_${tourId}`, []);
+  setLocalCache(`rl_tour_stops_${tourId}`, cached.filter(s => s.id !== stopId));
+
   try {
     await deleteDoc(doc(db, 'tours', tourId, 'stops', stopId));
   } catch (err) {
-    console.error('deleteTourStop error:', err);
+    console.debug('deleteTourStop queued in offline cache:', err.message);
   }
 }
 
 export function listenToTourStops(tourId, callback) {
   if (!tourId) { callback([]); return () => {}; }
+
+  const cached = getLocalCache(`rl_tour_stops_${tourId}`, []);
+  if (cached.length > 0) callback(cached);
+
   const ref = collection(db, 'tours', tourId, 'stops');
   return onSnapshot(ref, snap => {
     const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     list.sort((a, b) => (a.order || 0) - (b.order || 0) || new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+    setLocalCache(`rl_tour_stops_${tourId}`, list);
     callback(list);
   }, err => {
-    console.debug('listenToTourStops error:', err.message);
-    callback([]);
+    console.debug('listenToTourStops offline fallback:', err.message);
+    if (cached.length > 0) callback(cached);
   });
 }
 

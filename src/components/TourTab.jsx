@@ -10,7 +10,17 @@ import TourCreateModal from './TourCreateModal';
 import TourDetailPage from './TourDetailPage';
 import TourCostEstimatorModal from './TourCostEstimatorModal';
 
-export default function TourTab({ lang = 'bn', theme, user }) {
+export default function TourTab({
+  lang = 'bn',
+  theme,
+  user,
+  intercomEngine,
+  setIntercomEngine,
+  intercomState,
+  setIntercomState,
+  intercomTourId,
+  setIntercomTourId
+}) {
   const t = translations[lang] || translations['bn'];
   const [tours, setTours] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -45,16 +55,23 @@ export default function TourTab({ lang = 'bn', theme, user }) {
     await respondToTourInvitation(tourId, user.uid, false);
   };
 
-  if (activeTourId) {
+  const currentViewingTourId = activeTourId || (intercomState?.isConnected ? intercomTourId : null);
+
+  if (currentViewingTourId) {
     return (
       <>
         <TourDetailPage
-          tourId={activeTourId}
+          tourId={currentViewingTourId}
           lang={lang}
           theme={theme}
           user={user}
           onBack={() => setActiveTourId(null)}
           onOpenCreate={() => setShowCreate(true)}
+          intercomEngine={intercomEngine}
+          setIntercomEngine={setIntercomEngine}
+          intercomState={intercomState}
+          setIntercomState={setIntercomState}
+          setIntercomTourId={setIntercomTourId}
         />
         {showCreate && (
           <TourCreateModal

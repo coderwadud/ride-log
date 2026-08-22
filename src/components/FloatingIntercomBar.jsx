@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mic, MicOff, Radio, PhoneOff, Maximize2, Users } from 'lucide-react';
+import { Mic, MicOff, Radio, PhoneOff, Maximize2, Users, Video } from 'lucide-react';
 
 export default function FloatingIntercomBar({
   intercomState,
@@ -24,13 +24,19 @@ export default function FloatingIntercomBar({
       <div className="floating-intercom-left">
         <div className="floating-live-dot-wrap">
           <span className="floating-live-pulse" />
-          <Radio size={15} className="text-emerald-400" />
+          {intercomState?.isVideoEnabled ? (
+            <Video size={15} className="text-emerald-400 animate-pulse" />
+          ) : (
+            <Radio size={15} className="text-emerald-400" />
+          )}
         </div>
 
         <div className="floating-intercom-info">
           <div className="floating-intercom-title">
             <span className="font-semibold text-white">
-              {lang === 'bn' ? 'ইন্টারকম লাইভ' : 'Rider Intercom'}
+              {intercomState?.isVideoEnabled
+                ? (lang === 'bn' ? 'ভিডিও কল লাইভ' : 'Video Intercom')
+                : (lang === 'bn' ? 'ইন্টারকম লাইভ' : 'Rider Intercom')}
             </span>
             <span className="floating-participant-count">
               <Users size={11} /> {participantsList.length}

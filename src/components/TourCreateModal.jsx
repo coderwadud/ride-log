@@ -8,20 +8,65 @@ import { Capacitor } from '@capacitor/core';
 import { translations } from '../utils/translations';
 import { createTour } from '../utils/tourStorage';
 import { calculateCostEstimate } from '../utils/tourCalculations';
+import { createOfflineCachedTileLayer } from '../utils/offlineMapTiles';
 
 const OSRM_BASE = 'https://router.project-osrm.org/route/v1/driving';
 const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org/search';
 
-const POPULAR_DESTINATIONS = [
-  { id: 'coxsbazar', name: "Cox's Bazar", labelBn: '🏖️ কক্সবাজার', labelEn: "🏖️ Cox's Bazar", lat: 21.4272, lng: 91.9702, keywords: ['cox', 'bazar', 'কক্সবাজার', 'সমুদ্র'] },
-  { id: 'sajek', name: 'Sajek Valley', labelBn: '⛰️ সাজেক ভ্যালি', labelEn: '⛰️ Sajek Valley', lat: 23.3820, lng: 92.2938, keywords: ['sajek', 'সাজেক', 'ভ্যালি', 'পাহাড়'] },
-  { id: 'sreemangal', name: 'Sreemangal, Sylhet', labelBn: '🌲 শ্রীমঙ্গল / সিলেট', labelEn: '🌲 Sreemangal, Sylhet', lat: 24.3065, lng: 91.7296, keywords: ['sylhet', 'sreemangal', 'সিলেট', 'শ্রীমঙ্গল', 'চা বাগান'] },
-  { id: 'bandarban', name: 'Bandarban', labelBn: '🏔️ বান্দরবান', labelEn: '🏔️ Bandarban', lat: 22.1953, lng: 92.2184, keywords: ['bandarban', 'বান্দরবান', 'নীলগিরি', 'বগালেক'] },
-  { id: 'kuakata', name: 'Kuakata Beach', labelBn: '🌅 কুয়াকাটা', labelEn: '🌅 Kuakata Beach', lat: 21.8167, lng: 90.1194, keywords: ['kuakata', 'কুয়াকাটা', 'কুয়াকাটা', 'সূর্যাস্ত'] },
-  { id: 'jaflong', name: 'Jaflong, Sylhet', labelBn: '🏞️ জাফলং', labelEn: '🏞️ Jaflong', lat: 25.1634, lng: 92.0175, keywords: ['jaflong', 'জাফলং', 'বিছানাকান্দি', 'রাতারগুল'] },
-  { id: 'tanguar', name: 'Tanguar Haor', labelBn: '🏕️ টাঙ্গুয়ার হাওর', labelEn: '🏕️ Tanguar Haor', lat: 25.1235, lng: 91.0712, keywords: ['tanguar', 'haor', 'হাওর', 'টাঙ্গুয়ার', 'সুনামগঞ্জ'] },
-  { id: 'chittagong', name: 'Chittagong', labelBn: '🏙️ চট্টগ্রাম', labelEn: '🏙️ Chittagong', lat: 22.3569, lng: 91.7832, keywords: ['chittagong', 'chattogram', 'চট্টগ্রাম', 'পতেঙ্গা'] }
+function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+export const BD_OFFLINE_PLACES = [
+  // Top Motorcycle Tourist Spots
+  { id: 'coxsbazar', name: "Cox's Bazar", labelBn: '🏖️ কক্সবাজার', labelEn: "🏖️ Cox's Bazar", lat: 21.4272, lng: 91.9702, keywords: ['cox', 'bazar', 'কক্সবাজার', 'সমুদ্র', 'মেরিন ড্রাইভ'] },
+  { id: 'sajek', name: 'Sajek Valley', labelBn: '⛰️ সাজেক ভ্যালি', labelEn: '⛰️ Sajek Valley', lat: 23.3820, lng: 92.2938, keywords: ['sajek', 'সাজেক', 'ভ্যালি', 'পাহাড়', 'মেঘ'] },
+  { id: 'sreemangal', name: 'Sreemangal', labelBn: '🌲 শ্রীমঙ্গল / মৌলভীবাজার', labelEn: '🌲 Sreemangal', lat: 24.3065, lng: 91.7296, keywords: ['sylhet', 'sreemangal', 'শ্রীমঙ্গল', 'মৌলভীবাজার', 'চা বাগান'] },
+  { id: 'bandarban', name: 'Bandarban', labelBn: '🏔️ বান্দরবান (নীলগিরি/বগালেক)', labelEn: '🏔️ Bandarban', lat: 22.1953, lng: 92.2184, keywords: ['bandarban', 'বান্দরবান', 'নীলগিরি', 'বগালেক', 'চিম্বুক'] },
+  { id: 'kuakata', name: 'Kuakata Beach', labelBn: '🌅 কুয়াকাটা সমুদ্র সৈকত', labelEn: '🌅 Kuakata Beach', lat: 21.8167, lng: 90.1194, keywords: ['kuakata', 'কুয়াকাটা', 'কুয়াকাটা', 'পটুয়াখালী', 'সূর্যাস্ত'] },
+  { id: 'jaflong', name: 'Jaflong, Sylhet', labelBn: '🏞️ জাফলং (সিলেট)', labelEn: '🏞️ Jaflong, Sylhet', lat: 25.1634, lng: 92.0175, keywords: ['jaflong', 'জাফলং', 'বিছানাকান্দি', 'রাতারগুল', 'ভোলাগঞ্জ'] },
+  { id: 'tanguar', name: 'Tanguar Haor', labelBn: '🏕️ টাঙ্গুয়ার হাওর (সুনামগঞ্জ)', labelEn: '🏕️ Tanguar Haor', lat: 25.1235, lng: 91.0712, keywords: ['tanguar', 'haor', 'হাওর', 'টাঙ্গুয়ার', 'সুনামগঞ্জ', 'শিমুল বাগান'] },
+  { id: 'saintmartin', name: 'Saint Martin Island', labelBn: '🏝️ সেন্টমার্টিন দ্বীপ', labelEn: '🏝️ Saint Martin', lat: 20.6273, lng: 92.3225, keywords: ['saint', 'martin', 'সেন্টমার্টিন', 'দ্বীপ', 'ছেঁড়াদ্বীপ'] },
+  { id: 'rangamati', name: 'Rangamati', labelBn: '🛶 রাঙামাটি (কাপ্তাই হ্রদ)', labelEn: '🛶 Rangamati', lat: 22.6533, lng: 92.1789, keywords: ['rangamati', 'রাঙামাটি', 'কাপ্তাই', 'ঝুলন্ত সেতু', 'সাজেদা'] },
+  { id: 'khagrachari', name: 'Khagrachari', labelBn: '🌿 খাগড়াছড়ি (আলুটিলা)', labelEn: '🌿 Khagrachari', lat: 23.1193, lng: 91.9847, keywords: ['khagrachari', 'খাগড়াছড়ি', 'আলুটিলা', 'রিছাং ঝর্ণা'] },
+  { id: 'tetulia', name: 'Tetulia, Panchagarh', labelBn: '🏔️ তেঁতুলিয়া (পঞ্চগড়)', labelEn: '🏔️ Tetulia, Panchagarh', lat: 26.4947, lng: 88.3582, keywords: ['tetulia', 'তেঁতুলিয়া', 'পঞ্চগড়', 'কাঞ্চনজঙ্ঘা', 'বাংলাবান্ধা'] },
+  { id: 'birishiri', name: 'Birishiri, Netrokona', labelBn: '🌿 বিরিশিরি (নেত্রকোণা)', labelEn: '🌿 Birishiri', lat: 25.1100, lng: 90.6500, keywords: ['birishiri', 'বিরিশিরি', 'নেত্রকোণা', 'বিজয়পুর', 'সাদা মাটি'] },
+  // Major Divisions & Districts
+  { id: 'dhaka', name: 'Dhaka', labelBn: '🏛️ ঢাকা', labelEn: '🏛️ Dhaka', lat: 23.8103, lng: 90.4125, keywords: ['dhaka', 'ঢাকা', 'উত্তরা', 'মিরপুর', 'গুলশান', 'ধানমন্ডি'] },
+  { id: 'chittagong', name: 'Chittagong', labelBn: '🏙️ চট্টগ্রাম', labelEn: '🏙️ Chittagong', lat: 22.3569, lng: 91.7832, keywords: ['chittagong', 'chattogram', 'চট্টগ্রাম', 'পতেঙ্গা', 'ভাটিয়ারী'] },
+  { id: 'sylhet', name: 'Sylhet', labelBn: '🌧️ সিলেট', labelEn: '🌧️ Sylhet', lat: 24.8949, lng: 91.8687, keywords: ['sylhet', 'সিলেট', 'শাহজালাল', 'লালাখাল'] },
+  { id: 'rajshahi', name: 'Rajshahi', labelBn: '🥭 রাজশাহী', labelEn: '🥭 Rajshahi', lat: 24.3745, lng: 88.6042, keywords: ['rajshahi', 'রাজশাহী', 'পদ্মা গার্ডেন'] },
+  { id: 'khulna', name: 'Khulna', labelBn: '🐅 খুলনা', labelEn: '🐅 Khulna', lat: 22.8456, lng: 89.5403, keywords: ['khulna', 'খুলনা', 'সুন্দরবন', 'বাগেরহাট', 'ষাটগম্বুজ'] },
+  { id: 'barisal', name: 'Barisal', labelBn: '⛵ বরিশাল', labelEn: '⛵ Barisal', lat: 22.7010, lng: 90.3535, keywords: ['barisal', 'বরিশাল', 'ভাসমান পেয়ারা বাজার', 'কীর্তনখোলা'] },
+  { id: 'rangpur', name: 'Rangpur', labelBn: '🌾 রংপুর', labelEn: '🌾 Rangpur', lat: 25.7439, lng: 89.2752, keywords: ['rangpur', 'রংপুর', 'তাজহাট জমিদার বাড়ি'] },
+  { id: 'mymensingh', name: 'Mymensingh', labelBn: '🏞️ ময়মনসিংহ', labelEn: '🏞️ Mymensingh', lat: 24.7471, lng: 90.4203, keywords: ['mymensingh', 'ময়মনসিংহ', 'শশী লজ', 'কৃষি বিশ্ববিদ্যালয়'] },
+  { id: 'gazipur', name: 'Gazipur', labelBn: '🏭 গাজীপুর', labelEn: '🏭 Gazipur', lat: 23.9999, lng: 90.4203, keywords: ['gazipur', 'গাজীপুর', 'ভাওয়াল জাতীয় উদ্যান'] },
+  { id: 'narayanganj', name: 'Narayanganj', labelBn: '⛴️ নারায়ণগঞ্জ', labelEn: '⛴️ Narayanganj', lat: 23.6238, lng: 90.5000, keywords: ['narayanganj', 'নারায়ণগঞ্জ', 'সোনারগাঁও', 'পানাম নগর'] },
+  { id: 'comilla', name: 'Comilla', labelBn: '🏛️ কুমিল্লা', labelEn: '🏛️ Comilla', lat: 23.4682, lng: 91.1788, keywords: ['comilla', 'cumilla', 'কুমিল্লা', 'ময়নামতি', 'শালবন বিহার'] },
+  { id: 'bogra', name: 'Bogra', labelBn: '🏺 বগুড়া', labelEn: '🏺 Bogra', lat: 24.8465, lng: 89.3770, keywords: ['bogra', 'bogura', 'বগুড়া', 'মহাস্থানগড়', 'দই'] },
+  { id: 'jessore', name: 'Jessore', labelBn: '🌺 যশোর', labelEn: '🌺 Jessore', lat: 23.1664, lng: 89.2115, keywords: ['jessore', 'jashore', 'যশোর', 'বেনাপোল'] },
+  { id: 'dinajpur', name: 'Dinajpur', labelBn: '🏛️ দিনাজপুর', labelEn: '🏛️ Dinajpur', lat: 25.6217, lng: 88.6355, keywords: ['dinajpur', 'দিনাজপুর', 'কান্তজীউ', 'রামসাগর'] },
+  { id: 'faridpur', name: 'Faridpur', labelBn: '🌾 ফরিদপুর', labelEn: '🌾 Faridpur', lat: 23.6071, lng: 89.8429, keywords: ['faridpur', 'ফরিদপুর', 'পল্লীকবি জসীমউদ্দীন'] },
+  { id: 'tangail', name: 'Tangail', labelBn: '🥻 টাঙ্গাইল', labelEn: '🥻 Tangail', lat: 24.2513, lng: 89.9167, keywords: ['tangail', 'টাঙ্গাইল', 'যমুনা', 'মহেড়া জমিদার বাড়ি'] },
+  { id: 'pabna', name: 'Pabna', labelBn: '⚡ পাবনা', labelEn: '⚡ Pabna', lat: 24.0064, lng: 89.2372, keywords: ['pabna', 'পাবনা', 'রূপপুর', 'হার্ডিঞ্জ ব্রিজ'] },
+  { id: 'kushtia', name: 'Kushtia', labelBn: '🎶 কুষ্টিয়া', labelEn: '🎶 Kushtia', lat: 23.9013, lng: 89.1205, keywords: ['kushtia', 'কুষ্টিয়া', 'লালন শাহ', 'শিলাইদহ'] },
+  { id: 'noakhali', name: 'Noakhali', labelBn: '🌊 নোয়াখালী', labelEn: '🌊 Noakhali', lat: 22.8696, lng: 91.0994, keywords: ['noakhali', 'নোয়াখালী', 'নিঝুম দ্বীপ'] },
+  { id: 'feni', name: 'Feni', labelBn: '🛣️ ফেনী', labelEn: '🛣️ Feni', lat: 23.0186, lng: 91.3966, keywords: ['feni', 'ফেনী'] },
+  { id: 'brahmanbaria', name: 'Brahmanbaria', labelBn: '🌾 ব্রাহ্মণবাড়িয়া', labelEn: '🌾 Brahmanbaria', lat: 23.9571, lng: 91.1119, keywords: ['brahmanbaria', 'ব্রাহ্মণবাড়িয়া'] },
+  { id: 'chandpur', name: 'Chandpur', labelBn: '🐟 চাঁদপুর', labelEn: '🐟 Chandpur', lat: 23.2333, lng: 90.6667, keywords: ['chandpur', 'চাঁদপুর', 'ইলিশ', 'মেঘনা মোহনা'] },
+  { id: 'sirajganj', name: 'Sirajganj', labelBn: '🌉 সিরাজগঞ্জ', labelEn: '🌉 Sirajganj', lat: 24.4534, lng: 89.7008, keywords: ['sirajganj', 'সিরাজগঞ্জ', 'যমুনা সেতু'] },
+  { id: 'natore', name: 'Natore', labelBn: '🏰 নাটোর', labelEn: '🏰 Natore', lat: 24.4206, lng: 88.9324, keywords: ['natore', 'নাটোর', 'উত্তরা গণভবন', 'রানী ভবানী রাজবাড়ি'] }
 ];
+
+export const POPULAR_DESTINATIONS = BD_OFFLINE_PLACES.slice(0, 11);
 
 let destIdSeq = 0;
 const EMPTY_DEST = () => ({ id: `dest_${Date.now()}_${++destIdSeq}_${Math.random().toString(36).substr(2, 5)}`, name: '', lat: null, lng: null });
@@ -170,19 +215,46 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
     return null;
   }, []);
 
-  // ── Destination search ────────────────────────────────────────────────────
+  // ── Destination search with Offline Place Database & Nominatim ────────────
   const searchPlace = useCallback((query, destId) => {
-    if (!query || query.length < 3) { setSearchResults(r => ({ ...r, [destId]: [] })); return; }
+    if (!query || query.length < 2) { setSearchResults(r => ({ ...r, [destId]: [] })); return; }
+    
+    // 1. Instant local offline places search (0ms instant!)
+    const qLower = query.toLowerCase().trim();
+    const offlineMatches = BD_OFFLINE_PLACES.filter(place =>
+      place.name.toLowerCase().includes(qLower) ||
+      place.labelBn.toLowerCase().includes(qLower) ||
+      place.keywords.some(k => k.toLowerCase().includes(qLower))
+    ).map(p => ({
+      display_name: `${p.labelBn} (${p.name})`,
+      lat: String(p.lat),
+      lon: String(p.lng)
+    }));
+
+    if (offlineMatches.length > 0) {
+      setSearchResults(r => ({ ...r, [destId]: offlineMatches }));
+    }
+
+    // 2. If online, also query Nominatim and merge
     clearTimeout(searchTimers.current[destId]);
     searchTimers.current[destId] = setTimeout(async () => {
+      if (!navigator.onLine) return;
       setSearchLoading(l => ({ ...l, [destId]: true }));
       try {
         const url = `${NOMINATIM_BASE}?q=${encodeURIComponent(query)}&format=json&limit=5&countrycodes=bd&accept-language=${lang}`;
         const res = await fetch(url, { headers: { 'Accept-Language': lang } });
         const data = await res.json();
-        setSearchResults(r => ({ ...r, [destId]: data }));
-      } catch { setSearchResults(r => ({ ...r, [destId]: [] })); }
-      finally { setSearchLoading(l => ({ ...l, [destId]: false })); }
+        if (Array.isArray(data) && data.length > 0) {
+          setSearchResults(r => ({
+            ...r,
+            [destId]: [...offlineMatches, ...data.filter(d => !offlineMatches.some(m => Math.abs(parseFloat(m.lat) - parseFloat(d.lat)) < 0.01))]
+          }));
+        }
+      } catch {
+        setSearchResults(r => ({ ...r, [destId]: offlineMatches }));
+      } finally {
+        setSearchLoading(l => ({ ...l, [destId]: false }));
+      }
     }, 400);
   }, [lang]);
 
@@ -219,7 +291,7 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
     setAutoSuggestUsed(false);
   };
 
-  // ── Route calculation with Steps & Geometry ──────────────────────────────
+  // ── Route calculation with Offline Fallback & Geometry ───────────────────
   const calculateRoutes = useCallback(async (customDests = null) => {
     const activeDests = customDests || destinations;
     const validDests = activeDests.filter(d => d.lat && d.lng);
@@ -231,65 +303,106 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
     setRoutesLoading(true);
     setRoutes([]);
     try {
-      const coords = validDests.map(d => `${d.lng},${d.lat}`).join(';');
-      const url = `${OSRM_BASE}/${coords}?overview=full&geometries=geojson&alternatives=3&steps=true`;
-      const res = await fetch(url);
-      const data = await res.json();
-      if (data.code === 'Ok' && data.routes?.length) {
-        const kmPerLiter = Number(costParams.kmPerLiter) || 40;
-        const fuelPrice = Number(costParams.fuelPricePerLiter) || 135;
+      let routeList = [];
+      const kmPerLiter = Number(costParams.kmPerLiter) || 40;
+      const fuelPrice = Number(costParams.fuelPricePerLiter) || 135;
 
-        const routeList = data.routes.map((r, i) => {
-          const distKm = Math.round((r.distance / 1000) * 10) / 10;
-          const durationHours = r.duration / 3600;
-          const fuelLiters = Math.round((distKm / kmPerLiter) * 10) / 10;
-          const fuelCost = Math.round(fuelLiters * fuelPrice);
-          const roadName = r.legs?.[0]?.summary || `Route ${i + 1}`;
+      // 1. Try online OSRM driving route if internet is available
+      if (navigator.onLine) {
+        try {
+          const coords = validDests.map(d => `${d.lng},${d.lat}`).join(';');
+          const url = `${OSRM_BASE}/${coords}?overview=full&geometries=geojson&alternatives=3&steps=true`;
+          const res = await fetch(url);
+          const data = await res.json();
+          if (data.code === 'Ok' && data.routes?.length) {
+            routeList = data.routes.map((r, i) => {
+              const distKm = Math.round((r.distance / 1000) * 10) / 10;
+              const durationHours = r.duration / 3600;
+              const fuelLiters = Math.round((distKm / kmPerLiter) * 10) / 10;
+              const fuelCost = Math.round(fuelLiters * fuelPrice);
+              const roadName = r.legs?.[0]?.summary || `Route ${i + 1}`;
 
-          return {
-            index: i,
-            distanceKm: distKm,
-            durationHours: durationHours,
-            fuelLiters: fuelLiters,
-            fuelCost: fuelCost,
-            summary: roadName,
-            geometry: r.geometry
-          };
-        });
-
-        // Find fastest and shortest routes for smart recommendation
-        let fastestIdx = 0;
-        let shortestIdx = 0;
-        routeList.forEach((r, idx) => {
-          if (r.durationHours < routeList[fastestIdx].durationHours) fastestIdx = idx;
-          if (r.distanceKm < routeList[shortestIdx].distanceKm) shortestIdx = idx;
-        });
-
-        const analyzed = routeList.map((r, idx) => ({
-          ...r,
-          isFastest: idx === fastestIdx,
-          isShortest: idx === shortestIdx,
-          isBestRecommended: idx === fastestIdx
-        }));
-
-        setRoutes(analyzed);
-        setSelectedRouteIdx(fastestIdx);
-
-        // Pre-fill toll with standard formula if not manually specified
-        const distKm = analyzed[0]?.distanceKm || 0;
-        setCostParams(p => ({
-          ...p,
-          tollCostManual: p.tollCostManual !== '' ? p.tollCostManual : Math.round(distKm * 0.5)
-        }));
-      } else {
-        setError(t.noRoutesFound);
+              return {
+                index: i,
+                distanceKm: distKm,
+                durationHours: durationHours,
+                fuelLiters: fuelLiters,
+                fuelCost: fuelCost,
+                summary: roadName,
+                geometry: r.geometry
+              };
+            });
+          }
+        } catch (onlineErr) {
+          console.debug('Online OSRM route fetch fallback to offline calculation:', onlineErr);
+        }
       }
-    } catch { 
-      setError(t.noRoutesFound); 
+
+      // 2. Offline Route Calculation Fallback (100% Works Offline!)
+      if (routeList.length === 0) {
+        let totalDirectDist = 0;
+        const coordinates = [];
+        for (let i = 0; i < validDests.length; i++) {
+          coordinates.push([validDests[i].lng, validDests[i].lat]);
+          if (i < validDests.length - 1) {
+            totalDirectDist += calculateHaversineDistance(
+              validDests[i].lat, validDests[i].lng,
+              validDests[i + 1].lat, validDests[i + 1].lng
+            );
+          }
+        }
+
+        // Apply 1.25x road-winding factor for realistic road distance in Bangladesh
+        const distKm = Math.round(totalDirectDist * 1.25 * 10) / 10;
+        // Assume 45 km/h average motorcycle touring speed
+        const durationHours = Math.round((distKm / 45) * 10) / 10;
+        const fuelLiters = Math.round((distKm / kmPerLiter) * 10) / 10;
+        const fuelCost = Math.round(fuelLiters * fuelPrice);
+
+        routeList = [{
+          index: 0,
+          distanceKm: distKm,
+          durationHours: durationHours,
+          fuelLiters: fuelLiters,
+          fuelCost: fuelCost,
+          summary: lang === 'bn' ? 'অফলাইন রুট (আনুমানিক)' : 'Offline Estimated Route',
+          geometry: {
+            type: 'LineString',
+            coordinates: coordinates
+          }
+        }];
+      }
+
+      // Find fastest and shortest routes
+      let fastestIdx = 0;
+      let shortestIdx = 0;
+      routeList.forEach((r, idx) => {
+        if (r.durationHours < routeList[fastestIdx].durationHours) fastestIdx = idx;
+        if (r.distanceKm < routeList[shortestIdx].distanceKm) shortestIdx = idx;
+      });
+
+      const analyzed = routeList.map((r, idx) => ({
+        ...r,
+        isFastest: idx === fastestIdx,
+        isShortest: idx === shortestIdx,
+        isBestRecommended: idx === fastestIdx
+      }));
+
+      setRoutes(analyzed);
+      setSelectedRouteIdx(fastestIdx);
+
+      // Pre-fill toll
+      const distKm = analyzed[0]?.distanceKm || 0;
+      setCostParams(p => ({
+        ...p,
+        tollCostManual: p.tollCostManual !== '' ? p.tollCostManual : Math.round(distKm * 0.5)
+      }));
+    } catch (err) {
+      console.error('Route calculation error:', err);
     } finally { 
       setRoutesLoading(false); 
     }
-  }, [destinations, lang, t, costParams.kmPerLiter, costParams.fuelPricePerLiter]);
+  }, [destinations, lang, costParams.kmPerLiter, costParams.fuelPricePerLiter]);
 
   // Auto-calculate routes if 2 valid destinations are present and routes are empty
   useEffect(() => {
@@ -301,7 +414,7 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
     }
   }, [step, destinations, routes.length, routesLoading, calculateRoutes]);
 
-  // ── Leaflet Map Setup in Step 2 ───────────────────────────────────────────
+  // ── Leaflet Map Setup in Step 2 with Offline Cached TileLayer ──────────────
   useEffect(() => {
     if (step !== 2) return;
     if (!mapContainerRef.current) return;
@@ -318,10 +431,16 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
           zoomControl: true
         });
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '© OpenStreetMap',
-          maxZoom: 19
-        }).addTo(map);
+        const tileLayer = createOfflineCachedTileLayer(
+          L,
+          'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+          {
+            attribution: '© OpenStreetMap',
+            maxZoom: 19,
+            layerKey: 'osm_create_modal'
+          }
+        );
+        if (tileLayer) tileLayer.addTo(map);
 
         leafletMapRef.current = map;
         setTimeout(() => {

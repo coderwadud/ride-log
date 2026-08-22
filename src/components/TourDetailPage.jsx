@@ -37,7 +37,19 @@ const SUB_TABS = [
   { id: 'analytics', icon: TrendingUp, labelBn: 'পরিসংখ্যান', labelEn: 'Analytics' }
 ];
 
-export default function TourDetailPage({ tourId, lang = 'bn', theme, user, onBack, onOpenCreate }) {
+export default function TourDetailPage({
+  tourId,
+  lang = 'bn',
+  theme,
+  user,
+  onBack,
+  onOpenCreate,
+  intercomEngine: passedIntercomEngine,
+  setIntercomEngine: passedSetIntercomEngine,
+  intercomState: passedIntercomState,
+  setIntercomState: passedSetIntercomState,
+  setIntercomTourId
+}) {
   const t = translations[lang] || translations['bn'];
   const [tour, setTour] = useState(null);
   const [members, setMembers] = useState([]);
@@ -48,8 +60,8 @@ export default function TourDetailPage({ tourId, lang = 'bn', theme, user, onBac
   const [showReportModal, setShowReportModal] = useState(false);
 
   // Global Tour Intercom Voice State
-  const [intercomEngine, setIntercomEngine] = useState(null);
-  const [intercomState, setIntercomState] = useState({
+  const [localIntercomEngine, setLocalIntercomEngine] = useState(null);
+  const [localIntercomState, setLocalIntercomState] = useState({
     isConnected: false,
     isMuted: false,
     isSpeaking: false,
@@ -58,6 +70,17 @@ export default function TourDetailPage({ tourId, lang = 'bn', theme, user, onBac
     participants: {},
     peerCount: 0
   });
+
+  const intercomEngine = passedIntercomEngine !== undefined ? passedIntercomEngine : localIntercomEngine;
+  const setIntercomEngine = (engine) => {
+    if (passedSetIntercomEngine) passedSetIntercomEngine(engine);
+    else setLocalIntercomEngine(engine);
+    if (setIntercomTourId) setIntercomTourId(engine ? tourId : null);
+  };
+
+  const intercomState = passedIntercomState !== undefined ? passedIntercomState : localIntercomState;
+  const setIntercomState = passedSetIntercomState || setLocalIntercomState;
+
   const [activeIntercomSession, setActiveIntercomSession] = useState(null);
 
   useEffect(() => {

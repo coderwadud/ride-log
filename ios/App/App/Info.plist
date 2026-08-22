@@ -47,7 +47,11 @@
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>RideLog BD requires microphone access for live group voice intercom during rides.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>RideLog BD requires camera access for live group video calling and rider video intercom.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>RideLog BD uses Bluetooth to connect with helmet headsets for audio intercom.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>RideLog BD uses Bluetooth to bridge audio intercom with nearby riders.</string>
 </dict>
 </plist>

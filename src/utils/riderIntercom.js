@@ -211,6 +211,8 @@ export class RiderIntercomEngine {
     this.remoteStreams = new Map();   // peerUid -> MediaStream
     this.remoteAudioElements = new Map(); // peerUid -> HTMLAudioElement
 
+    this.isVideoEnabled = false;
+    this.facingMode = 'user'; // 'user' (front) | 'environment' (back)
     this.isMuted = this.options.pttMode; // Default muted if in PTT mode
     this.isSpeaking = false;
     this.pttActive = false;
@@ -339,11 +341,46 @@ export class RiderIntercomEngine {
     }).catch(() => {});
   }
 
+  async acquireWakeLock() {
+    try {
+      if ('wakeLock' in navigator && !this.wakeLock) {
+        this.wakeLock = await navigator.wakeLock.request('screen');
+        this.wakeLock.addEventListener('release', () => {
+          this.wakeLock = null;
+        });
+      }
+    } catch (err) {
+      console.debug('Intercom WakeLock request:', err);
+    }
+  }
+
+  releaseWakeLock() {
+    if (this.wakeLock) {
+      this.wakeLock.release().catch(() => {});
+      this.wakeLock = null;
+    }
+  }
+
+  setupVisibilityListener() {
+    if (this.visibilityHandler) return;
+    this.visibilityHandler = () => {
+      if (this.audioContext && this.audioContext.state === 'suspended') {
+        this.audioContext.resume().catch(() => {});
+      }
+      if (document.visibilityState === 'visible' && !this.wakeLock) {
+        this.acquireWakeLock();
+      }
+    };
+    document.addEventListener('visibilitychange', this.visibilityHandler);
+  }
+
   /**
    * Start or Join Tour Intercom Call
    */
   async join() {
     await this.setupLocalAudio();
+    await this.acquireWakeLock();
+    this.setupVisibilityListener();
 
     const sessionRef = getIntercomSessionRef(this.tourId);
     const sessionSnap = await getDoc(sessionRef);
@@ -440,7 +477,7 @@ export class RiderIntercomEngine {
       });
     }
 
-    // Handle remote audio stream arrival
+    // Handle remote audio & video stream arrival
     pc.ontrack = (event) => {
       const [remoteStream] = event.streams;
       if (remoteStream) {
@@ -466,12 +503,12 @@ export class RiderIntercomEngine {
       }
     };
 
-    // If initiator, create and send WebRTC Offer
+    // If initiator, create and send WebRTC Offer (supporting both audio and video)
     if (isInitiator) {
       try {
         const offer = await pc.createOffer({
           offerToReceiveAudio: true,
-          offerToReceiveVideo: false
+          offerToReceiveVideo: true
         });
         await pc.setLocalDescription(offer);
         await this.sendSignal(peerUid, {
@@ -497,6 +534,146 @@ export class RiderIntercomEngine {
     }
     audioEl.srcObject = stream;
     audioEl.play().catch((e) => console.debug('Audio play autoplay handled:', e));
+  }
+
+  /**
+   * ─── GROUP VIDEO CALLING CAPABILITIES (100% FREE P2P) ───────────────────────
+   */
+
+  async enableVideo() {
+    const isBn = this.options.lang === 'bn';
+    try {
+      const videoConstraints = {
+        video: {
+          facingMode: this.facingMode,
+          width: { ideal: 640, max: 1280 },
+          height: { ideal: 480, max: 720 },
+          frameRate: { ideal: 24, max: 30 }
+        }
+      };
+
+      const videoStream = await navigator.mediaDevices.getUserMedia(videoConstraints);
+      const videoTrack = videoStream.getVideoTracks()[0];
+
+      if (!videoTrack) throw new Error('No video track obtained');
+
+      // Add track to local stream
+      if (this.localStream) {
+        this.localStream.addTrack(videoTrack);
+      } else {
+        this.localStream = videoStream;
+      }
+
+      // Add or replace video track in all active peer connections
+      for (const [peerUid, pc] of this.peerConnections) {
+        const senders = pc.getSenders();
+        const videoSender = senders.find((s) => s.track && s.track.kind === 'video');
+
+        if (videoSender) {
+          await videoSender.replaceTrack(videoTrack);
+        } else {
+          pc.addTrack(videoTrack, this.localStream);
+          // Renegotiate with peer
+          try {
+            const offer = await pc.createOffer({
+              offerToReceiveAudio: true,
+              offerToReceiveVideo: true
+            });
+            await pc.setLocalDescription(offer);
+            await this.sendSignal(peerUid, {
+              type: 'offer',
+              sdp: offer.sdp
+            });
+          } catch (e) {
+            console.debug('Renegotiate offer error:', e);
+          }
+        }
+      }
+
+      this.isVideoEnabled = true;
+      if (this.tourId && this.user?.uid) {
+        const sessionRef = getIntercomSessionRef(this.tourId);
+        updateDoc(sessionRef, {
+          [`participants.${this.user.uid}.isVideoEnabled`]: true
+        }).catch(() => {});
+      }
+      this.notifyState();
+    } catch (err) {
+      console.error('Enable video error:', err);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        throw new Error(
+          isBn
+            ? 'ক্যামেরা পারমিশন বন্ধ আছে। অনুগ্রহ করে ব্রাউজার বা অ্যাপ সেটিংসে ক্যামেরা অনুমতি দিন।'
+            : 'Camera permission denied. Please allow camera access in app settings.'
+        );
+      }
+      throw err;
+    }
+  }
+
+  async disableVideo() {
+    if (this.localStream) {
+      const videoTracks = this.localStream.getVideoTracks();
+      videoTracks.forEach((track) => {
+        track.stop();
+        this.localStream.removeTrack(track);
+      });
+    }
+
+    // Replace video track with null on peers
+    for (const [, pc] of this.peerConnections) {
+      const senders = pc.getSenders();
+      const videoSender = senders.find((s) => s.track && s.track.kind === 'video');
+      if (videoSender) {
+        videoSender.replaceTrack(null).catch(() => {});
+      }
+    }
+
+    this.isVideoEnabled = false;
+    if (this.tourId && this.user?.uid) {
+      const sessionRef = getIntercomSessionRef(this.tourId);
+      updateDoc(sessionRef, {
+        [`participants.${this.user.uid}.isVideoEnabled`]: false
+      }).catch(() => {});
+    }
+    this.notifyState();
+  }
+
+  async switchCamera() {
+    const newFacingMode = this.facingMode === 'user' ? 'environment' : 'user';
+    this.facingMode = newFacingMode;
+
+    if (this.isVideoEnabled) {
+      // Stop existing video track and start new facingMode
+      if (this.localStream) {
+        const oldTracks = this.localStream.getVideoTracks();
+        oldTracks.forEach((t) => {
+          t.stop();
+          this.localStream.removeTrack(t);
+        });
+      }
+
+      const videoStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: this.facingMode,
+          width: { ideal: 640, max: 1280 },
+          height: { ideal: 480, max: 720 },
+          frameRate: { ideal: 24, max: 30 }
+        }
+      });
+      const newVideoTrack = videoStream.getVideoTracks()[0];
+      if (newVideoTrack && this.localStream) {
+        this.localStream.addTrack(newVideoTrack);
+        for (const [, pc] of this.peerConnections) {
+          const senders = pc.getSenders();
+          const videoSender = senders.find((s) => s.track && s.track.kind === 'video');
+          if (videoSender) {
+            videoSender.replaceTrack(newVideoTrack).catch(() => {});
+          }
+        }
+      }
+    }
+    this.notifyState();
   }
 
   /**
@@ -660,7 +837,7 @@ export class RiderIntercomEngine {
       this.closePeer(peerUid);
     }
 
-    // Stop local microphone tracks
+    // Stop local microphone & camera tracks
     if (this.localStream) {
       this.localStream.getTracks().forEach((track) => track.stop());
       this.localStream = null;
@@ -695,7 +872,14 @@ export class RiderIntercomEngine {
       }
     }
 
+    this.releaseWakeLock();
+    if (this.visibilityHandler) {
+      document.removeEventListener('visibilitychange', this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
+
     this.isConnected = false;
+    this.isVideoEnabled = false;
     this.isSpeaking = false;
     this.participants = {};
     this.notifyState();
@@ -705,6 +889,10 @@ export class RiderIntercomEngine {
     this.onStateChange({
       isConnected: this.isConnected,
       isMuted: this.isMuted,
+      isVideoEnabled: this.isVideoEnabled,
+      facingMode: this.facingMode,
+      localStream: this.localStream,
+      remoteStreams: new Map(this.remoteStreams),
       isSpeaking: this.isSpeaking,
       pttActive: this.pttActive,
       pttMode: this.options.pttMode,

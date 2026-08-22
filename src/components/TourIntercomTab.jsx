@@ -2,10 +2,41 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Mic, MicOff, Radio, Users, Volume2, VolumeX, ShieldCheck,
   PhoneOff, PhoneCall, Sparkles, Wifi, WifiOff, Loader, Headphones,
-  CheckCircle2, AlertCircle, Info, Wind
+  CheckCircle2, AlertCircle, Info, Wind, Video, VideoOff, SwitchCamera,
+  Layers, Maximize2, Minimize2, Share2
 } from 'lucide-react';
 import { translations } from '../utils/translations';
 import { RiderIntercomEngine, listenToIntercomSession, soundEffects } from '../utils/riderIntercom';
+
+// ─── DEDICATED LIVE VIDEO PLAYER COMPONENT ────────────────────────────────────
+function RiderVideoFeed({ stream, isMuted = false, isMirrored = false, name = '', isSpeaking = false, isMe = false }) {
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream]);
+
+  return (
+    <div className={`rider-video-card ${isSpeaking ? 'speaking-pulse' : ''}`}>
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted={isMuted}
+        style={{ transform: isMirrored ? 'scaleX(-1)' : 'none' }}
+        className="rider-video-element"
+      />
+      <div className="rider-video-overlay">
+        <div className="rider-video-badge">
+          <span className="rider-video-name">{name} {isMe && '(You)'}</span>
+          {isSpeaking && <span className="video-speaking-tag">🎤</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function TourIntercomTab({
   tourId,
@@ -20,10 +51,11 @@ export default function TourIntercomTab({
 }) {
   const t = translations[lang] || translations['bn'];
   const [connecting, setConnecting] = useState(false);
+  const [videoLoading, setVideoLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [activeSession, setActiveSession] = useState(null);
   const [pttPressed, setPttPressed] = useState(false);
-  const [noiseFilter, setNoiseFilter] = useState(true);
+  const [noiseFilter] = useState(true);
 
   const pttButtonRef = useRef(null);
 
@@ -106,12 +138,45 @@ export default function TourIntercomTab({
       setIntercomState({
         isConnected: false,
         isMuted: false,
+        isVideoEnabled: false,
+        facingMode: 'user',
+        localStream: null,
+        remoteStreams: new Map(),
         isSpeaking: false,
         pttActive: false,
         pttMode: false,
         participants: {},
         peerCount: 0
       });
+    }
+  };
+
+  // Toggle Camera Video On/Off
+  const handleToggleVideo = async () => {
+    if (!intercomEngine) return;
+    setVideoLoading(true);
+    setErrorMsg('');
+    try {
+      if (intercomState?.isVideoEnabled) {
+        await intercomEngine.disableVideo();
+      } else {
+        await intercomEngine.enableVideo();
+      }
+    } catch (err) {
+      console.error('Toggle video error:', err);
+      setErrorMsg(err.message || (lang === 'bn' ? 'ক্যামেরা চালু করা যায়নি' : 'Could not start camera'));
+    } finally {
+      setVideoLoading(false);
+    }
+  };
+
+  // Switch Front / Back Camera
+  const handleSwitchCamera = async () => {
+    if (!intercomEngine || !intercomState?.isVideoEnabled) return;
+    try {
+      await intercomEngine.switchCamera();
+    } catch (err) {
+      console.error('Switch camera error:', err);
     }
   };
 
@@ -250,12 +315,30 @@ export default function TourIntercomTab({
       ) : (
         /* Active Connected Intercom View */
         <div className="tour-intercom-active-box">
-          {/* Riders Mesh Grid */}
+          {/* Riders Mesh Grid (Audio Cards & Live Video Feeds) */}
           <div className="tour-intercom-riders-grid">
             {participantsList.map((rider) => {
               const isMe = rider.uid === user?.uid;
               const isSpeaking = isMe ? intercomState?.isSpeaking : rider.isSpeaking;
               const isMuted = isMe ? intercomState?.isMuted : rider.isMuted;
+              const isVideoActive = isMe
+                ? (intercomState?.isVideoEnabled && intercomState?.localStream?.getVideoTracks()?.length > 0)
+                : (rider.isVideoEnabled || (intercomState?.remoteStreams?.get(rider.uid)?.getVideoTracks()?.length > 0));
+              const stream = isMe ? intercomState?.localStream : intercomState?.remoteStreams?.get(rider.uid);
+
+              if (isVideoActive && stream) {
+                return (
+                  <RiderVideoFeed
+                    key={rider.uid}
+                    stream={stream}
+                    isMuted={isMe}
+                    isMirrored={isMe && intercomState?.facingMode === 'user'}
+                    name={rider.name}
+                    isSpeaking={isSpeaking}
+                    isMe={isMe}
+                  />
+                );
+              }
 
               return (
                 <div
@@ -293,6 +376,39 @@ export default function TourIntercomTab({
                 </div>
               );
             })}
+          </div>
+
+          {/* Quick Video & Media Action Bar */}
+          <div className="tour-intercom-video-toolbar">
+            <button
+              className={`intercom-video-toggle-btn ${intercomState?.isVideoEnabled ? 'active' : ''}`}
+              onClick={handleToggleVideo}
+              disabled={videoLoading}
+            >
+              {videoLoading ? (
+                <Loader size={16} className="spin" />
+              ) : intercomState?.isVideoEnabled ? (
+                <Video size={16} className="text-emerald-400" />
+              ) : (
+                <VideoOff size={16} />
+              )}
+              <span>
+                {intercomState?.isVideoEnabled
+                  ? (lang === 'bn' ? 'ক্যামেরা বন্ধ করুন' : 'Turn Off Video')
+                  : (lang === 'bn' ? 'ক্যামেরা চালু করুন' : 'Start Video')}
+              </span>
+            </button>
+
+            {intercomState?.isVideoEnabled && (
+              <button
+                className="intercom-camera-flip-btn"
+                onClick={handleSwitchCamera}
+                title={lang === 'bn' ? 'ক্যামেরা পরিবর্তন (সামনে/পেছনে)' : 'Flip Camera'}
+              >
+                <SwitchCamera size={16} />
+                <span>{intercomState?.facingMode === 'user' ? (lang === 'bn' ? 'ব্যাক ক্যামেরা' : 'Rear Cam') : (lang === 'bn' ? 'ফ্রন্ট ক্যামেরা' : 'Front Cam')}</span>
+              </button>
+            )}
           </div>
 
           {/* Push-To-Talk (PTT) / Open Mic Control Stage */}
@@ -355,6 +471,21 @@ export default function TourIntercomTab({
         </div>
       )}
 
+      {/* Offline Rider Mesh & Hotspot Bridge Guide Box */}
+      <div className="tour-intercom-mesh-guide">
+        <div className="mesh-guide-header">
+          <Wifi size={16} className="text-emerald-400" />
+          <span className="mesh-guide-title">
+            {lang === 'bn' ? '📶 অফলাইন রাইডার ব্রিজ (Offline Rider Mesh Bridge)' : '📶 Offline Rider Mesh Bridge'}
+          </span>
+        </div>
+        <p className="mesh-guide-text">
+          {lang === 'bn'
+            ? 'পাহাড়ে বা নেটওয়ার্কহীন এলাকায় কারো ইন্টারনেট না থাকলে, যেকোনো একজন রাইডার ফোনের Personal Hotspot অন করলে (ডাটা ছাড়া) পাশের রাইডাররা কানেক্ট হয়ে লোকাল নেটওয়ার্কে ১০০% ফ্রিতে লাইভ ভয়েস ও ভিডিও কলে যুক্ত হতে পারবেন।'
+            : 'When riding in remote areas with no cellular data, one rider can turn on Personal Hotspot (no data required). Nearby riders connecting to the hotspot can join the live call with 0 data cost!'}
+        </p>
+      </div>
+
       {/* Rider Tips Box */}
       <div className="tour-intercom-tips">
         <div className="tips-title">
@@ -362,8 +493,8 @@ export default function TourIntercomTab({
           <span>{lang === 'bn' ? 'রাইডারদের জন্য টিপস' : 'Rider Tips'}</span>
         </div>
         <ul className="tips-list">
-          <li>{lang === 'bn' ? 'বাইক চালানোর সময় আপনি ম্যাপ বা GPS Tracker চালু করলেও ইন্টারকম চালু থাকবে।' : 'Voice will stay connected even when browsing the live Map or GPS Tracker.'}</li>
-          <li>{lang === 'bn' ? 'উইন্ড নয়েজ কমাতে হেলমেট হেডসেট বা এয়ারপডস ব্যবহার করুন।' : 'Use a Bluetooth helmet headset for automatic road & wind noise suppression.'}</li>
+          <li>{lang === 'bn' ? 'বাইক চালানোর সময় আপনি ম্যাপ বা GPS Tracker চালু করলেও ইন্টারকম চালু থাকবে।' : 'Voice and video stay connected even when browsing the live Map or GPS Tracker.'}</li>
+          <li>{lang === 'bn' ? 'উইন্ড নয়েজ কমাতে হেলমেট ব্লুটুথ হেডসেট ব্যবহার করুন।' : 'Use a Bluetooth helmet headset for automatic road & wind noise suppression.'}</li>
         </ul>
       </div>
     </div>

@@ -19,6 +19,7 @@ import UpdateModal from './components/UpdateModal';
 import CampaignModal from './components/CampaignModal';
 import TicketUpdateModal from './components/TicketUpdateModal';
 import FeedbackPage from './components/FeedbackPage';
+import FloatingIntercomBar from './components/FloatingIntercomBar';
 import Footer from './components/Footer';
 import BikeSelector from './components/BikeSelector';
 
@@ -86,6 +87,19 @@ export default function App() {
   const [activeBikeId, setActiveBikeId] = useState(() => loadActiveBikeId());
   const [fuelLogs, setFuelLogs] = useState(() => loadFuelLogs());
   const [serviceLogs, setServiceLogs] = useState(() => loadServiceLogs());
+
+  // Global Rider Intercom Engine (Runs continuously in background across all tabs)
+  const [globalIntercomEngine, setGlobalIntercomEngine] = useState(null);
+  const [globalIntercomState, setGlobalIntercomState] = useState({
+    isConnected: false,
+    isMuted: false,
+    isSpeaking: false,
+    pttActive: false,
+    pttMode: false,
+    participants: {},
+    peerCount: 0
+  });
+  const [globalIntercomTourId, setGlobalIntercomTourId] = useState(null);
 
   // Flag to avoid saving initial empty state over Firestore before loading finishes
   const isLoadedRef = useRef(false);
@@ -670,6 +684,35 @@ export default function App() {
         </button>
       </nav>
 
+      {/* Global Floating Intercom Bar (Keeps voice alive and interactive when viewing Map, GPS, Dashboard, etc.) */}
+      {globalIntercomState.isConnected && activeTab !== 'tour' && (
+        <FloatingIntercomBar
+          intercomState={globalIntercomState}
+          intercomEngine={globalIntercomEngine}
+          onOpenIntercomTab={() => {
+            setIsFeedbackPageOpen(false);
+            setActiveTab('tour');
+          }}
+          onLeaveCall={async () => {
+            if (globalIntercomEngine) {
+              await globalIntercomEngine.leave(true);
+              setGlobalIntercomEngine(null);
+              setGlobalIntercomState({
+                isConnected: false,
+                isMuted: false,
+                isSpeaking: false,
+                pttActive: false,
+                pttMode: false,
+                participants: {},
+                peerCount: 0
+              });
+              setGlobalIntercomTourId(null);
+            }
+          }}
+          lang={lang}
+        />
+      )}
+
       {/* Tab View Contents */}
       <main>
         {isFeedbackPageOpen ? (
@@ -721,6 +764,12 @@ export default function App() {
                 lang={lang}
                 theme={theme}
                 user={user}
+                intercomEngine={globalIntercomEngine}
+                setIntercomEngine={setGlobalIntercomEngine}
+                intercomState={globalIntercomState}
+                setIntercomState={setGlobalIntercomState}
+                intercomTourId={globalIntercomTourId}
+                setIntercomTourId={setGlobalIntercomTourId}
               />
             )}
             {activeTab === 'service' && (
