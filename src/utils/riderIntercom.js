@@ -229,26 +229,41 @@ export class RiderIntercomEngine {
   async setupLocalAudio() {
     if (this.localStream) return this.localStream;
 
-    const constraints = {
-      audio: {
-        echoCancellation: this.options.echoCancellation,
-        noiseSuppression: this.options.noiseSuppression,
-        autoGainControl: this.options.autoGainControl,
-        channelCount: 1,
-        sampleRate: 48000
-      },
-      video: false
-    };
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error('আপনার ডিভাইসের ব্রাউজার ভয়েস কলিং সাপোর্ট করছে না বা সাইটটি HTTPS-এ নেই।');
+    }
 
     try {
+      // 1. Try with advanced Motorcycle Wind / Noise Cancellation
+      const constraints = {
+        audio: {
+          echoCancellation: this.options.echoCancellation,
+          noiseSuppression: this.options.noiseSuppression,
+          autoGainControl: this.options.autoGainControl
+        },
+        video: false
+      };
       this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
-      this.applyMuteState();
-      this.setupAudioMeter(this.localStream);
-      return this.localStream;
-    } catch (err) {
-      console.error('Microphone access error:', err);
-      throw new Error(err.name === 'NotAllowedError' ? 'Microphone permission denied' : 'Could not access microphone');
+    } catch (primaryErr) {
+      console.warn('Advanced audio constraints failed, trying basic audio stream...', primaryErr);
+      try {
+        // 2. Fallback to basic audio
+        this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      } catch (fallbackErr) {
+        console.error('Microphone access denied or failed:', fallbackErr);
+        if (fallbackErr.name === 'NotAllowedError' || fallbackErr.name === 'PermissionDeniedError') {
+          throw new Error('মাইক্রোফোন পারমিশন বন্ধ আছে। অনুগ্রহ করে ব্রাউজার বা ফোনের সাইট সেটিংসে গিয়ে Microphone Allow (অনুমতি দিন) করুন।');
+        } else if (fallbackErr.name === 'NotFoundError' || fallbackErr.name === 'DevicesNotFoundError') {
+          throw new Error('কোনো মাইক্রোফোন খুঁজে পাওয়া যায়নি।');
+        } else {
+          throw new Error(`মাইক্রোফোন চালু করা যায়নি (${fallbackErr.message || fallbackErr.name})`);
+        }
+      }
     }
+
+    this.applyMuteState();
+    this.setupAudioMeter(this.localStream);
+    return this.localStream;
   }
 
   /**
