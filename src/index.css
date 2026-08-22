@@ -2812,4 +2812,84 @@ h5 {
   margin: 0; font-size: 11px; color: var(--text-dim); line-height: 1.5;
 }
 
+/* ── Wi-Fi Direct Auto Connect Radar Card ── */
+.tour-wifi-direct-card {
+  background: rgba(245, 158, 11, 0.05); border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px;
+  transition: all 0.2s ease;
+}
+.tour-wifi-direct-card.scanning {
+  border-color: #f59e0b; box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
+}
+.wifi-direct-top { display: flex; align-items: center; gap: 10px; }
+.wifi-direct-icon-wrap {
+  position: relative; width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(245, 158, 11, 0.15); display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.wifi-radar-pulse {
+  position: absolute; width: 100%; height: 100%; border-radius: 50%;
+  border: 2px solid #f59e0b; animation: radarPulse 1.5s infinite;
+}
+@keyframes radarPulse {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+.wifi-direct-info { display: flex; flex-direction: column; gap: 2px; }
+.wifi-direct-title { font-size: 12px; font-weight: 800; color: var(--text-main); }
+.wifi-direct-subtitle { font-size: 11px; color: var(--text-dim); line-height: 1.35; }
+
+.wifi-direct-action-row { display: flex; gap: 8px; align-items: center; }
+.wifi-direct-scan-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 14px; border-radius: 10px; background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35); color: #fbbf24; font-size: 11px;
+  font-weight: 700; cursor: pointer; transition: all 0.2s;
+}
+.wifi-direct-scan-btn.active {
+  background: #f59e0b; color: #000;
+}
+.wifi-direct-qr-btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 12px; border-radius: 10px; background: var(--bg-input);
+  border: 1px solid var(--border-color); color: var(--text-main); font-size: 11px;
+  font-weight: 600; cursor: pointer; transition: all 0.2s;
+}
+.wifi-direct-status-badge {
+  font-size: 10px; color: #10b981; font-weight: 700; background: rgba(16, 185, 129, 0.1);
+  padding: 4px 8px; border-radius: 6px; align-self: flex-start;
+}
+
+/* ── 1-Tap QR Instant Connection Modal ── */
+.tour-qr-modal {
+  background: var(--bg-card); border: 1.5px solid var(--border-color);
+  border-radius: 20px; width: 100%; max-width: 320px; overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.6); animation: modalPop 0.2s ease-out;
+}
+@keyframes modalPop {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.tour-qr-header {
+  padding: 14px 16px; border-bottom: 1px solid var(--border-color);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.tour-qr-close-btn {
+  background: transparent; border: none; color: var(--text-dim); cursor: pointer;
+  padding: 4px; display: flex; align-items: center; justify-content: center;
+}
+.tour-qr-body {
+  padding: 20px 16px; display: flex; flex-direction: column; align-items: center; gap: 14px;
+}
+.tour-qr-frame {
+  padding: 12px; background: #fff; border-radius: 16px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center;
+}
+.tour-qr-image { width: 190px; height: 190px; display: block; border-radius: 8px; }
+.tour-qr-instructions {
+  display: flex; align-items: flex-start; gap: 8px; background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 10px; padding: 10px 12px;
+}
+.tour-qr-instructions p { margin: 0; font-size: 11px; color: var(--text-dim); line-height: 1.4; }
+
 

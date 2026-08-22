@@ -3,10 +3,11 @@ import {
   Mic, MicOff, Radio, Users, Volume2, VolumeX, ShieldCheck,
   PhoneOff, PhoneCall, Sparkles, Wifi, WifiOff, Loader, Headphones,
   CheckCircle2, AlertCircle, Info, Wind, Video, VideoOff, SwitchCamera,
-  Layers, Maximize2, Minimize2, Share2
+  Layers, Maximize2, Minimize2, Share2, QrCode, X, Zap, Smartphone
 } from 'lucide-react';
 import { translations } from '../utils/translations';
 import { RiderIntercomEngine, listenToIntercomSession, soundEffects } from '../utils/riderIntercom';
+import { wifiDirectMesh } from '../utils/wifiDirectMesh';
 
 // ─── DEDICATED LIVE VIDEO PLAYER COMPONENT ────────────────────────────────────
 function RiderVideoFeed({ stream, isMuted = false, isMirrored = false, name = '', isSpeaking = false, isMe = false }) {
@@ -56,8 +57,20 @@ export default function TourIntercomTab({
   const [activeSession, setActiveSession] = useState(null);
   const [pttPressed, setPttPressed] = useState(false);
   const [noiseFilter] = useState(true);
+  const [isWifiScanning, setIsWifiScanning] = useState(false);
+  const [wifiDirectState, setWifiDirectState] = useState({ isScanning: false, discoveredPeers: [], localIp: null });
+  const [showQrModal, setShowQrModal] = useState(false);
 
   const pttButtonRef = useRef(null);
+
+  // Listen to Wi-Fi Direct local mesh state
+  useEffect(() => {
+    const unsub = wifiDirectMesh.addListener((state) => {
+      setWifiDirectState(state);
+      setIsWifiScanning(state.isScanning);
+    });
+    return unsub;
+  }, []);
 
   // Listen to remote intercom session state in Firestore
   useEffect(() => {
@@ -202,9 +215,22 @@ export default function TourIntercomTab({
   };
 
   const handlePttEnd = () => {
-    if (!intercomEngine || !intercomState.pttMode) return;
+    if (!intercomEngine || !intercomState?.pttMode) return;
     setPttPressed(false);
     intercomEngine.setPttPress(false);
+  };
+
+  // Toggle Wi-Fi Direct P2P Auto-Scan
+  const handleToggleWifiDirect = async () => {
+    if (isWifiScanning) {
+      wifiDirectMesh.stopDiscovery();
+    } else {
+      await wifiDirectMesh.startDiscovery(tourId, user);
+      // Auto-join call if not already connected
+      if (!intercomState?.isConnected) {
+        handleJoinCall();
+      }
+    }
   };
 
   const isConnected = !!intercomState?.isConnected;
@@ -466,6 +492,98 @@ export default function TourIntercomTab({
                 <PhoneOff size={16} />
                 <span>{lang === 'bn' ? 'কল ত্যাগ করুন' : 'Leave'}</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Wi-Fi Direct (Wi-Fi to Wi-Fi P2P) Auto-Connect Radar Box */}
+      <div className={`tour-wifi-direct-card ${isWifiScanning ? 'scanning' : ''}`}>
+        <div className="wifi-direct-top">
+          <div className="wifi-direct-icon-wrap">
+            <Zap size={18} className="text-amber-400" />
+            {isWifiScanning && <span className="wifi-radar-pulse" />}
+          </div>
+          <div className="wifi-direct-info">
+            <span className="wifi-direct-title">
+              {lang === 'bn' ? '⚡ Wi-Fi Direct অটো কানেক্ট (পাসওয়ার্ড ছাড়া)' : '⚡ Wi-Fi Direct Auto Connect (No Password)'}
+            </span>
+            <span className="wifi-direct-subtitle">
+              {isWifiScanning
+                ? (lang === 'bn' ? 'কাছাকাছি রাইডারদের স্ক্যান করা হচ্ছে... (Wi-Fi চালু রাখুন)' : 'Scanning nearby rider devices on Wi-Fi...')
+                : (lang === 'bn' ? 'ইন্টারনেট বা হটস্পট ছাড়াও Wi-Fi চালু থাকলে অটো পেয়ারিং হবে' : 'Auto-pair phone-to-phone on local Wi-Fi without passwords')}
+            </span>
+          </div>
+        </div>
+
+        <div className="wifi-direct-action-row">
+          <button
+            className={`wifi-direct-scan-btn ${isWifiScanning ? 'active' : ''}`}
+            onClick={handleToggleWifiDirect}
+          >
+            {isWifiScanning ? (
+              <>
+                <Loader size={14} className="spin text-amber-400" />
+                <span>{lang === 'bn' ? 'স্ক্যানিং চলছে...' : 'Scanning Wi-Fi...'}</span>
+              </>
+            ) : (
+              <>
+                <Zap size={14} />
+                <span>{lang === 'bn' ? 'Wi-Fi Direct স্ক্যান শুরু করুন' : 'Start Wi-Fi Direct'}</span>
+              </>
+            )}
+          </button>
+
+          <button
+            className="wifi-direct-qr-btn"
+            onClick={() => setShowQrModal(true)}
+            title="1-Tap QR Code"
+          >
+            <QrCode size={14} />
+            <span>{lang === 'bn' ? '১-ট্যাপ QR' : '1-Tap QR'}</span>
+          </button>
+        </div>
+
+        {wifiDirectState.localIp && (
+          <div className="wifi-direct-status-badge">
+            <span>🌐 {lang === 'bn' ? 'লোকাল সাবনেট IP' : 'Local Mesh IP'}: {wifiDirectState.localIp}</span>
+          </div>
+        )}
+      </div>
+
+      {/* 1-Tap QR Instant Connection Modal */}
+      {showQrModal && (
+        <div className="tour-modal-backdrop" onClick={() => setShowQrModal(false)}>
+          <div className="tour-qr-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="tour-qr-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <QrCode size={20} className="text-emerald-400" />
+                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800 }}>
+                  {lang === 'bn' ? '১-ক্লিকে অটো কানেক্ট QR' : '1-Tap Auto Connect QR'}
+                </h3>
+              </div>
+              <button className="tour-qr-close-btn" onClick={() => setShowQrModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="tour-qr-body">
+              <div className="tour-qr-frame">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent('WIFI:T:nopass;S:RideLog_Tour_Mesh;P:;;')}`}
+                  alt="Wi-Fi Direct QR Code"
+                  className="tour-qr-image"
+                />
+              </div>
+
+              <div className="tour-qr-instructions">
+                <Smartphone size={16} className="text-indigo-400" />
+                <p>
+                  {lang === 'bn'
+                    ? 'পাশের রাইডারকে তার ফোনের ক্যামেরা বা কিউআর স্ক্যানার দিয়ে এটি স্ক্যান করতে বলুন। কোনো পাসওয়ার্ড টাইপ না করেই ১ ক্লিকে অটো কানেক্ট হবে।'
+                    : 'Ask nearby riders to scan this QR with their camera. They will connect instantly with zero password typing.'}
+                </p>
+              </div>
             </div>
           </div>
         </div>
