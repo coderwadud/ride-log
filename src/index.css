@@ -1462,6 +1462,85 @@ h5 {
 }
 .tour-add-dest-btn:hover { background: rgba(99,102,241,0.15); }
 
+.tour-gps-detect-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 9px; border-radius: 8px;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #818cf8; font-size: 11px; font-weight: 700;
+  cursor: pointer; transition: all 0.2s;
+}
+.tour-gps-detect-btn:hover {
+  background: rgba(99, 102, 241, 0.22);
+  color: #fff;
+  border-color: #6366f1;
+}
+
+/* Quick Suggestion Destinations Chips */
+.tour-quick-destinations-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 2px;
+}
+.tour-quick-dest-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.tour-quick-chips-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.tour-quick-chips-wrap::-webkit-scrollbar { display: none; }
+.tour-quick-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.tour-quick-chip-btn:hover {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: #6366f1;
+  color: #818cf8;
+  transform: translateY(-1px);
+}
+.tour-quick-chip-btn.active {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: #10b981;
+  color: #10b981;
+}
+
+/* Auto Suggestion Banner */
+.tour-auto-suggest-banner {
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px dashed rgba(16, 185, 129, 0.35);
+  border-radius: 12px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #10b981;
+  line-height: 1.4;
+}
+
 .tour-calc-route-btn {
   display: flex; align-items: center; justify-content: center; gap: 7px;
   width: 100%; padding: 11px; border-radius: 10px;

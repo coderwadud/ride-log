@@ -2,14 +2,26 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   X, MapPin, Plus, Trash2, ChevronRight, ChevronLeft, Loader, 
   Check, Route, AlertCircle, Sparkles, Zap, Compass, Clock, Fuel,
-  CheckCircle2, Info, Navigation
+  CheckCircle2, Info, Navigation, LocateFixed
 } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { translations } from '../utils/translations';
 import { createTour } from '../utils/tourStorage';
 import { calculateCostEstimate } from '../utils/tourCalculations';
 
 const OSRM_BASE = 'https://router.project-osrm.org/route/v1/driving';
 const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org/search';
+
+const POPULAR_DESTINATIONS = [
+  { id: 'coxsbazar', name: "Cox's Bazar", labelBn: '🏖️ কক্সবাজার', labelEn: "🏖️ Cox's Bazar", lat: 21.4272, lng: 91.9702, keywords: ['cox', 'bazar', 'কক্সবাজার', 'সমুদ্র'] },
+  { id: 'sajek', name: 'Sajek Valley', labelBn: '⛰️ সাজেক ভ্যালি', labelEn: '⛰️ Sajek Valley', lat: 23.3820, lng: 92.2938, keywords: ['sajek', 'সাজেক', 'ভ্যালি', 'পাহাড়'] },
+  { id: 'sreemangal', name: 'Sreemangal, Sylhet', labelBn: '🌲 শ্রীমঙ্গল / সিলেট', labelEn: '🌲 Sreemangal, Sylhet', lat: 24.3065, lng: 91.7296, keywords: ['sylhet', 'sreemangal', 'সিলেট', 'শ্রীমঙ্গল', 'চা বাগান'] },
+  { id: 'bandarban', name: 'Bandarban', labelBn: '🏔️ বান্দরবান', labelEn: '🏔️ Bandarban', lat: 22.1953, lng: 92.2184, keywords: ['bandarban', 'বান্দরবান', 'নীলগিরি', 'বগালেক'] },
+  { id: 'kuakata', name: 'Kuakata Beach', labelBn: '🌅 কুয়াকাটা', labelEn: '🌅 Kuakata Beach', lat: 21.8167, lng: 90.1194, keywords: ['kuakata', 'কুয়াকাটা', 'কুয়াকাটা', 'সূর্যাস্ত'] },
+  { id: 'jaflong', name: 'Jaflong, Sylhet', labelBn: '🏞️ জাফলং', labelEn: '🏞️ Jaflong', lat: 25.1634, lng: 92.0175, keywords: ['jaflong', 'জাফলং', 'বিছানাকান্দি', 'রাতারগুল'] },
+  { id: 'tanguar', name: 'Tanguar Haor', labelBn: '🏕️ টাঙ্গুয়ার হাওর', labelEn: '🏕️ Tanguar Haor', lat: 25.1235, lng: 91.0712, keywords: ['tanguar', 'haor', 'হাওর', 'টাঙ্গুয়ার', 'সুনামগঞ্জ'] },
+  { id: 'chittagong', name: 'Chittagong', labelBn: '🏙️ চট্টগ্রাম', labelEn: '🏙️ Chittagong', lat: 22.3569, lng: 91.7832, keywords: ['chittagong', 'chattogram', 'চট্টগ্রাম', 'পতেঙ্গা'] }
+];
 
 let destIdSeq = 0;
 const EMPTY_DEST = () => ({ id: `dest_${Date.now()}_${++destIdSeq}_${Math.random().toString(36).substr(2, 5)}`, name: '', lat: null, lng: null });
@@ -33,6 +45,8 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
   const [routes, setRoutes] = useState([]);
   const [routesLoading, setRoutesLoading] = useState(false);
   const [selectedRouteIdx, setSelectedRouteIdx] = useState(0);
+  const [detectingGps, setDetectingGps] = useState(false);
+  const [autoSuggestUsed, setAutoSuggestUsed] = useState(false);
 
   // Leaflet map refs
   const mapContainerRef = useRef(null);
@@ -81,6 +95,81 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
     return `${h > 0 ? `${h}h ` : ''}${m}m`;
   }, [lang]);
 
+  // ── Auto-Detect Current GPS Location for Start Position ───────────────────
+  const detectCurrentGpsLocation = useCallback(async (force = false) => {
+    if (!force && destinations[0]?.lat && destinations[0]?.lng) return null;
+    setDetectingGps(true);
+    try {
+      let lat = null;
+      let lng = null;
+
+      if (Capacitor.isNativePlatform()) {
+        try {
+          const { Geolocation } = await import('@capacitor/geolocation');
+          const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 7000 });
+          lat = pos.coords.latitude;
+          lng = pos.coords.longitude;
+        } catch (e) {}
+      }
+
+      if (!lat && navigator.geolocation) {
+        const pos = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 7000 });
+        });
+        lat = pos.coords.latitude;
+        lng = pos.coords.longitude;
+      }
+
+      if (lat && lng) {
+        let placeName = lang === 'bn' ? 'আমার বর্তমান অবস্থান' : 'Current GPS Location';
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=${lang}`);
+          const data = await res.json();
+          if (data?.address) {
+            const addr = data.address;
+            const suburb = addr.suburb || addr.neighbourhood || addr.city_district || addr.residential || '';
+            const city = addr.city || addr.town || addr.state_district || addr.state || '';
+            const combined = [suburb, city].filter(Boolean).join(', ');
+            if (combined) placeName = combined;
+          }
+        } catch (e) {}
+
+        setDestinations(d => {
+          const updated = [...d];
+          updated[0] = {
+            ...updated[0],
+            name: placeName,
+            lat: parseFloat(lat),
+            lng: parseFloat(lng),
+            isCurrentGps: true
+          };
+          return updated;
+        });
+
+        return { lat: parseFloat(lat), lng: parseFloat(lng), placeName };
+      }
+    } catch (err) {
+      console.debug('GPS auto-detection skipped:', err);
+    } finally {
+      setDetectingGps(false);
+    }
+    return null;
+  }, [lang, destinations]);
+
+  // ── Match Destination from Title ──────────────────────────────────────────
+  const matchDestinationFromTitle = useCallback((titleText) => {
+    if (!titleText) return null;
+    const lower = titleText.toLowerCase();
+    for (const item of POPULAR_DESTINATIONS) {
+      for (const kw of item.keywords) {
+        if (lower.includes(kw.toLowerCase())) {
+          return item;
+        }
+      }
+    }
+    return null;
+  }, []);
+
   // ── Destination search ────────────────────────────────────────────────────
   const searchPlace = useCallback((query, destId) => {
     if (!query || query.length < 3) { setSearchResults(r => ({ ...r, [destId]: [] })); return; }
@@ -98,12 +187,12 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
   }, [lang]);
 
   const updateDest = (id, field, value) => {
-    setDestinations(d => d.map(dest => dest.id === id ? { ...dest, [field]: value } : dest));
+    setDestinations(d => d.map(dest => dest.id === id ? { ...dest, [field]: value, isCurrentGps: false } : dest));
   };
 
   const selectPlace = (destId, place) => {
     setDestinations(d => d.map(dest =>
-      dest.id === destId ? { ...dest, name: place.display_name.split(',')[0], lat: parseFloat(place.lat), lng: parseFloat(place.lon) } : dest
+      dest.id === destId ? { ...dest, name: place.display_name.split(',')[0], lat: parseFloat(place.lat), lng: parseFloat(place.lon), isCurrentGps: false } : dest
     ));
     setSearchResults(r => ({ ...r, [destId]: [] }));
   };
@@ -111,9 +200,29 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
   const addDestination = () => setDestinations(d => [...d, EMPTY_DEST()]);
   const removeDest = (id) => setDestinations(d => d.filter(dest => dest.id !== id));
 
+  // Quick 1-tap select popular destination
+  const selectQuickDestination = (item) => {
+    const destName = lang === 'bn' ? item.labelBn.replace(/^[^\s]+\s/, '') : item.name;
+    setDestinations(d => {
+      const updated = [...d];
+      if (updated.length >= 2) {
+        updated[updated.length - 1] = {
+          ...updated[updated.length - 1],
+          name: destName,
+          lat: item.lat,
+          lng: item.lng,
+          isCurrentGps: false
+        };
+      }
+      return updated;
+    });
+    setAutoSuggestUsed(false);
+  };
+
   // ── Route calculation with Steps & Geometry ──────────────────────────────
-  const calculateRoutes = useCallback(async () => {
-    const validDests = destinations.filter(d => d.lat && d.lng);
+  const calculateRoutes = useCallback(async (customDests = null) => {
+    const activeDests = customDests || destinations;
+    const validDests = activeDests.filter(d => d.lat && d.lng);
     if (validDests.length < 2) { 
       setError(lang === 'bn' ? 'কমপক্ষে ২টি গন্তব্য নির্বাচন করুন।' : 'Select at least 2 destinations.'); 
       return; 
@@ -160,7 +269,7 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
           ...r,
           isFastest: idx === fastestIdx,
           isShortest: idx === shortestIdx,
-          isBestRecommended: idx === fastestIdx // Fastest route via highway is best for tours
+          isBestRecommended: idx === fastestIdx
         }));
 
         setRoutes(analyzed);
@@ -182,7 +291,17 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
     }
   }, [destinations, lang, t, costParams.kmPerLiter, costParams.fuelPricePerLiter]);
 
-  // ── Leaflet Map Setup & Invalidation in Step 2 ────────────────────────────
+  // Auto-calculate routes if 2 valid destinations are present and routes are empty
+  useEffect(() => {
+    if (step === 2) {
+      const valid = destinations.filter(d => d.lat && d.lng);
+      if (valid.length >= 2 && routes.length === 0 && !routesLoading) {
+        calculateRoutes(destinations);
+      }
+    }
+  }, [step, destinations, routes.length, routesLoading, calculateRoutes]);
+
+  // ── Leaflet Map Setup in Step 2 ───────────────────────────────────────────
   useEffect(() => {
     if (step !== 2) return;
     if (!mapContainerRef.current) return;
@@ -237,7 +356,7 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
         const isStart = i === 0;
         const isEnd = i === validDests.length - 1;
         const markerColor = isStart ? '#10b981' : isEnd ? '#ef4444' : '#38bdf8';
-        const markerEmoji = isStart ? '🚩' : isEnd ? '🏁' : `${i + 1}`;
+        const markerEmoji = isStart ? (dest.isCurrentGps ? '📍' : '🚩') : isEnd ? '🏁' : `${i + 1}`;
 
         const icon = L.divIcon({
           className: '',
@@ -258,7 +377,7 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
         routeLayersRef.current.push(m);
       });
 
-      // 2. Draw Alternative Routes in Dashed Gray Lines
+      // 2. Draw Alternative Routes in Dashed Lines (Clickable)
       routes.forEach((r, idx) => {
         if (!r.geometry || idx === selectedRouteIdx) return;
         try {
@@ -324,7 +443,7 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
     if (step !== 3) return;
     const selectedRoute = routes[selectedRouteIdx];
     const distKm = selectedRoute?.distanceKm || 0;
-    const numMembers = 1; // user starts as 1 member; others added after creation
+    const numMembers = 1;
     const estimate = calculateCostEstimate(distKm, numMembers, {
       ...costParams,
       days: Number(costParams.days) || 1,
@@ -337,7 +456,7 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
     setCostEstimate(estimate);
   }, [step, routes, selectedRouteIdx, costParams]);
 
-  // ── Step validation ───────────────────────────────────────────────────────
+  // ── Step validation & Navigation ──────────────────────────────────────────
   const validateStep = () => {
     if (step === 1) {
       if (!title.trim()) { setError(lang === 'bn' ? 'ট্যুরের নাম দিন।' : 'Enter tour title.'); return false; }
@@ -348,7 +467,39 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
     return true;
   };
 
-  const handleNext = () => { if (validateStep()) setStep(s => s + 1); };
+  const handleNext = async () => {
+    if (step === 1) {
+      if (!validateStep()) return;
+      setStep(2);
+
+      // Auto-detect user GPS location for start point
+      const curGps = await detectCurrentGpsLocation();
+
+      // Check if title mentions a destination (e.g. Cox's Bazar, Sajek, Sylhet)
+      const matched = matchDestinationFromTitle(title);
+      const targetDest = matched || POPULAR_DESTINATIONS[0]; // fallback Cox's Bazar
+
+      setDestinations(d => {
+        const updated = [...d];
+        if (!updated[1]?.lat) {
+          const destName = lang === 'bn' ? targetDest.labelBn.replace(/^[^\s]+\s/, '') : targetDest.name;
+          updated[1] = {
+            ...updated[1],
+            name: destName,
+            lat: targetDest.lat,
+            lng: targetDest.lng,
+            isCurrentGps: false
+          };
+          setAutoSuggestUsed(true);
+        }
+        return updated;
+      });
+      return;
+    }
+
+    if (validateStep()) setStep(s => s + 1);
+  };
+
   const handleBack = () => { setError(''); setStep(s => s - 1); };
 
   // ── Create Tour ───────────────────────────────────────────────────────────
@@ -460,13 +611,33 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
           {/* ── Step 2: Route, Interactive Map & Recommendation ── */}
           {step === 2 && (
             <div className="tour-step-content">
+              {/* Auto suggestion notice banner */}
+              {autoSuggestUsed && (
+                <div className="tour-auto-suggest-banner">
+                  <Sparkles size={14} style={{ flexShrink: 0 }} />
+                  <span>{t.autoRouteSuggestionNotice || (lang === 'bn' ? 'আপনার বর্তমান লোকেশন থেকে রুট সাজেস্ট করা হয়েছে। প্রয়োজনে নিচে থেকে পরিবর্তন করে নিন।' : 'Route suggested from your GPS location. Customize anytime below.')}</span>
+                </div>
+              )}
+
               <div className="form-group">
-                <label>{t.tourDestinations}</label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <label style={{ margin: 0 }}>{t.tourDestinations}</label>
+                  <button 
+                    type="button" 
+                    className="tour-gps-detect-btn" 
+                    onClick={() => detectCurrentGpsLocation(true)}
+                    disabled={detectingGps}
+                  >
+                    {detectingGps ? <Loader size={11} className="spin" /> : <LocateFixed size={11} />}
+                    <span>{detectingGps ? (t.detectingLocation || 'লোকেশন খোঁজা হচ্ছে...') : (t.useCurrentLocation || 'আমার বর্তমান GPS')}</span>
+                  </button>
+                </div>
+
                 <div className="tour-destinations-list">
                   {destinations.map((dest, idx) => (
                     <div key={dest.id} className="tour-dest-row">
                       <div className="tour-dest-marker">
-                        {idx === 0 ? '🟢' : idx === destinations.length - 1 ? '🔴' : '🔵'}
+                        {idx === 0 ? (dest.isCurrentGps ? '📍' : '🟢') : idx === destinations.length - 1 ? '🔴' : '🔵'}
                       </div>
                       <div className="tour-dest-input-wrap">
                         <input
@@ -475,7 +646,12 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
                           onChange={e => { updateDest(dest.id, 'name', e.target.value); searchPlace(e.target.value, dest.id); }}
                           placeholder={idx === 0 ? (lang === 'bn' ? 'শুরুর স্থান (যেমন: ঢাকা)' : 'Starting location (e.g. Dhaka)') : idx === destinations.length - 1 ? (lang === 'bn' ? 'চূড়ান্ত গন্তব্য (যেমন: কক্সবাজার)' : 'Final destination (e.g. Cox\'s Bazar)') : t.destinationPlaceholder}
                         />
-                        {dest.lat && <span className="tour-dest-confirmed"><Check size={12} /> {dest.lat.toFixed(3)}, {dest.lng.toFixed(3)}</span>}
+                        {dest.lat && (
+                          <span className="tour-dest-confirmed">
+                            <Check size={12} /> 
+                            {dest.isCurrentGps ? (t.autoDetectedLocation || 'বর্তমান অবস্থান') : `${dest.lat.toFixed(3)}, ${dest.lng.toFixed(3)}`}
+                          </span>
+                        )}
                         {searchLoading[dest.id] && <Loader size={12} className="spin" />}
                         {searchResults[dest.id]?.length > 0 && (
                           <div className="tour-search-dropdown">
@@ -494,7 +670,31 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
                     </div>
                   ))}
                 </div>
-                <button className="tour-add-dest-btn" onClick={addDestination}>
+
+                {/* 1-Tap Popular Destination Quick Suggestion Chips */}
+                <div className="tour-quick-destinations-section">
+                  <div className="tour-quick-dest-title">
+                    <Sparkles size={12} className="text-indigo-400" />
+                    <span>{t.suggestedDestinations || (lang === 'bn' ? 'জনপ্রিয় ট্যুর গন্তব্য (১-ট্যাপে সিলেক্ট করুন):' : 'Popular Destinations (1-Tap Select):')}</span>
+                  </div>
+                  <div className="tour-quick-chips-wrap">
+                    {POPULAR_DESTINATIONS.map(item => {
+                      const isActive = destinations.some(d => d.lat && Math.abs(d.lat - item.lat) < 0.05);
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className={`tour-quick-chip-btn ${isActive ? 'active' : ''}`}
+                          onClick={() => selectQuickDestination(item)}
+                        >
+                          <span>{lang === 'bn' ? item.labelBn : item.labelEn}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <button className="tour-add-dest-btn" style={{ marginTop: '8px' }} onClick={addDestination}>
                   <Plus size={14} /> {t.addDestination}
                 </button>
               </div>
@@ -502,7 +702,7 @@ export default function TourCreateModal({ lang = 'bn', theme, user, onClose, onC
               {/* Calculate Routes Button */}
               <button
                 className="tour-calc-route-btn"
-                onClick={calculateRoutes}
+                onClick={() => calculateRoutes(destinations)}
                 disabled={routesLoading}
               >
                 {routesLoading ? <><Loader size={15} className="spin" /> {t.loadingRoutes}</> : <><Route size={15} /> {t.compareRoutes}</>}
