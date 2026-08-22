@@ -302,6 +302,14 @@ export const translations = {
     filterAll: "সব ট্যুর",
     filterCreated: "আমার তৈরি",
     filterJoined: "যুক্ত হওয়া ট্যুর",
+    intercom: "ইন্টারকম",
+    intercomLive: "ইন্টারকম লাইভ",
+    startIntercom: "ইন্টারকম কল শুরু করুন",
+    joinIntercom: "গ্রুপ কলে যোগ দিন",
+    leaveIntercom: "কল ত্যাগ করুন",
+    pttHoldToTalk: "চেপে ধরে কথা বলুন (PTT)",
+    openMicMode: "Open Mic (খোলা মাইক)",
+    windNoiseFilter: "উইন্ড নয়েজ ফিল্টার",
   },
   en: {
     appName: "RideLog BD",
@@ -604,5 +612,13 @@ export const translations = {
     filterAll: "All Tours",
     filterCreated: "Created by Me",
     filterJoined: "Joined Tours",
+    intercom: "Intercom",
+    intercomLive: "Intercom Live",
+    startIntercom: "Start Group Call",
+    joinIntercom: "Join Group Call",
+    leaveIntercom: "Leave Call",
+    pttHoldToTalk: "Hold to Talk (PTT)",
+    openMicMode: "Open Mic",
+    windNoiseFilter: "Wind Noise Filter",
   }
 };

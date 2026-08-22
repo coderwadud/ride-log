@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft, Users, Map, Receipt, PiggyBank, Scale, FileText,
   Play, CheckCircle, Trash2, MoreVertical, Plus, Clock, Image as ImageIcon,
-  TrendingUp, ShieldAlert, Download, Mail, Check, X
+  TrendingUp, ShieldAlert, Download, Mail, Check, X, Radio
 } from 'lucide-react';
 import { translations } from '../utils/translations';
 import {
@@ -10,6 +10,7 @@ import {
   listenToTourMembers, respondToTourInvitation
 } from '../utils/tourStorage';
 import { getTourStatus } from '../utils/tourCalculations';
+import { listenToIntercomSession, RiderIntercomEngine } from '../utils/riderIntercom';
 import TourMembersTab from './TourMembersTab';
 import TourMapTab from './TourMapTab';
 import TourItineraryTab from './TourItineraryTab';
@@ -18,11 +19,15 @@ import TourFundTab from './TourFundTab';
 import TourSettlementTab from './TourSettlementTab';
 import TourGalleryTab from './TourGalleryTab';
 import TourAnalyticsTab from './TourAnalyticsTab';
+import TourIntercomTab from './TourIntercomTab';
+import FloatingIntercomBar from './FloatingIntercomBar';
+import IncomingCallBanner from './IncomingCallBanner';
 import TourSafetyModal from './TourSafetyModal';
 import TourReportModal from './TourReportModal';
 
 const SUB_TABS = [
   { id: 'members',   icon: Users,      labelBn: 'সদস্য',     labelEn: 'Members' },
+  { id: 'intercom',  icon: Radio,      labelBn: 'ইন্টারকম',   labelEn: 'Intercom' },
   { id: 'map',       icon: Map,        labelBn: 'ম্যাপ',      labelEn: 'Map' },
   { id: 'itinerary', icon: Clock,      labelBn: 'ভ্রমণসূচি',  labelEn: 'Itinerary' },
   { id: 'expenses',  icon: Receipt,    labelBn: 'খরচ',      labelEn: 'Expenses' },
@@ -42,6 +47,19 @@ export default function TourDetailPage({ tourId, lang = 'bn', theme, user, onBac
   const [showSafetyModal, setShowSafetyModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
 
+  // Global Tour Intercom Voice State
+  const [intercomEngine, setIntercomEngine] = useState(null);
+  const [intercomState, setIntercomState] = useState({
+    isConnected: false,
+    isMuted: false,
+    isSpeaking: false,
+    pttActive: false,
+    pttMode: false,
+    participants: {},
+    peerCount: 0
+  });
+  const [activeIntercomSession, setActiveIntercomSession] = useState(null);
+
   useEffect(() => {
     if (!tourId) return;
     const unsub1 = listenToTour(tourId, (data) => {
@@ -49,7 +67,10 @@ export default function TourDetailPage({ tourId, lang = 'bn', theme, user, onBac
       setLoading(false);
     });
     const unsub2 = listenToTourMembers(tourId, setMembers);
-    return () => { unsub1(); unsub2(); };
+    const unsub3 = listenToIntercomSession(tourId, (session) => {
+      setActiveIntercomSession(session);
+    });
+    return () => { unsub1(); unsub2(); unsub3(); };
   }, [tourId]);
 
   const isOrganizer = tour?.createdBy === user?.uid;
@@ -245,6 +266,40 @@ export default function TourDetailPage({ tourId, lang = 'bn', theme, user, onBac
         </div>
       )}
 
+      {/* Incoming Call Notification Banner */}
+      <IncomingCallBanner
+        activeSession={activeIntercomSession}
+        currentUser={user}
+        isConnected={intercomState.isConnected}
+        onJoinCall={() => setActiveSubTab('intercom')}
+        lang={lang}
+      />
+
+      {/* Floating Intercom Bar across non-intercom tabs */}
+      {activeSubTab !== 'intercom' && intercomState.isConnected && (
+        <FloatingIntercomBar
+          intercomState={intercomState}
+          intercomEngine={intercomEngine}
+          onOpenIntercomTab={() => setActiveSubTab('intercom')}
+          onLeaveCall={async () => {
+            if (intercomEngine) {
+              await intercomEngine.leave(true);
+              setIntercomEngine(null);
+              setIntercomState({
+                isConnected: false,
+                isMuted: false,
+                isSpeaking: false,
+                pttActive: false,
+                pttMode: false,
+                participants: {},
+                peerCount: 0
+              });
+            }
+          }}
+          lang={lang}
+        />
+      )}
+
       {/* Sub-tab navigation */}
       <div className="tour-subtab-bar">
         {SUB_TABS.map(({ id, icon: Icon, labelBn, labelEn }) => (
@@ -263,6 +318,19 @@ export default function TourDetailPage({ tourId, lang = 'bn', theme, user, onBac
       <div className="tour-subtab-content">
         {activeSubTab === 'members' && (
           <TourMembersTab tourId={tourId} tour={tour} lang={lang} user={user} isOrganizer={isOrganizer} />
+        )}
+        {activeSubTab === 'intercom' && (
+          <TourIntercomTab
+            tourId={tourId}
+            tour={tour}
+            lang={lang}
+            user={user}
+            isOrganizer={isOrganizer}
+            intercomEngine={intercomEngine}
+            setIntercomEngine={setIntercomEngine}
+            intercomState={intercomState}
+            setIntercomState={setIntercomState}
+          />
         )}
         {activeSubTab === 'map' && (
           <TourMapTab tourId={tourId} tour={tour} lang={lang} user={user} />
