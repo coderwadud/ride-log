@@ -36,9 +36,9 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
     if (!tourId) return;
     const unsub = listenToTourGallery(tourId, setPhotos);
 
-    // Check if Google Drive token is currently cached in session
-    const token = sessionStorage.getItem('rl_drive_token');
-    const exp = sessionStorage.getItem('rl_drive_token_exp');
+    // Check if Google Drive token is currently cached in session or local storage
+    const token = sessionStorage.getItem('rl_drive_token') || localStorage.getItem('rl_drive_token');
+    const exp = sessionStorage.getItem('rl_drive_token_exp') || localStorage.getItem('rl_drive_token_exp');
     if (token && exp && Number(exp) > Date.now()) {
       setHasDriveToken(true);
     }
@@ -350,7 +350,7 @@ export default function TourGalleryTab({ tourId, tour, lang = 'bn', user, isOrga
                   {driveApiNotEnabled && (
                     <div style={{ marginTop: '8px' }}>
                       <a
-                        href="https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=757251174457"
+                        href={`https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=${import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '4274608297'}`}
                         target="_blank"
                         rel="noreferrer"
                         className="tour-btn-primary small"

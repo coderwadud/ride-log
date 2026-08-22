@@ -1,7 +1,7 @@
 {
   "name": "fuel-log",
   "private": true,
-  "version": "1.6.3",
+  "version": "1.6.4",
   "type": "module",
   "scripts": {
     "dev": "vite --host --port 3000",

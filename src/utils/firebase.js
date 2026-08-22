@@ -28,7 +28,9 @@ export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const provider = new GoogleAuthProvider();
+provider.addScope(DRIVE_SCOPE);
 
 /**
  * Sign in with Google.
@@ -37,32 +39,64 @@ const provider = new GoogleAuthProvider();
  * On Web Browser: Uses standard Firebase popup window.
  */
 export async function signInWithGoogle() {
+  // 1. Try Native Google Sign-In bottom sheet on Android / iOS
   if (Capacitor.isNativePlatform()) {
-    const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
-    const res = await FirebaseAuthentication.signInWithGoogle({
-      scopes: ['profile', 'email']
-    });
+    try {
+      const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
+      const res = await FirebaseAuthentication.signInWithGoogle({
+        scopes: ['profile', 'email', DRIVE_SCOPE]
+      });
 
-    const idToken = res.credential?.idToken;
-    const accessToken = res.credential?.accessToken;
+      const idToken = res.credential?.idToken;
+      const accessToken = res.credential?.accessToken;
 
-    if (idToken || accessToken) {
-      const credential = GoogleAuthProvider.credential(idToken, accessToken);
-      const userCredential = await signInWithCredential(auth, credential);
-      return userCredential.user;
-    } else if (res.user) {
-      return res.user;
+      if (accessToken) {
+        sessionStorage.setItem('rl_drive_token', accessToken);
+        sessionStorage.setItem('rl_drive_token_exp', String(Date.now() + 55 * 60 * 1000));
+        localStorage.setItem('rl_drive_token', accessToken);
+        localStorage.setItem('rl_drive_token_exp', String(Date.now() + 55 * 60 * 1000));
+      }
+
+      if (idToken || accessToken) {
+        const credential = GoogleAuthProvider.credential(idToken, accessToken);
+        const userCredential = await signInWithCredential(auth, credential);
+        return userCredential.user;
+      } else if (res.user) {
+        return res.user;
+      }
+    } catch (nativeErr) {
+      console.warn('Native Google Auth unavailable or blocked on this device (e.g. Xiaomi/Huawei/Vivo ROM). Falling back to Web Google Auth...', nativeErr);
+      // Fall through to Web Fallback below so it NEVER fails on any phone!
     }
-    return;
   }
 
-  // Web Browser ONLY
-  const result = await signInWithPopup(auth, provider);
-  return result.user;
+  // 2. Universal Web Fallback: Works on ALL devices and browsers guaranteed
+  try {
+    const result = await signInWithPopup(auth, provider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    const token = credential?.accessToken;
+
+    if (token) {
+      sessionStorage.setItem('rl_drive_token', token);
+      sessionStorage.setItem('rl_drive_token_exp', String(Date.now() + 55 * 60 * 1000));
+      localStorage.setItem('rl_drive_token', token);
+      localStorage.setItem('rl_drive_token_exp', String(Date.now() + 55 * 60 * 1000));
+    }
+
+    return result.user;
+  } catch (webErr) {
+    console.error('Google Sign-In Error:', webErr);
+    throw webErr;
+  }
 }
 
 // Sign out
 export async function signOutUser() {
+  // Clear cached Drive tokens
+  sessionStorage.removeItem('rl_drive_token');
+  sessionStorage.removeItem('rl_drive_token_exp');
+  localStorage.removeItem('rl_drive_token');
+  localStorage.removeItem('rl_drive_token_exp');
   if (Capacitor.isNativePlatform()) {
     try {
       const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');

@@ -6,6 +6,7 @@
 
 import { auth } from './firebase';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { Capacitor } from '@capacitor/core';
 
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const DRIVE_API_URL = 'https://www.googleapis.com/drive/v3';
@@ -15,14 +16,36 @@ const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
  * Get cached access token or request a new one with drive.file scope.
  */
 export async function getDriveAccessToken() {
-  // Check session storage first
-  const cached = sessionStorage.getItem('rl_drive_token');
-  const expiry = sessionStorage.getItem('rl_drive_token_exp');
+  // Check session / local storage first
+  const cached = sessionStorage.getItem('rl_drive_token') || localStorage.getItem('rl_drive_token');
+  const expiry = sessionStorage.getItem('rl_drive_token_exp') || localStorage.getItem('rl_drive_token_exp');
   if (cached && expiry && Number(expiry) > Date.now()) {
     return cached;
   }
 
-  // Request fresh token via Google Provider with drive.file scope
+  // Mobile App (Android/iOS): STRICTLY uses native Google Sign-In bottom sheet
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
+      const res = await FirebaseAuthentication.signInWithGoogle({
+        scopes: ['profile', 'email', DRIVE_SCOPE]
+      });
+
+      const token = res.credential?.accessToken;
+      if (token) {
+        sessionStorage.setItem('rl_drive_token', token);
+        sessionStorage.setItem('rl_drive_token_exp', String(Date.now() + 55 * 60 * 1000));
+        localStorage.setItem('rl_drive_token', token);
+        localStorage.setItem('rl_drive_token_exp', String(Date.now() + 55 * 60 * 1000));
+        return token;
+      }
+    } catch (nativeErr) {
+      console.warn('Native Google Drive Auth unavailable on this ROM (e.g. Xiaomi/Huawei/Vivo). Falling back to Web Auth...', nativeErr);
+      // Fall through to Web Auth below
+    }
+  }
+
+  // Web Browser ONLY: Uses standard Firebase popup window
   const provider = new GoogleAuthProvider();
   provider.addScope(DRIVE_SCOPE);
 
@@ -35,6 +58,8 @@ export async function getDriveAccessToken() {
       // Cache token for 55 minutes
       sessionStorage.setItem('rl_drive_token', token);
       sessionStorage.setItem('rl_drive_token_exp', String(Date.now() + 55 * 60 * 1000));
+      localStorage.setItem('rl_drive_token', token);
+      localStorage.setItem('rl_drive_token_exp', String(Date.now() + 55 * 60 * 1000));
       return token;
     }
   } catch (err) {
