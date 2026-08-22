@@ -35,6 +35,18 @@ function setLocalCache(key, data) {
   } catch {}
 }
 
+/**
+ * Executes a Firestore write asynchronously in background without blocking UI or hanging when offline.
+ */
+function safeAsyncWrite(writePromise) {
+  return Promise.race([
+    writePromise,
+    new Promise((resolve) => setTimeout(resolve, 80))
+  ]).catch((err) => {
+    console.debug('Firestore background write queued for offline sync:', err?.message);
+  });
+}
+
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
 function generateId(prefix = 'id') {
@@ -51,14 +63,14 @@ export async function upsertUserIndex(uid, userData) {
   if (!uid || uid === 'guest') return;
   try {
     const ref = doc(db, 'user_index', uid);
-    await setDoc(ref, {
+    safeAsyncWrite(setDoc(ref, {
       uid,
       email: (userData.email || '').toLowerCase(),
       displayName: userData.displayName || userData.name || '',
       photoURL: userData.photoURL || '',
       phone: userData.phone || '',
       updatedAt: new Date().toISOString()
-    }, { merge: true });
+    }, { merge: true }));
   } catch (err) {
     console.debug('upsertUserIndex skipped:', err.message);
   }
@@ -111,7 +123,7 @@ export async function lookupUserByPhone(phone) {
 
 /**
  * Create a new tour. The creator is automatically added as 'organizer' member.
- * Returns the new tourId. Works 100% offline.
+ * Returns the new tourId instantly (0ms offline-first).
  */
 export async function createTour(uid, userData, tourData) {
   if (!uid) throw new Error('uid required');
@@ -162,13 +174,9 @@ export async function createTour(uid, userData, tourData) {
   };
   setLocalCache(`rl_tour_members_${tourId}`, [organizerMember]);
 
-  // 2. Persist to Firestore (Cached locally in IndexedDB by SDK and queued for sync if offline)
-  try {
-    await setDoc(doc(db, 'tours', tourId), tourDoc);
-    await setDoc(doc(db, 'tours', tourId, 'members', uid), organizerMember);
-  } catch (err) {
-    console.debug('Firestore write queued in offline cache:', err.message);
-  }
+  // 2. Persist to Firestore asynchronously in background (never blocks offline creation)
+  safeAsyncWrite(setDoc(doc(db, 'tours', tourId), tourDoc));
+  safeAsyncWrite(setDoc(doc(db, 'tours', tourId, 'members', uid), organizerMember));
 
   return tourId;
 }
@@ -191,12 +199,7 @@ export async function updateTour(tourId, updates) {
     }
   }
 
-  try {
-    const ref = doc(db, 'tours', tourId);
-    await updateDoc(ref, { ...updates, updatedAt: now });
-  } catch (err) {
-    console.debug('updateTour queued in offline cache:', err.message);
-  }
+  safeAsyncWrite(updateDoc(doc(db, 'tours', tourId), { ...updates, updatedAt: now }));
 }
 
 /**
@@ -218,13 +221,10 @@ export async function deleteTour(tourId) {
     const myTours = getLocalCache(`rl_my_tours_${cached.createdBy}`, []);
     setLocalCache(`rl_my_tours_${cached.createdBy}`, myTours.filter(t => t.id !== tourId));
   }
-  localStorage.removeItem(`rl_tour_${tourId}`);
+  setLocalCache(`rl_tour_${tourId}`, null);
+  try { localStorage.removeItem(`rl_tour_${tourId}`); } catch {}
 
-  try {
-    await deleteDoc(doc(db, 'tours', tourId));
-  } catch (err) {
-    console.error('deleteTour error:', err);
-  }
+  safeAsyncWrite(deleteDoc(doc(db, 'tours', tourId)));
 }
 
 /**
@@ -272,10 +272,27 @@ export async function getMyTours(uid) {
  * Emits cached tour immediately for 0ms offline display!
  */
 export function listenToTour(tourId, callback) {
-  if (!tourId) return () => {};
+  if (!tourId) { callback(null); return () => {}; }
   
   // 1. Instant local cache emission
-  const cached = getLocalCache(`rl_tour_${tourId}`);
+  let cached = getLocalCache(`rl_tour_${tourId}`);
+  if (!cached) {
+    // Search within any user's my_tours cache
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('rl_my_tours_')) {
+          const list = JSON.parse(localStorage.getItem(key) || '[]');
+          const match = list.find(t => t.id === tourId);
+          if (match) {
+            cached = match;
+            setLocalCache(`rl_tour_${tourId}`, match);
+            break;
+          }
+        }
+      }
+    } catch {}
+  }
   if (cached) callback(cached);
 
   const ref = doc(db, 'tours', tourId);
@@ -290,6 +307,7 @@ export function listenToTour(tourId, callback) {
   }, err => {
     console.debug('listenToTour offline fallback:', err.message);
     if (cached) callback(cached);
+    else callback(null);
   });
 }
 
@@ -330,54 +348,68 @@ export function listenToMyTours(uid, callback) {
 export async function addTourMember(tourId, memberData) {
   if (!tourId || !memberData?.uid) return;
   const now = new Date().toISOString();
-  try {
-    await setDoc(doc(db, 'tours', tourId, 'members', memberData.uid), {
-      uid: memberData.uid,
-      name: memberData.displayName || memberData.name || 'Member',
-      email: (memberData.email || '').toLowerCase(),
-      phone: memberData.phone || '',
-      photoURL: memberData.photoURL || '',
-      role: 'member',
-      status: 'invited',
-      shareLocation: false,
-      invitedAt: now,
-      joinedAt: null
-    });
-    // Atomically add uid to memberIds array
-    await updateDoc(doc(db, 'tours', tourId), {
-      memberIds: arrayUnion(memberData.uid),
-      updatedAt: now
-    });
-  } catch (err) {
-    console.error('addTourMember error:', err);
+  const member = {
+    uid: memberData.uid,
+    name: memberData.displayName || memberData.name || 'Member',
+    email: (memberData.email || '').toLowerCase(),
+    phone: memberData.phone || '',
+    photoURL: memberData.photoURL || '',
+    role: 'member',
+    status: 'invited',
+    shareLocation: false,
+    invitedAt: now,
+    joinedAt: null
+  };
+
+  // Synchronously update local members cache
+  const cachedMembers = getLocalCache(`rl_tour_members_${tourId}`, []);
+  const updatedMembers = [...cachedMembers.filter(m => m.uid !== memberData.uid), member];
+  setLocalCache(`rl_tour_members_${tourId}`, updatedMembers);
+
+  // Synchronously update local tour cache
+  const cachedTour = getLocalCache(`rl_tour_${tourId}`);
+  if (cachedTour) {
+    const updatedMemberIds = Array.from(new Set([...(cachedTour.memberIds || []), memberData.uid]));
+    const updatedTour = { ...cachedTour, memberIds: updatedMemberIds, updatedAt: now };
+    setLocalCache(`rl_tour_${tourId}`, updatedTour);
   }
+
+  safeAsyncWrite(setDoc(doc(db, 'tours', tourId, 'members', memberData.uid), member));
+  safeAsyncWrite(updateDoc(doc(db, 'tours', tourId), {
+    memberIds: arrayUnion(memberData.uid),
+    updatedAt: now
+  }));
 }
 
 /**
  * Add a guest member (non-registered). Stored in tour.guestMembers array.
  */
 export async function addGuestMember(tourId, guestData) {
-  if (!tourId || !guestData?.name) return;
+  if (!tourId || !guestData?.name) return null;
   const guest = {
     id: generateId('guest'),
     name: guestData.name.trim(),
     phone: guestData.phone || '',
     email: guestData.email || '',
     role: 'member',
-    status: 'accepted', // guests are auto-accepted
+    status: 'accepted',
     isGuest: true,
     addedAt: new Date().toISOString()
   };
-  try {
-    await updateDoc(doc(db, 'tours', tourId), {
-      guestMembers: arrayUnion(guest),
-      updatedAt: new Date().toISOString()
-    });
-    return guest;
-  } catch (err) {
-    console.error('addGuestMember error:', err);
-    return null;
+
+  // Synchronously update local tour cache
+  const cachedTour = getLocalCache(`rl_tour_${tourId}`);
+  if (cachedTour) {
+    const updatedGuests = [...(cachedTour.guestMembers || []), guest];
+    const updatedTour = { ...cachedTour, guestMembers: updatedGuests, updatedAt: new Date().toISOString() };
+    setLocalCache(`rl_tour_${tourId}`, updatedTour);
   }
+
+  safeAsyncWrite(updateDoc(doc(db, 'tours', tourId), {
+    guestMembers: arrayUnion(guest),
+    updatedAt: new Date().toISOString()
+  }));
+  return guest;
 }
 
 /**
@@ -385,15 +417,26 @@ export async function addGuestMember(tourId, guestData) {
  */
 export async function removeTourMember(tourId, memberUid) {
   if (!tourId || !memberUid) return;
-  try {
-    await deleteDoc(doc(db, 'tours', tourId, 'members', memberUid));
-    await updateDoc(doc(db, 'tours', tourId), {
-      memberIds: arrayRemove(memberUid),
-      updatedAt: new Date().toISOString()
-    });
-  } catch (err) {
-    console.error('removeTourMember error:', err);
+  const now = new Date().toISOString();
+
+  const cachedMembers = getLocalCache(`rl_tour_members_${tourId}`, []);
+  setLocalCache(`rl_tour_members_${tourId}`, cachedMembers.filter(m => m.uid !== memberUid));
+
+  const cachedTour = getLocalCache(`rl_tour_${tourId}`);
+  if (cachedTour) {
+    const updatedTour = {
+      ...cachedTour,
+      memberIds: (cachedTour.memberIds || []).filter(id => id !== memberUid),
+      updatedAt: now
+    };
+    setLocalCache(`rl_tour_${tourId}`, updatedTour);
   }
+
+  safeAsyncWrite(deleteDoc(doc(db, 'tours', tourId, 'members', memberUid)));
+  safeAsyncWrite(updateDoc(doc(db, 'tours', tourId), {
+    memberIds: arrayRemove(memberUid),
+    updatedAt: now
+  }));
 }
 
 /**
@@ -401,14 +444,22 @@ export async function removeTourMember(tourId, memberUid) {
  */
 export async function removeGuestMember(tourId, guest) {
   if (!tourId || !guest) return;
-  try {
-    await updateDoc(doc(db, 'tours', tourId), {
-      guestMembers: arrayRemove(guest),
-      updatedAt: new Date().toISOString()
-    });
-  } catch (err) {
-    console.error('removeGuestMember error:', err);
+  const now = new Date().toISOString();
+
+  const cachedTour = getLocalCache(`rl_tour_${tourId}`);
+  if (cachedTour) {
+    const updatedTour = {
+      ...cachedTour,
+      guestMembers: (cachedTour.guestMembers || []).filter(g => (g.id || g.name) !== (guest.id || guest.name)),
+      updatedAt: now
+    };
+    setLocalCache(`rl_tour_${tourId}`, updatedTour);
   }
+
+  safeAsyncWrite(updateDoc(doc(db, 'tours', tourId), {
+    guestMembers: arrayRemove(guest),
+    updatedAt: now
+  }));
 }
 
 /**
@@ -416,14 +467,14 @@ export async function removeGuestMember(tourId, guest) {
  */
 export async function updateMemberField(tourId, memberUid, updates) {
   if (!tourId || !memberUid) return;
-  try {
-    await updateDoc(doc(db, 'tours', tourId, 'members', memberUid), {
-      ...updates,
-      updatedAt: new Date().toISOString()
-    });
-  } catch (err) {
-    console.error('updateMemberField error:', err);
-  }
+  const cachedMembers = getLocalCache(`rl_tour_members_${tourId}`, []);
+  const updatedMembers = cachedMembers.map(m => m.uid === memberUid ? { ...m, ...updates } : m);
+  setLocalCache(`rl_tour_members_${tourId}`, updatedMembers);
+
+  safeAsyncWrite(updateDoc(doc(db, 'tours', tourId, 'members', memberUid), {
+    ...updates,
+    updatedAt: new Date().toISOString()
+  }));
 }
 
 /**
@@ -476,11 +527,7 @@ export async function addExpense(tourId, expenseData) {
   const updated = [expense, ...cached.filter(e => e.id !== expenseId)];
   setLocalCache(`rl_tour_expenses_${tourId}`, updated);
 
-  try {
-    await setDoc(doc(db, 'tours', tourId, 'expenses', expenseId), expense);
-  } catch (err) {
-    console.debug('addExpense queued in offline cache:', err.message);
-  }
+  safeAsyncWrite(setDoc(doc(db, 'tours', tourId, 'expenses', expenseId), expense));
   return expense;
 }
 
@@ -493,14 +540,10 @@ export async function updateExpense(tourId, expenseId, updates) {
   const updated = cached.map(e => e.id === expenseId ? { ...e, ...updates } : e);
   setLocalCache(`rl_tour_expenses_${tourId}`, updated);
 
-  try {
-    await updateDoc(doc(db, 'tours', tourId, 'expenses', expenseId), {
-      ...updates,
-      updatedAt: new Date().toISOString()
-    });
-  } catch (err) {
-    console.debug('updateExpense queued in offline cache:', err.message);
-  }
+  safeAsyncWrite(updateDoc(doc(db, 'tours', tourId, 'expenses', expenseId), {
+    ...updates,
+    updatedAt: new Date().toISOString()
+  }));
 }
 
 /**
@@ -511,11 +554,7 @@ export async function deleteExpense(tourId, expenseId) {
   const cached = getLocalCache(`rl_tour_expenses_${tourId}`, []);
   setLocalCache(`rl_tour_expenses_${tourId}`, cached.filter(e => e.id !== expenseId));
 
-  try {
-    await deleteDoc(doc(db, 'tours', tourId, 'expenses', expenseId));
-  } catch (err) {
-    console.debug('deleteExpense queued in offline cache:', err.message);
-  }
+  safeAsyncWrite(deleteDoc(doc(db, 'tours', tourId, 'expenses', expenseId)));
 }
 
 /**
@@ -563,11 +602,7 @@ export async function addFundContribution(tourId, contribData) {
   const updated = [contrib, ...cached.filter(c => c.id !== contribId)];
   setLocalCache(`rl_tour_fund_${tourId}`, updated);
 
-  try {
-    await setDoc(doc(db, 'tours', tourId, 'fund_contributions', contribId), contrib);
-  } catch (err) {
-    console.debug('addFundContribution queued in offline cache:', err.message);
-  }
+  safeAsyncWrite(setDoc(doc(db, 'tours', tourId, 'fund_contributions', contribId), contrib));
   return contrib;
 }
 
@@ -579,11 +614,7 @@ export async function deleteFundContribution(tourId, contribId) {
   const cached = getLocalCache(`rl_tour_fund_${tourId}`, []);
   setLocalCache(`rl_tour_fund_${tourId}`, cached.filter(c => c.id !== contribId));
 
-  try {
-    await deleteDoc(doc(db, 'tours', tourId, 'fund_contributions', contribId));
-  } catch (err) {
-    console.debug('deleteFundContribution queued in offline cache:', err.message);
-  }
+  safeAsyncWrite(deleteDoc(doc(db, 'tours', tourId, 'fund_contributions', contribId)));
 }
 
 /**
@@ -615,19 +646,15 @@ export function listenToFundContributions(tourId, callback) {
  */
 export async function updateLiveLocation(tourId, uid, coords) {
   if (!tourId || !uid || !coords) return;
-  try {
-    await setDoc(doc(db, 'tours', tourId, 'live_locations', uid), {
-      uid,
-      lat: Number(coords.lat) || 0,
-      lng: Number(coords.lng) || 0,
-      speed: Number(coords.speed) || 0,
-      heading: Number(coords.heading) || 0,
-      accuracy: Number(coords.accuracy) || 0,
-      updatedAt: new Date().toISOString()
-    });
-  } catch (err) {
-    console.debug('updateLiveLocation error:', err.message);
-  }
+  safeAsyncWrite(setDoc(doc(db, 'tours', tourId, 'live_locations', uid), {
+    uid,
+    lat: Number(coords.lat) || 0,
+    lng: Number(coords.lng) || 0,
+    speed: Number(coords.speed) || 0,
+    heading: Number(coords.heading) || 0,
+    accuracy: Number(coords.accuracy) || 0,
+    updatedAt: new Date().toISOString()
+  }));
 }
 
 /**
@@ -635,11 +662,7 @@ export async function updateLiveLocation(tourId, uid, coords) {
  */
 export async function clearLiveLocation(tourId, uid) {
   if (!tourId || !uid) return;
-  try {
-    await deleteDoc(doc(db, 'tours', tourId, 'live_locations', uid));
-  } catch (err) {
-    console.debug('clearLiveLocation error:', err.message);
-  }
+  safeAsyncWrite(deleteDoc(doc(db, 'tours', tourId, 'live_locations', uid)));
 }
 
 /**
@@ -664,15 +687,11 @@ export function listenToLiveLocations(tourId, callback) {
  */
 export async function markTransactionSettled(tourId, transactionKey, settledByUid) {
   if (!tourId || !transactionKey) return;
-  try {
-    await setDoc(doc(db, 'tours', tourId, 'settlements', transactionKey), {
-      key: transactionKey,
-      settledAt: new Date().toISOString(),
-      settledBy: settledByUid || ''
-    });
-  } catch (err) {
-    console.error('markTransactionSettled error:', err);
-  }
+  safeAsyncWrite(setDoc(doc(db, 'tours', tourId, 'settlements', transactionKey), {
+    key: transactionKey,
+    settledAt: new Date().toISOString(),
+    settledBy: settledByUid || ''
+  }));
 }
 
 /**
@@ -713,11 +732,7 @@ export async function addTourStop(tourId, stopData) {
   updated.sort((a, b) => (a.order || 0) - (b.order || 0) || new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
   setLocalCache(`rl_tour_stops_${tourId}`, updated);
 
-  try {
-    await setDoc(doc(db, 'tours', tourId, 'stops', id), docData);
-  } catch (err) {
-    console.debug('addTourStop queued in offline cache:', err.message);
-  }
+  safeAsyncWrite(setDoc(doc(db, 'tours', tourId, 'stops', id), docData));
   return id;
 }
 
@@ -727,14 +742,10 @@ export async function updateTourStop(tourId, stopId, updates) {
   const updated = cached.map(s => s.id === stopId ? { ...s, ...updates } : s);
   setLocalCache(`rl_tour_stops_${tourId}`, updated);
 
-  try {
-    await updateDoc(doc(db, 'tours', tourId, 'stops', stopId), {
-      ...updates,
-      updatedAt: new Date().toISOString()
-    });
-  } catch (err) {
-    console.debug('updateTourStop queued in offline cache:', err.message);
-  }
+  safeAsyncWrite(updateDoc(doc(db, 'tours', tourId, 'stops', stopId), {
+    ...updates,
+    updatedAt: new Date().toISOString()
+  }));
 }
 
 export async function deleteTourStop(tourId, stopId) {
@@ -742,11 +753,7 @@ export async function deleteTourStop(tourId, stopId) {
   const cached = getLocalCache(`rl_tour_stops_${tourId}`, []);
   setLocalCache(`rl_tour_stops_${tourId}`, cached.filter(s => s.id !== stopId));
 
-  try {
-    await deleteDoc(doc(db, 'tours', tourId, 'stops', stopId));
-  } catch (err) {
-    console.debug('deleteTourStop queued in offline cache:', err.message);
-  }
+  safeAsyncWrite(deleteDoc(doc(db, 'tours', tourId, 'stops', stopId)));
 }
 
 export function listenToTourStops(tourId, callback) {
@@ -793,29 +800,39 @@ export async function addTourPhoto(tourId, photoData) {
     folderViewLink: photoData.folderViewLink || '',
     createdAt: new Date().toISOString()
   };
-  await setDoc(doc(db, 'tours', tourId, 'gallery', id), docData);
+
+  const cached = getLocalCache(`rl_tour_gallery_${tourId}`, []);
+  const updated = [docData, ...cached.filter(p => p.id !== id)];
+  setLocalCache(`rl_tour_gallery_${tourId}`, updated);
+
+  safeAsyncWrite(setDoc(doc(db, 'tours', tourId, 'gallery', id), docData));
   return id;
 }
 
 export async function deleteTourPhoto(tourId, photoId) {
   if (!tourId || !photoId) return;
-  try {
-    await deleteDoc(doc(db, 'tours', tourId, 'gallery', photoId));
-  } catch (err) {
-    console.error('deleteTourPhoto error:', err);
-  }
+  const cached = getLocalCache(`rl_tour_gallery_${tourId}`, []);
+  setLocalCache(`rl_tour_gallery_${tourId}`, cached.filter(p => p.id !== photoId));
+
+  safeAsyncWrite(deleteDoc(doc(db, 'tours', tourId, 'gallery', photoId)));
 }
 
 export function listenToTourGallery(tourId, callback) {
   if (!tourId) { callback([]); return () => {}; }
+
+  const cached = getLocalCache(`rl_tour_gallery_${tourId}`, []);
+  if (cached.length > 0) callback(cached);
+
   const ref = collection(db, 'tours', tourId, 'gallery');
   return onSnapshot(ref, snap => {
     const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    setLocalCache(`rl_tour_gallery_${tourId}`, list);
     callback(list);
   }, err => {
-    console.debug('listenToTourGallery error:', err.message);
-    callback([]);
+    console.debug('listenToTourGallery offline fallback:', err.message);
+    if (cached.length > 0) callback(cached);
+    else callback([]);
   });
 }
 
@@ -836,32 +853,43 @@ export async function broadcastSosAlert(tourId, alertData) {
     message: alertData.message || '🚨 Emergency SOS alert! Rider needs assistance.',
     createdAt: new Date().toISOString()
   };
-  await setDoc(doc(db, 'tours', tourId, 'sos_alerts', id), docData);
+
+  const cached = getLocalCache(`rl_tour_sos_${tourId}`, []);
+  const updated = [docData, ...cached.filter(s => s.id !== id)];
+  setLocalCache(`rl_tour_sos_${tourId}`, updated);
+
+  safeAsyncWrite(setDoc(doc(db, 'tours', tourId, 'sos_alerts', id), docData));
   return id;
 }
 
 export async function resolveSosAlert(tourId, alertId) {
   if (!tourId || !alertId) return;
-  try {
-    await updateDoc(doc(db, 'tours', tourId, 'sos_alerts', alertId), {
-      status: 'resolved',
-      resolvedAt: new Date().toISOString()
-    });
-  } catch (err) {
-    console.error('resolveSosAlert error:', err);
-  }
+  const cached = getLocalCache(`rl_tour_sos_${tourId}`, []);
+  const updated = cached.map(s => s.id === alertId ? { ...s, status: 'resolved', resolvedAt: new Date().toISOString() } : s);
+  setLocalCache(`rl_tour_sos_${tourId}`, updated);
+
+  safeAsyncWrite(updateDoc(doc(db, 'tours', tourId, 'sos_alerts', alertId), {
+    status: 'resolved',
+    resolvedAt: new Date().toISOString()
+  }));
 }
 
 export function listenToTourSosAlerts(tourId, callback) {
   if (!tourId) { callback([]); return () => {}; }
+
+  const cached = getLocalCache(`rl_tour_sos_${tourId}`, []);
+  if (cached.length > 0) callback(cached);
+
   const ref = collection(db, 'tours', tourId, 'sos_alerts');
   return onSnapshot(ref, snap => {
     const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    setLocalCache(`rl_tour_sos_${tourId}`, list);
     callback(list);
   }, err => {
-    console.debug('listenToTourSosAlerts error:', err.message);
-    callback([]);
+    console.debug('listenToTourSosAlerts offline fallback:', err.message);
+    if (cached.length > 0) callback(cached);
+    else callback([]);
   });
 }
 
@@ -869,28 +897,20 @@ export function listenToTourSosAlerts(tourId, callback) {
 
 export async function respondToTourInvitation(tourId, uid, accept = true) {
   if (!tourId || !uid) return;
-  try {
-    const memberRef = doc(db, 'tours', tourId, 'members', uid);
-    if (accept) {
-      await updateDoc(memberRef, {
-        status: 'accepted',
-        joinedAt: new Date().toISOString()
-      });
-      // Ensure uid is in tour memberIds
-      await updateDoc(doc(db, 'tours', tourId), {
-        memberIds: arrayUnion(uid)
-      });
-    } else {
-      await updateDoc(memberRef, {
-        status: 'declined',
-        declinedAt: new Date().toISOString()
-      });
-      await updateDoc(doc(db, 'tours', tourId), {
-        memberIds: arrayRemove(uid)
-      });
-    }
-  } catch (err) {
-    console.error('respondToTourInvitation error:', err);
+  const memberRef = doc(db, 'tours', tourId, 'members', uid);
+  const now = new Date().toISOString();
+
+  // Update local caches
+  const cachedMembers = getLocalCache(`rl_tour_members_${tourId}`, []);
+  const updatedMembers = cachedMembers.map(m => m.uid === uid ? { ...m, status: accept ? 'accepted' : 'declined' } : m);
+  setLocalCache(`rl_tour_members_${tourId}`, updatedMembers);
+
+  if (accept) {
+    safeAsyncWrite(updateDoc(memberRef, { status: 'accepted', joinedAt: now }));
+    safeAsyncWrite(updateDoc(doc(db, 'tours', tourId), { memberIds: arrayUnion(uid), updatedAt: now }));
+  } else {
+    safeAsyncWrite(updateDoc(memberRef, { status: 'declined', declinedAt: now }));
+    safeAsyncWrite(updateDoc(doc(db, 'tours', tourId), { memberIds: arrayRemove(uid), updatedAt: now }));
   }
 }
 
